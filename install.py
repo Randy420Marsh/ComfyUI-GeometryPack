@@ -374,9 +374,6 @@ def install_system_dependencies():
     print("[Install] Checking for required OpenGL libraries...")
     print("[Install] These are needed for PyMeshLab remeshing to work properly.")
 
-    # Check if running as root or with sudo
-    is_root = os.geteuid() == 0 if hasattr(os, 'geteuid') else False
-
     try:
         # Try to install OpenGL libraries
         # Note: Package names changed in Ubuntu 24.04+
@@ -384,37 +381,52 @@ def install_system_dependencies():
         # New: libgl1, libglx-mesa0, libopengl0 (24.04+)
         packages = ["libgl1", "libopengl0", "libglu1-mesa", "libglx-mesa0", "libosmesa6"]
 
-        if is_root:
-            print(f"[Install] Installing OpenGL libraries: {', '.join(packages)}")
-            # Update apt cache first
-            print("[Install] Updating apt cache...")
-            subprocess.run(['apt-get', 'update'], capture_output=True, timeout=120)
+        print(f"[Install] Installing OpenGL libraries: {', '.join(packages)}")
+        print("[Install] You may be prompted for your sudo password...")
 
-            result = subprocess.run(
-                ['apt-get', 'install', '-y'] + packages,
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
+        # Update apt cache first with sudo
+        print("[Install] Updating apt cache...")
+        update_result = subprocess.run(
+            ['sudo', 'apt-get', 'update'],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
 
-            if result.returncode == 0:
-                print("[Install] ✓ OpenGL libraries installed successfully!")
-                return True
-            else:
-                print(f"[Install] Warning: Failed to install OpenGL libraries")
-                print(f"[Install] Error: {result.stderr}")
-                print(f"[Install] You may need to run manually:")
-                print(f"[Install]   sudo apt-get install {' '.join(packages)}")
-                return True  # Don't fail installation, just warn
+        if update_result.returncode != 0:
+            print("[Install] Warning: Failed to update apt cache")
+            print(f"[Install] You may need to run manually: sudo apt-get update")
+
+        # Install packages with sudo
+        result = subprocess.run(
+            ['sudo', 'apt-get', 'install', '-y'] + packages,
+            capture_output=False,  # Show output to user so they can see the sudo prompt
+            timeout=300
+        )
+
+        if result.returncode == 0:
+            print("[Install] ✓ OpenGL libraries installed successfully!")
+            return True
         else:
-            print("[Install] Need sudo privileges to install system packages.")
-            print(f"[Install] Please run:")
+            print(f"[Install] Warning: Failed to install OpenGL libraries")
+            print(f"[Install] You may need to run manually:")
             print(f"[Install]   sudo apt-get install {' '.join(packages)}")
-            print("[Install] Or run this installer with sudo:")
-            print(f"[Install]   sudo python {__file__}")
-            print("[Install] Continuing without installing system dependencies...")
-            return True  # Don't fail installation
+            return True  # Don't fail installation, just warn
 
+    except subprocess.TimeoutExpired:
+        print("[Install] Warning: Installation timed out")
+        print(f"[Install] You may need to run manually:")
+        print(f"[Install]   sudo apt-get install libgl1 libopengl0 libglu1-mesa libglx-mesa0 libosmesa6")
+        return True  # Don't fail installation, just warn
+    except FileNotFoundError:
+        print("[Install] Warning: apt-get not found (not a Debian/Ubuntu system?)")
+        print("[Install] Please install OpenGL libraries manually for your distribution")
+        return True  # Don't fail installation, just warn
+    except KeyboardInterrupt:
+        print("\n[Install] Installation cancelled by user")
+        print(f"[Install] You can install OpenGL libraries later with:")
+        print(f"[Install]   sudo apt-get install libgl1 libopengl0 libglu1-mesa libglx-mesa0 libosmesa6")
+        return True  # Don't fail installation, just warn
     except Exception as e:
         print(f"[Install] Warning: Could not install system dependencies: {e}")
         print(f"[Install] PyMeshLab remeshing may not work without OpenGL libraries.")
