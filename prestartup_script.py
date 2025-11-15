@@ -43,12 +43,12 @@ def setup_example_assets():
         if os.path.exists(workflows_src):
             # Get ComfyUI root directory (parent of input folder)
             comfyui_root = os.path.dirname(input_folder)
-            # Check for user/default/workflows or fallback to root
+            # Get user workflows directory and create it if it doesn't exist
             user_workflows_dir = os.path.join(comfyui_root, "user", "default", "workflows")
-            if not os.path.exists(user_workflows_dir):
-                user_workflows_dir = comfyui_root
+            os.makedirs(user_workflows_dir, exist_ok=True)
 
             # Copy each workflow file with prefix
+            copied_count = 0
             for workflow_file in os.listdir(workflows_src):
                 if workflow_file.endswith('.json'):
                     source_workflow = os.path.join(workflows_src, workflow_file)
@@ -56,7 +56,13 @@ def setup_example_assets():
 
                     if not os.path.exists(dest_workflow):
                         shutil.copy2(source_workflow, dest_workflow)
-                        print(f"[GeometryPack] Copied workflow GeometryPack-{workflow_file}")
+                        copied_count += 1
+                        print(f"[GeometryPack] Copied workflow: GeometryPack-{workflow_file}")
+
+            if copied_count > 0:
+                print(f"[GeometryPack] [OK] Copied {copied_count} workflow(s) to {user_workflows_dir}")
+            else:
+                print(f"[GeometryPack] All workflows already exist in {user_workflows_dir}")
 
     except Exception as e:
         print(f"[GeometryPack] Error setting up example assets: {e}")

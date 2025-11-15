@@ -194,6 +194,22 @@
                     <input type="checkbox" id="showAxisIndicator"> Show Axis Indicator
                 </label>
             </div>
+            <div class="setting-row" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #444;">
+                <label style="font-weight: bold; color: #aaa;">Colormap Range:</label>
+            </div>
+            <div class="setting-row">
+                <label>
+                    <input type="checkbox" id="autoColorRange" checked> Auto Range
+                </label>
+            </div>
+            <div class="setting-row">
+                <label>Min:</label>
+                <input type="number" id="colormapMin" step="any" placeholder="Auto" style="width: 120px;">
+            </div>
+            <div class="setting-row">
+                <label>Max:</label>
+                <input type="number" id="colormapMax" step="any" placeholder="Auto" style="width: 120px;">
+            </div>
             <div class="button-row">
                 <button id="applySettings">Apply</button>
                 <button id="cancelSettings">Cancel</button>
@@ -226,6 +242,10 @@
             Field:
             <select id="fieldSelector"></select>
         </label>
+        <label id="colormapLabel" style="display:none;">
+            Colormap:
+            <select id="colormapSelector"></select>
+        </label>
         <button id="screenshot">Screenshot</button>
         <button id="saveMesh" style="background: #2a5a2a;">Save Mesh</button>
     </div>
@@ -243,11 +263,13 @@
         const vtkPolyDataNormals = vtk.Filters.Core.vtkPolyDataNormals;
         const vtkInteractorStyleTrackballCamera = vtk.Interaction.Style.vtkInteractorStyleTrackballCamera;
         const vtkColorTransferFunction = vtk.Rendering.Core.vtkColorTransferFunction;
-        const vtkColorMaps = vtk.Rendering.Core.vtkColorMaps;
+        const vtkColorMaps = vtk.Rendering.Core.vtkColorTransferFunction.vtkColorMaps;
         const vtkOrientationMarkerWidget = vtk.Interaction.Widgets.vtkOrientationMarkerWidget;
         const vtkAnnotatedCubeActor = vtk.Rendering.Core.vtkAnnotatedCubeActor;
 
         console.log('[GeomPack VTK Fields Viewer] Initializing...');
+        console.log('[CACHE TEST - VIEWER_VTK_FIELDS] vtkColorMaps loaded:', typeof vtkColorMaps);
+        console.log('[CACHE TEST - VIEWER_VTK_FIELDS] vtkColorMaps.getPresetByName exists:', typeof vtkColorMaps?.getPresetByName);
 
         // Helper function to convert RGB values (0-1 range) to RGB string
         function createRGBStringFromRGBValues(r, g, b) {
@@ -445,6 +467,55 @@
                 } else {
                     fieldLabel.style.display = 'none';
                     console.log('[GeomPack VTK Fields Viewer] No scalar fields found');
+                }
+
+                // Populate colormap selector
+                const colormapSelector = document.getElementById('colormapSelector');
+                const colormapLabel = document.getElementById('colormapLabel');
+                if (numArrays > 0) {
+                    colormapSelector.innerHTML = '';
+
+                    // Add popular colormaps first
+                    const popular = [
+                        'erdc_rainbow_bright',
+                        'Cool to Warm',
+                        'Viridis (matplotlib)',
+                        'Plasma (matplotlib)',
+                        'Inferno (matplotlib)',
+                        'Magma (matplotlib)',
+                        'jet',
+                        'rainbow'
+                    ];
+
+                    const allPresets = vtkColorMaps.rgbPresetNames;
+
+                    popular.forEach(name => {
+                        if (allPresets.includes(name)) {
+                            const option = document.createElement('option');
+                            option.value = name;
+                            option.textContent = name;
+                            if (name === 'erdc_rainbow_bright') option.selected = true;
+                            colormapSelector.appendChild(option);
+                        }
+                    });
+
+                    // Add separator
+                    const separator = document.createElement('option');
+                    separator.disabled = true;
+                    separator.textContent = '──────────';
+                    colormapSelector.appendChild(separator);
+
+                    // Add all other presets
+                    allPresets.filter(n => !popular.includes(n)).sort().forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        option.textContent = name;
+                        colormapSelector.appendChild(option);
+                    });
+
+                    colormapLabel.style.display = 'flex';
+                } else {
+                    colormapLabel.style.display = 'none';
                 }
 
                 // CRITICAL: Use proper VTK pipeline with normals filter
@@ -808,14 +879,56 @@
             }
         });
 
+        // Update colormap function (reusable)
+        function updateColormap() {
+            const fieldName = document.getElementById('fieldSelector').value;
+            if (!fieldName || !currentReader) return;
+
+            const polydata = mapper.getInputData();
+            const pointData = polydata.getPointData();
+            const scalarArray = pointData.getArrayByName(fieldName);
+
+            if (!scalarArray) return;
+
+            // Get selected colormap
+            const colormapName = document.getElementById('colormapSelector').value || 'erdc_rainbow_bright';
+
+            // Get color range (custom or auto)
+            const autoRange = document.getElementById('autoColorRange').checked;
+            const dataRange = scalarArray.getRange();
+            let minVal, maxVal;
+
+            if (autoRange) {
+                [minVal, maxVal] = dataRange;
+                // Update inputs to show current auto range
+                document.getElementById('colormapMin').value = minVal.toFixed(3);
+                document.getElementById('colormapMax').value = maxVal.toFixed(3);
+            } else {
+                minVal = parseFloat(document.getElementById('colormapMin').value) || dataRange[0];
+                maxVal = parseFloat(document.getElementById('colormapMax').value) || dataRange[1];
+            }
+
+            // Create and apply colormap
+            const lookupTable = vtkColorTransferFunction.newInstance();
+            const preset = vtkColorMaps.getPresetByName(colormapName);
+            lookupTable.applyColorMap(preset);
+            lookupTable.setMappingRange(minVal, maxVal);
+            lookupTable.updateRange();
+
+            mapper.setLookupTable(lookupTable);
+            renderWindow.render();
+
+            console.log(`[GeomPack VTK Fields Viewer] Colormap '${colormapName}' applied with range [${minVal.toFixed(3)}, ${maxVal.toFixed(3)}]`);
+        }
+
         // Scalar field selector event handler
         document.getElementById('fieldSelector').addEventListener('change', (e) => {
             const fieldName = e.target.value;
             console.log('[GeomPack VTK Fields Viewer] Scalar field selected:', fieldName);
 
             if (fieldName && currentReader) {
-                // Get the polydata with scalar field
-                const polydata = currentReader.getOutputData();
+                // Get the polydata with scalar field (from mapper's input, not reader)
+                const polydata = mapper.getInputData();
                 const pointData = polydata.getPointData();
                 const scalarArray = pointData.getArrayByName(fieldName);
 
@@ -828,14 +941,8 @@
                     mapper.setScalarModeToUsePointData();
                     mapper.setScalarRange(scalarArray.getRange());
 
-                    // Create color transfer function with a nice colormap
-                    const lookupTable = vtkColorTransferFunction.newInstance();
-                    const preset = vtkColorMaps.getPresetByName('erdc_rainbow_bright');
-                    lookupTable.applyColorMap(preset);
-                    lookupTable.setMappingRange(...scalarArray.getRange());
-                    lookupTable.updateRange();
-
-                    mapper.setLookupTable(lookupTable);
+                    // Apply colormap using the updateColormap function
+                    updateColormap();
 
                     console.log(`[GeomPack VTK Fields Viewer] Scalar field '${fieldName}' activated, range:`, scalarArray.getRange());
                 } else {
@@ -849,6 +956,41 @@
             }
 
             renderWindow.render();
+        });
+
+        // Colormap selector event handler
+        document.getElementById('colormapSelector').addEventListener('change', () => {
+            updateColormap();
+        });
+
+        // Auto range checkbox event handler
+        document.getElementById('autoColorRange').addEventListener('change', (e) => {
+            const minInput = document.getElementById('colormapMin');
+            const maxInput = document.getElementById('colormapMax');
+
+            if (e.target.checked) {
+                // Auto range enabled - disable manual inputs
+                minInput.disabled = true;
+                maxInput.disabled = true;
+                updateColormap();
+            } else {
+                // Auto range disabled - enable manual inputs
+                minInput.disabled = false;
+                maxInput.disabled = false;
+            }
+        });
+
+        // Color range input event handlers
+        document.getElementById('colormapMin').addEventListener('change', () => {
+            if (!document.getElementById('autoColorRange').checked) {
+                updateColormap();
+            }
+        });
+
+        document.getElementById('colormapMax').addEventListener('change', () => {
+            if (!document.getElementById('autoColorRange').checked) {
+                updateColormap();
+            }
         });
 
         console.log('[GeomPack VTK Fields Viewer] Ready');
