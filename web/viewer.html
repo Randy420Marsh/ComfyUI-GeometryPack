@@ -67,6 +67,7 @@
         const controls = new OrbitControls(camera, canvas);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
+        controls.zoomSpeed = 3.0;  // 3x faster zoom
 
         // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);

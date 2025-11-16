@@ -375,13 +375,14 @@ def install_system_dependencies():
     print("[Install] These are needed for PyMeshLab remeshing to work properly.")
 
     try:
-        # Try to install OpenGL libraries
-        # Note: Package names changed in Ubuntu 24.04+
-        # Old: libgl1-mesa-glx (pre-24.04)
-        # New: libgl1, libglx-mesa0, libopengl0 (24.04+)
-        packages = ["libgl1", "libopengl0", "libglu1-mesa", "libglx-mesa0", "libosmesa6"]
+        # Define packages with priority levels
+        # Critical packages are required for PyMeshLab to function
+        # Optional packages provide additional functionality but aren't strictly required
+        critical_packages = ["libgl1", "libopengl0", "libglu1-mesa", "libglx-mesa0"]
+        optional_packages = ["libosmesa6"]  # For offscreen rendering, not always available
 
-        print(f"[Install] Installing OpenGL libraries: {', '.join(packages)}")
+        all_packages = critical_packages + optional_packages
+        print(f"[Install] Installing OpenGL libraries: {', '.join(all_packages)}")
         print("[Install] You may be prompted for your sudo password...")
 
         # Update apt cache first with sudo
@@ -397,41 +398,97 @@ def install_system_dependencies():
             print("[Install] Warning: Failed to update apt cache")
             print(f"[Install] You may need to run manually: sudo apt-get update")
 
-        # Install packages with sudo
-        result = subprocess.run(
-            ['sudo', 'apt-get', 'install', '-y'] + packages,
-            capture_output=False,  # Show output to user so they can see the sudo prompt
-            timeout=300
-        )
+        # Install packages individually to handle failures gracefully
+        installed_packages = []
+        failed_packages = []
+        critical_failed = []
 
-        if result.returncode == 0:
-            print("[Install] ✓ OpenGL libraries installed successfully!")
-            return True
-        else:
-            print(f"[Install] Warning: Failed to install OpenGL libraries")
+        # Install critical packages first
+        print("[Install] Installing critical OpenGL libraries...")
+        for package in critical_packages:
+            result = subprocess.run(
+                ['sudo', 'apt-get', 'install', '-y', package],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if result.returncode == 0:
+                installed_packages.append(package)
+                print(f"[Install]   ✓ {package}")
+            else:
+                failed_packages.append(package)
+                critical_failed.append(package)
+                print(f"[Install]   ✗ {package} (failed)")
+
+        # Install optional packages
+        print("[Install] Installing optional OpenGL libraries...")
+        for package in optional_packages:
+            result = subprocess.run(
+                ['sudo', 'apt-get', 'install', '-y', package],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if result.returncode == 0:
+                installed_packages.append(package)
+                print(f"[Install]   ✓ {package}")
+            else:
+                failed_packages.append(package)
+                print(f"[Install]   ⚠ {package} (optional, skipped)")
+
+        # Verify critical library can be loaded
+        print("[Install] Verifying OpenGL libraries...")
+        opengl_works = False
+        try:
+            import ctypes
+            ctypes.CDLL("libOpenGL.so.0")
+            opengl_works = True
+            print("[Install]   ✓ libOpenGL.so.0 loaded successfully")
+        except OSError as e:
+            print(f"[Install]   ✗ libOpenGL.so.0 failed to load: {e}")
+
+        # Report results
+        if installed_packages:
+            print(f"[Install] ✓ Installed: {', '.join(installed_packages)}")
+
+        if failed_packages:
+            print(f"[Install] ⚠ Failed to install: {', '.join(failed_packages)}")
+
+        # Determine success based on critical packages and library verification
+        if critical_failed:
+            print(f"[Install] ERROR: Critical packages failed to install: {', '.join(critical_failed)}")
+            print(f"[Install] PyMeshLab remeshing will NOT work!")
             print(f"[Install] You may need to run manually:")
-            print(f"[Install]   sudo apt-get install {' '.join(packages)}")
-            return True  # Don't fail installation, just warn
+            print(f"[Install]   sudo apt-get install {' '.join(critical_failed)}")
+            return False  # Critical failure
+        elif not opengl_works:
+            print("[Install] ERROR: OpenGL libraries installed but cannot be loaded!")
+            print("[Install] PyMeshLab remeshing will NOT work!")
+            print("[Install] Try running: sudo ldconfig")
+            return False  # Critical failure
+        else:
+            print("[Install] ✓ OpenGL libraries installed and verified successfully!")
+            return True
 
     except subprocess.TimeoutExpired:
         print("[Install] Warning: Installation timed out")
         print(f"[Install] You may need to run manually:")
-        print(f"[Install]   sudo apt-get install libgl1 libopengl0 libglu1-mesa libglx-mesa0 libosmesa6")
-        return True  # Don't fail installation, just warn
+        print(f"[Install]   sudo apt-get install libgl1 libopengl0 libglu1-mesa libglx-mesa0")
+        return False  # Consider this a failure
     except FileNotFoundError:
         print("[Install] Warning: apt-get not found (not a Debian/Ubuntu system?)")
         print("[Install] Please install OpenGL libraries manually for your distribution")
-        return True  # Don't fail installation, just warn
+        return True  # Don't fail installation on non-Debian systems
     except KeyboardInterrupt:
         print("\n[Install] Installation cancelled by user")
         print(f"[Install] You can install OpenGL libraries later with:")
-        print(f"[Install]   sudo apt-get install libgl1 libopengl0 libglu1-mesa libglx-mesa0 libosmesa6")
-        return True  # Don't fail installation, just warn
+        print(f"[Install]   sudo apt-get install libgl1 libopengl0 libglu1-mesa libglx-mesa0")
+        return False  # User cancelled
     except Exception as e:
         print(f"[Install] Warning: Could not install system dependencies: {e}")
         print(f"[Install] PyMeshLab remeshing may not work without OpenGL libraries.")
-        print(f"[Install] To fix, run: sudo apt-get update && sudo apt-get install libgl1 libopengl0 libglu1-mesa libglx-mesa0 libosmesa6")
-        return True  # Don't fail installation, just warn
+        print(f"[Install] To fix, run: sudo apt-get update && sudo apt-get install libgl1 libopengl0 libglu1-mesa libglx-mesa0")
+        return False  # Consider this a failure
 
 
 def install_python_dependencies():

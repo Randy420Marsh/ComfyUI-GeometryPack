@@ -324,8 +324,14 @@ class BlenderRemeshWithTexture:
 
         try:
             # Export source mesh with UVs
-            trimesh.export(source_obj.name)
+            print(f"[BlenderRemeshWithTexture] Exporting source mesh to OBJ...")
+            print(f"[BlenderRemeshWithTexture]   Source mesh has UVs: {trimesh.visual.uv is not None}")
+            if trimesh.visual.uv is not None:
+                print(f"[BlenderRemeshWithTexture]   UV shape: {trimesh.visual.uv.shape}")
+            print(f"[BlenderRemeshWithTexture]   Visual kind: {trimesh.visual.kind}")
+            trimesh.export(source_obj.name, include_texture=True)
             source_obj.close()
+            print(f"[BlenderRemeshWithTexture]   Exported to: {source_obj.name}")
 
             # 4. Build Blender script for remeshing + UV unwrapping + texture baking
             if remesh_method == "voxel":
@@ -345,6 +351,15 @@ bpy.ops.object.delete()
 bpy.ops.wm.obj_import(filepath='{source_obj.name}')
 source_obj = bpy.context.selected_objects[0]
 source_obj.name = 'Source'
+
+# DEBUG: Verify UV import
+print(f"[Blender] Source mesh vertices: {{len(source_obj.data.vertices)}}")
+print(f"[Blender] Source mesh UV layers: {{len(source_obj.data.uv_layers)}}")
+if len(source_obj.data.uv_layers) > 0:
+    for i, uv_layer in enumerate(source_obj.data.uv_layers):
+        print(f"[Blender]   UV Layer {{i}}: {{uv_layer.name}}")
+else:
+    print("[Blender] WARNING: No UV layers found after import!")
 
 # Duplicate for remeshing
 bpy.ops.object.duplicate()
@@ -373,12 +388,17 @@ source_nodes = source_mat.node_tree.nodes
 source_nodes.clear()
 
 # Create texture node with source texture
+tex_coord = source_nodes.new('ShaderNodeTexCoord')
 tex_image = source_nodes.new('ShaderNodeTexImage')
-tex_image.image = bpy.data.images.load('{texture_path}')
+loaded_image = bpy.data.images.load('{texture_path}')
+tex_image.image = loaded_image
+print(f"[Blender] Loaded texture: {{loaded_image.name}}, size: {{loaded_image.size[0]}}x{{loaded_image.size[1]}}")
 bsdf = source_nodes.new('ShaderNodeBsdfDiffuse')
 output_node = source_nodes.new('ShaderNodeOutputMaterial')
+source_mat.node_tree.links.new(tex_coord.outputs['UV'], tex_image.inputs['Vector'])
 source_mat.node_tree.links.new(tex_image.outputs['Color'], bsdf.inputs['Color'])
 source_mat.node_tree.links.new(bsdf.outputs['BSDF'], output_node.inputs['Surface'])
+print(f"[Blender] Source material shader nodes connected")
 
 # Setup target material with bake image
 if len(target_obj.data.materials) > 0:
@@ -412,6 +432,11 @@ bpy.context.scene.render.bake.use_selected_to_active = True
 bpy.context.scene.render.bake.margin = {bake_margin}
 bpy.context.scene.render.bake.cage_extrusion = 0.1
 bpy.context.scene.render.bake.max_ray_distance = 1.0
+
+# CRITICAL: Configure DIFFUSE pass to only capture color, not lighting
+bpy.context.scene.render.bake.use_pass_direct = False
+bpy.context.scene.render.bake.use_pass_indirect = False
+bpy.context.scene.render.bake.use_pass_color = True
 
 print("[Blender] Starting texture bake...")
 try:
@@ -563,12 +588,15 @@ class XAtlasRemeshWithTexture:
         # Load texture image
         texture_img = Image.open(texture_path)
         texture_array = np.array(texture_img)
+        # Ensure texture is RGB (not RGBA) for consistent handling
+        if len(texture_array.shape) == 3 and texture_array.shape[2] == 4:
+            texture_array = texture_array[:, :, :3]  # Drop alpha channel
         tex_height, tex_width = texture_array.shape[:2]
 
         # 2. Remesh using PyMeshLab
         print(f"[XAtlasRemeshWithTexture] Remeshing...")
         remeshed, error = mesh_utils.pymeshlab_isotropic_remesh(
-            trimesh, target_edge_length, iterations, adaptive=True, preserve_topology=False
+            trimesh, target_edge_length, iterations
         )
 
         if remeshed is None:
