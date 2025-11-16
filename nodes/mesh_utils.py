@@ -564,12 +564,8 @@ def cgal_isotropic_remesh(
         # Use fully qualified module path to avoid namespace issues
         polygons = CGAL_Polygon_mesh_processing.Polygon_Vector()
         for face in mesh.faces:
-            polygon = CGAL_Polygon_mesh_processing.Int_Vector()
-            polygon.reserve(3)
-            polygon.append(int(face[0]))
-            polygon.append(int(face[1]))
-            polygon.append(int(face[2]))
-            polygons.append(polygon)
+            # Convert numpy array to Python list directly - CGAL accepts Python lists
+            polygons.append(face.tolist())
 
         # Create polyhedron from polygon soup
         P = Polyhedron_3()

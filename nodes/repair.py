@@ -23,7 +23,7 @@ class FixNormalsNode:
             },
         }
 
-    RETURN_TYPES = ("MESH", "STRING")
+    RETURN_TYPES = ("TRIMESH", "STRING")
     RETURN_NAMES = ("fixed_mesh", "info")
     FUNCTION = "fix_normals"
     CATEGORY = "geompack/repair"
@@ -177,7 +177,7 @@ class FillHolesNode:
             },
         }
 
-    RETURN_TYPES = ("MESH", "STRING")
+    RETURN_TYPES = ("TRIMESH", "STRING")
     RETURN_NAMES = ("filled_mesh", "info")
     FUNCTION = "fill_holes"
     CATEGORY = "geompack/repair"
@@ -322,7 +322,7 @@ class VisualizNormalFieldNode:
             },
         }
 
-    RETURN_TYPES = ("MESH", "STRING")
+    RETURN_TYPES = ("TRIMESH", "STRING")
     RETURN_NAMES = ("mesh_with_fields", "info")
     FUNCTION = "visualize_normals"
     CATEGORY = "geompack/repair"

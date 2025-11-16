@@ -1,221 +1,15 @@
 {
   "id": "fc31dc6e-fd82-4f42-9d3a-57283ccfadba",
   "revision": 0,
-  "last_node_id": 10,
-  "last_link_id": 10,
+  "last_node_id": 22,
+  "last_link_id": 20,
   "nodes": [
-    {
-      "id": 4,
-      "type": "GeomPackPreviewMeshVTKFields",
-      "pos": [
-        430.4038946945793,
-        -311.9555800525922
-      ],
-      "size": [
-        512,
-        590
-      ],
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 2
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "253a956368261760da54dc96750c2ab0224e2b1f",
-        "Node name for S&R": "GeomPackPreviewMeshVTKFields"
-      },
-      "widgets_values": [
-        ""
-      ]
-    },
-    {
-      "id": 6,
-      "type": "GeomPackPreviewMeshVTKFields",
-      "pos": [
-        157.72463131686902,
-        253.91128904996657
-      ],
-      "size": [
-        512,
-        590
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 6
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "253a956368261760da54dc96750c2ab0224e2b1f",
-        "Node name for S&R": "GeomPackPreviewMeshVTKFields"
-      },
-      "widgets_values": [
-        ""
-      ]
-    },
-    {
-      "id": 7,
-      "type": "GeomPackDetectSelfIntersections",
-      "pos": [
-        -107.75267727688085,
-        240.27893748746658
-      ],
-      "size": [
-        191.6373046875,
-        46
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 10
-        }
-      ],
-      "outputs": [
-        {
-          "name": "mesh_with_field",
-          "type": "TRIMESH",
-          "links": [
-            6
-          ]
-        },
-        {
-          "name": "report",
-          "type": "STRING",
-          "links": [
-            8
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "253a956368261760da54dc96750c2ab0224e2b1f",
-        "Node name for S&R": "GeomPackDetectSelfIntersections"
-      }
-    },
-    {
-      "id": 9,
-      "type": "PreviewAny",
-      "pos": [
-        -116.118220245631,
-        440.43846092496653
-      ],
-      "size": [
-        219.70922265624995,
-        245.19297656250004
-      ],
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "source",
-          "type": "*",
-          "link": 8
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.3.68",
-        "Node name for S&R": "PreviewAny"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 8,
-      "type": "PreviewAny",
-      "pos": [
-        162.56510397311916,
-        -247.29339845003352
-      ],
-      "size": [
-        296.74084765625,
-        229.36135546875005
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "source",
-          "type": "*",
-          "link": 7
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.3.68",
-        "Node name for S&R": "PreviewAny"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 2,
-      "type": "GeomPackDetectSelfIntersections",
-      "pos": [
-        -136.5401834758572,
-        -195.2691004841926
-      ],
-      "size": [
-        191.6373046875,
-        46
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 1
-        }
-      ],
-      "outputs": [
-        {
-          "name": "mesh_with_field",
-          "type": "TRIMESH",
-          "links": [
-            2
-          ]
-        },
-        {
-          "name": "report",
-          "type": "STRING",
-          "links": [
-            7
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "253a956368261760da54dc96750c2ab0224e2b1f",
-        "Node name for S&R": "GeomPackDetectSelfIntersections"
-      }
-    },
     {
       "id": 1,
       "type": "GeomPackLoadMesh",
       "pos": [
-        -415.0736028533223,
-        -8.86644680883306
+        -502.81561847832234,
+        -58.160239777583065
       ],
       "size": [
         270,
@@ -230,30 +24,104 @@
           "name": "mesh",
           "type": "TRIMESH",
           "links": [
-            1,
-            9
+            12,
+            13,
+            14,
+            15,
+            16
           ]
         }
       ],
       "properties": {
-        "cnr_id": "comfyui-geometrypack",
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
         "ver": "253a956368261760da54dc96750c2ab0224e2b1f",
-        "Node name for S&R": "GeomPackLoadMesh"
+        "Node name for S&R": "GeomPackLoadMesh",
+        "cnr_id": "comfyui-geometrypack"
       },
       "widgets_values": [
-        "3d/camelhead.off"
+        "3d/Stanford_Bunny.stl"
       ]
     },
     {
-      "id": 10,
-      "type": "GeomPackPyMeshLabRemesh",
+      "id": 15,
+      "type": "GeomPackBlenderQuadriflowRemesh",
       "pos": [
-        -211.82543899563103,
-        78.15169920621656
+        -83.31634915188096,
+        -252.37303516878342
       ],
       "size": [
-        295.9751953125,
-        82
+        274.98203125,
+        58
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "remeshed_mesh",
+          "type": "TRIMESH",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackBlenderQuadriflowRemesh"
+      },
+      "widgets_values": [
+        5000
+      ]
+    },
+    {
+      "id": 17,
+      "type": "GeomPackPreviewMeshVTK",
+      "pos": [
+        621.0426117856193,
+        -505.60618360628365
+      ],
+      "size": [
+        512,
+        670
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 17
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackPreviewMeshVTK"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 11,
+      "type": "GeomPackBlenderVoxelRemesh",
+      "pos": [
+        -55.06379446438086,
+        -84.43826954378358
+      ],
+      "size": [
+        270,
+        58
       ],
       "flags": {},
       "order": 2,
@@ -262,7 +130,7 @@
         {
           "name": "trimesh",
           "type": "TRIMESH",
-          "link": 9
+          "link": 13
         }
       ],
       "outputs": [
@@ -270,75 +138,308 @@
           "name": "remeshed_mesh",
           "type": "TRIMESH",
           "links": [
-            10
+            18
           ]
         }
       ],
       "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "253a956368261760da54dc96750c2ab0224e2b1f",
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackBlenderVoxelRemesh"
+      },
+      "widgets_values": [
+        0.05
+      ]
+    },
+    {
+      "id": 18,
+      "type": "GeomPackPreviewMeshVTK",
+      "pos": [
+        365.1162680356191,
+        -127.63857813753356
+      ],
+      "size": [
+        512,
+        670
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 18
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackPreviewMeshVTK"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 12,
+      "type": "GeomPackPyMeshLabRemesh",
+      "pos": [
+        -59.28036087063094,
+        74.95417967496644
+      ],
+      "size": [
+        295.9751953125,
+        82
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "remeshed_mesh",
+          "type": "TRIMESH",
+          "links": [
+            19
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
         "Node name for S&R": "GeomPackPyMeshLabRemesh"
       },
       "widgets_values": [
-        0.01,
+        0.1,
         3
+      ]
+    },
+    {
+      "id": 19,
+      "type": "GeomPackPreviewMeshVTK",
+      "pos": [
+        58.65871725436922,
+        671.0602070187167
+      ],
+      "size": [
+        512,
+        670
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 19
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackPreviewMeshVTK"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 13,
+      "type": "GeomPackCGALIsotropicRemesh",
+      "pos": [
+        -218.47523977688098,
+        278.8883359249665
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "remeshed_mesh",
+          "type": "TRIMESH",
+          "links": [
+            20
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackCGALIsotropicRemesh"
+      },
+      "widgets_values": [
+        0.17,
+        3,
+        "true"
+      ]
+    },
+    {
+      "id": 21,
+      "type": "GeomPackPreviewMeshVTK",
+      "pos": [
+        -572.0897046206306,
+        676.6961601437165
+      ],
+      "size": [
+        512,
+        670
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 20
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackPreviewMeshVTK"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 14,
+      "type": "GeomPackInstantMeshesRemesh",
+      "pos": [
+        -550.1801968081311,
+        322.39539842496646
+      ],
+      "size": [
+        270.06640625,
+        126
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "remeshed_mesh",
+          "type": "MESH",
+          "links": null
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackInstantMeshesRemesh"
+      },
+      "widgets_values": [
+        5000,
+        "true",
+        0
       ]
     }
   ],
   "links": [
     [
-      1,
+      12,
       1,
       0,
-      2,
+      15,
       0,
       "TRIMESH"
     ],
     [
-      2,
-      2,
+      13,
+      1,
       0,
-      4,
+      11,
       0,
       "TRIMESH"
     ],
     [
-      6,
-      7,
+      14,
+      1,
       0,
-      6,
+      12,
       0,
       "TRIMESH"
     ],
     [
-      7,
-      2,
-      1,
-      8,
-      0,
-      "*"
-    ],
-    [
-      8,
-      7,
-      1,
-      9,
-      0,
-      "*"
-    ],
-    [
-      9,
+      15,
       1,
       0,
-      10,
+      13,
       0,
       "TRIMESH"
     ],
     [
-      10,
-      10,
+      16,
+      1,
       0,
-      7,
+      14,
+      0,
+      "TRIMESH"
+    ],
+    [
+      17,
+      15,
+      0,
+      17,
+      0,
+      "TRIMESH"
+    ],
+    [
+      18,
+      11,
+      0,
+      18,
+      0,
+      "TRIMESH"
+    ],
+    [
+      19,
+      12,
+      0,
+      19,
+      0,
+      "TRIMESH"
+    ],
+    [
+      20,
+      13,
+      0,
+      21,
       0,
       "TRIMESH"
     ]
@@ -347,10 +448,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.7513148009015777,
+      "scale": 0.5644739300537777,
       "offset": [
-        605.172333526881,
-        268.2046562625335
+        1263.4612175268803,
+        303.1412963250335
       ]
     },
     "frontendVersion": "1.28.8"

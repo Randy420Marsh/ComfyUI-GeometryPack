@@ -503,7 +503,7 @@ class MeshDecimationNode:
             }
         }
 
-    RETURN_TYPES = ("MESH", "STRING")
+    RETURN_TYPES = ("TRIMESH", "STRING")
     RETURN_NAMES = ("decimated_mesh", "info")
     FUNCTION = "decimate"
     CATEGORY = "geompack/remeshing"
@@ -626,7 +626,7 @@ class MeshSubdivisionNode:
             }
         }
 
-    RETURN_TYPES = ("MESH", "STRING")
+    RETURN_TYPES = ("TRIMESH", "STRING")
     RETURN_NAMES = ("subdivided_mesh", "info")
     FUNCTION = "subdivide"
     CATEGORY = "geompack/remeshing"
@@ -734,7 +734,7 @@ class InstantMeshesRemeshNode:
             }
         }
 
-    RETURN_TYPES = ("MESH", "STRING")
+    RETURN_TYPES = ("TRIMESH", "STRING")
     RETURN_NAMES = ("remeshed_mesh", "info")
     FUNCTION = "remesh"
     CATEGORY = "geompack/remeshing"
