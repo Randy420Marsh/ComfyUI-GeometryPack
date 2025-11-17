@@ -554,18 +554,15 @@ def cgal_isotropic_remesh(
         print(f"[cgal_isotropic_remesh] Converting to CGAL format...")
 
         # Create Point_3_Vector for vertices
-        # Use fully qualified module paths to avoid namespace issues
         points = CGAL_Polygon_mesh_processing.Point_3_Vector()
         points.reserve(len(mesh.vertices))
         for v in mesh.vertices:
             points.append(Point_3(float(v[0]), float(v[1]), float(v[2])))
 
-        # Create Polygon_Vector for faces
-        # Use fully qualified module path to avoid namespace issues
-        polygons = CGAL_Polygon_mesh_processing.Polygon_Vector()
-        for face in mesh.faces:
-            # Convert numpy array to Python list directly - CGAL accepts Python lists
-            polygons.append(face.tolist())
+        # Create plain Python list of lists for faces
+        # Note: Polygon_Vector doesn't properly convert to std::vector<std::vector<int>>
+        # Using plain Python list works correctly with the SWIG bindings
+        polygons = [[int(idx) for idx in face] for face in mesh.faces]
 
         # Create polyhedron from polygon soup
         P = Polyhedron_3()

@@ -19,57 +19,7 @@ except:
     COMFYUI_OUTPUT_FOLDER = None
 
 from . import mesh_utils
-
-
-def _find_blender():
-    """
-    Find Blender executable on the system.
-
-    Returns:
-        str: Path to Blender executable
-
-    Raises:
-        RuntimeError: If Blender not found
-    """
-    # Get the directory containing this file
-    current_dir = Path(__file__).parent.parent  # Go up from nodes/ to package root
-    local_blender_dir = current_dir / "_blender"
-
-    # First, check for local Blender installation
-    if local_blender_dir.exists():
-        # Search for blender executable in _blender/
-        blender_executables = []
-
-        # Windows
-        blender_executables.extend(list(local_blender_dir.rglob("blender.exe")))
-
-        # Linux/macOS
-        blender_executables.extend([
-            p for p in local_blender_dir.rglob("blender")
-            if p.is_file() and os.access(p, os.X_OK)
-        ])
-
-        if blender_executables:
-            blender_path = str(blender_executables[0])
-            return blender_path
-
-    # Fall back to system installation
-    common_paths = [
-        'blender',  # In PATH
-        '/Applications/Blender.app/Contents/MacOS/Blender',  # macOS
-        'C:\\Program Files\\Blender Foundation\\Blender\\blender.exe',  # Windows
-        '/usr/bin/blender',  # Linux
-        '/usr/local/bin/blender',  # Linux
-    ]
-
-    for path in common_paths:
-        if shutil.which(path) or os.path.exists(path):
-            return path
-
-    raise RuntimeError(
-        "Blender not found. Please run 'python install.py' to download Blender automatically,\n"
-        "or install it manually from: https://www.blender.org/download/"
-    )
+from . import blender_utils
 
 
 def _convert_fbx_to_glb(fbx_path, cache_dir=None):
@@ -109,7 +59,7 @@ def _convert_fbx_to_glb(fbx_path, cache_dir=None):
 
     # Find Blender
     try:
-        blender_path = _find_blender()
+        blender_path = blender_utils.find_blender()
     except RuntimeError as e:
         raise RuntimeError(f"FBX conversion requires Blender: {e}")
 
@@ -814,7 +764,7 @@ class LoadMeshBlend:
 
         # Find Blender
         try:
-            blender_path = _find_blender()
+            blender_path = blender_utils.find_blender()
         except RuntimeError as e:
             raise RuntimeError(f".blend conversion requires Blender: {e}")
 

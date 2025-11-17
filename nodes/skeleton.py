@@ -314,13 +314,13 @@ class SkeletonToMesh:
 # =============================================================================
 
 NODE_CLASS_MAPPINGS = {
-    "ExtractSkeleton": ExtractSkeleton,
-    "SkeletonToTrimesh": SkeletonToTrimesh,
-    "SkeletonToMesh": SkeletonToMesh,
+    "GeomPackExtractSkeleton": ExtractSkeleton,
+    "GeomPackSkeletonToLines": SkeletonToTrimesh,
+    "GeomPackSkeletonToMesh": SkeletonToMesh,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ExtractSkeleton": "Extract Skeleton from Mesh",
-    "SkeletonToTrimesh": "Skeleton to Trimesh (Lines)",
-    "SkeletonToMesh": "Skeleton to Mesh (Solid)",
+    "GeomPackExtractSkeleton": "Extract Skeleton",
+    "GeomPackSkeletonToLines": "Skeleton to Lines",
+    "GeomPackSkeletonToMesh": "Skeleton to Mesh",
 }
