@@ -1,15 +1,15 @@
 {
-  "id": "fc31dc6e-fd82-4f42-9d3a-57283ccfadba",
+  "id": "746d1571-2318-46e2-88e9-43a1d2f60fd2",
   "revision": 0,
-  "last_node_id": 23,
-  "last_link_id": 25,
+  "last_node_id": 9,
+  "last_link_id": 11,
   "nodes": [
     {
-      "id": 1,
+      "id": 4,
       "type": "GeomPackLoadMesh",
       "pos": [
-        -502.81561847832234,
-        -58.160239777583065
+        -453.9167128131527,
+        65.826428602309
       ],
       "size": [
         270,
@@ -24,62 +24,30 @@
           "name": "mesh",
           "type": "TRIMESH",
           "links": [
-            24
+            9,
+            10
           ]
         }
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "253a956368261760da54dc96750c2ab0224e2b1f",
-        "Node name for S&R": "GeomPackLoadMesh",
-        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack"
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackLoadMesh"
       },
       "widgets_values": [
-        "3d/Stanford_Bunny.stl"
+        "3d/camelhead.off"
       ]
     },
     {
-      "id": 17,
+      "id": 5,
       "type": "GeomPackPreviewMeshVTK",
       "pos": [
-        137.76068448361752,
-        -68.59008174723344
+        453.93463488093937,
+        -381.8701468139127
       ],
       "size": [
         512,
         678
-      ],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 25
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
-        "Node name for S&R": "GeomPackPreviewMeshVTK",
-        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack"
-      },
-      "widgets_values": [
-        ""
-      ]
-    },
-    {
-      "id": 23,
-      "type": "GeomPackRemesh",
-      "pos": [
-        -175.70416954791025,
-        -63.30927156648044
-      ],
-      "size": [
-        270.06640625,
-        102
       ],
       "flags": {},
       "order": 1,
@@ -88,15 +56,46 @@
         {
           "name": "trimesh",
           "type": "TRIMESH",
-          "link": 24
+          "link": 9
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
+        "Node name for S&R": "GeomPackPreviewMeshVTK"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 8,
+      "type": "GeomPackUVUnwrap",
+      "pos": [
+        -157.952221682018,
+        228.87315911793422
+      ],
+      "size": [
+        270,
+        222
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 10
         }
       ],
       "outputs": [
         {
-          "name": "remeshed_mesh",
+          "name": "unwrapped_mesh",
           "type": "TRIMESH",
           "links": [
-            25
+            11
           ]
         },
         {
@@ -108,28 +107,74 @@
       "properties": {
         "cnr_id": "comfyui-geometrypack",
         "ver": "01a1fb3f161fe989dc1486b6064a395302d93af3",
-        "Node name for S&R": "GeomPackRemesh"
+        "Node name for S&R": "GeomPackUVUnwrap"
       },
       "widgets_values": [
-        "blender_voxel",
+        "xatlas",
+        10,
+        66,
+        0.02,
+        "true",
+        1,
         1
+      ]
+    },
+    {
+      "id": 9,
+      "type": "GeomPackPreviewMeshUV",
+      "pos": [
+        145.43559117338964,
+        309.59188787968344
+      ],
+      "size": [
+        600,
+        378
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 11
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "01a1fb3f161fe989dc1486b6064a395302d93af3",
+        "Node name for S&R": "GeomPackPreviewMeshUV"
+      },
+      "widgets_values": [
+        false,
+        false,
+        ""
       ]
     }
   ],
   "links": [
     [
-      24,
-      1,
+      9,
+      4,
       0,
-      23,
+      5,
       0,
       "TRIMESH"
     ],
     [
-      25,
-      23,
+      10,
+      4,
       0,
-      17,
+      8,
+      0,
+      "TRIMESH"
+    ],
+    [
+      11,
+      8,
+      0,
+      9,
       0,
       "TRIMESH"
     ]
@@ -138,10 +183,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 1,
+      "scale": 0.9090909090909091,
       "offset": [
-        599.9539170592741,
-        128.01001059344958
+        451.9424007129265,
+        -169.99262435509468
       ]
     },
     "frontendVersion": "1.28.8"

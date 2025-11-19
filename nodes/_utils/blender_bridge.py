@@ -29,7 +29,7 @@ def find_blender():
         RuntimeError: If Blender not found
     """
     # Get the directory containing this file
-    current_dir = Path(__file__).parent.parent  # Go up from nodes/ to package root
+    current_dir = Path(__file__).parent.parent.parent  # Go up from nodes/_utils/ to package root
     local_blender_dir = current_dir / "_blender"
 
     # First, check for local Blender installation

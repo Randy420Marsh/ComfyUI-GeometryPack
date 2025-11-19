@@ -39,7 +39,7 @@ class RemeshNode:
             "optional": {
                 # Isotropic params (pymeshlab, cgal)
                 "target_edge_length": ("FLOAT", {
-                    "default": 0.05,
+                    "default": 1.00,
                     "min": 0.001,
                     "max": 10.0,
                     "step": 0.01,
@@ -55,7 +55,7 @@ class RemeshNode:
                 "protect_boundaries": (["true", "false"], {"default": "true"}),
                 # Blender voxel
                 "voxel_size": ("FLOAT", {
-                    "default": 0.02,
+                    "default": 1,
                     "min": 0.001,
                     "max": 1.0,
                     "step": 0.01,
@@ -313,14 +313,14 @@ Quadriflow creates quad-dominant meshes with good topology.
                 "PyNanoInstantMeshes not installed. Install with: pip install PyNanoInstantMeshes"
             )
 
-        V = trimesh.vertices.astype(np.float64)
-        F = trimesh.faces.astype(np.int32)
+        V = trimesh.vertices.astype(np.float32)
+        F = trimesh.faces.astype(np.uint32)
 
-        V_out, F_out = pynano.instant_meshes(
+        V_out, F_out = pynano.remesh(
             V, F,
-            target_vertex_count=target_vertex_count,
+            vertex_count=target_vertex_count,
             deterministic=(deterministic == "true"),
-            crease_angle=crease_angle
+            creaseAngle=crease_angle
         )
 
         remeshed_mesh = trimesh_module.Trimesh(

@@ -194,9 +194,41 @@
         const highlightGeom = new THREE.SphereGeometry(1, 16, 16);
         const highlightMat = new THREE.MeshBasicMaterial({
             color: 0xff4444,
+            transparent: true,
+            opacity: 0.9,
             depthTest: true,
             depthWrite: true
         });
+
+        // Create crosshair lines for highlighting (unused - kept for reference)
+        // function createCrosshair() {
+        //     const lineGeom = new THREE.BufferGeometry();
+        //     const positions = new Float32Array([
+        //         -2, 0, 0,  2, 0, 0,  // X axis (red)
+        //         0, -2, 0,  0, 2, 0,  // Y axis (green)
+        //         0, 0, -2,  0, 0, 2   // Z axis (blue)
+        //     ]);
+        //     lineGeom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        //
+        //     // Create different colors for each axis
+        //     const colors = new Float32Array([
+        //         1, 0, 0,  1, 0, 0,  // X axis - red
+        //         0, 1, 0,  0, 1, 0,  // Y axis - green
+        //         0, 0, 1,  0, 0, 1   // Z axis - blue
+        //     ]);
+        //     lineGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        //
+        //     const lineMat = new THREE.LineBasicMaterial({
+        //         vertexColors: true,
+        //         linewidth: 2,
+        //         depthTest: true,
+        //         depthWrite: true,
+        //         transparent: true,
+        //         opacity: 0.8
+        //     });
+        //
+        //     return new THREE.LineSegments(lineGeom, lineMat);
+        // }
 
         // Update highlight positions (call in animation loop)
         function updateHighlightPositions() {
@@ -309,13 +341,15 @@
                                 child.material = new THREE.MeshStandardMaterial({
                                     map: createCheckerTexture(),
                                     metalness: 0.1,
-                                    roughness: 0.9
+                                    roughness: 0.9,
+                                    side: THREE.DoubleSide
                                 });
                             } else {
                                 child.material = new THREE.MeshStandardMaterial({
                                     color: 0x88aacc,
                                     metalness: 0.3,
-                                    roughness: 0.7
+                                    roughness: 0.7,
+                                    side: THREE.DoubleSide
                                 });
                             }
 
@@ -455,9 +489,12 @@
                     const box = new THREE.Box3().setFromObject(currentMesh);
                     const size = box.getSize(new THREE.Vector3());
                     const maxDim = Math.max(size.x, size.y, size.z);
-                    const scale = maxDim * 0.02;  // 2% of mesh size
+                    const scale = maxDim * 0.03;  // 3% of mesh size (slightly larger for better visibility)
                     meshHighlightSphere.scale.setScalar(scale);
                 }
+
+                // Ensure sphere always renders on top
+                meshHighlightSphere.renderOrder = 999;
 
                 meshScene.add(meshHighlightSphere);
                 console.log('[GeomPack UV Viewer] Sphere placed at:', point3D.x, point3D.y, point3D.z, 'scale:', meshHighlightSphere.scale.x);
@@ -480,43 +517,126 @@
             }
         }
 
-        // Mesh canvas click handler
-        meshCanvas.addEventListener('click', (event) => {
-            if (!currentMesh || !uvData) return;
+        // Mesh canvas click detection (using mousedown/mouseup to avoid OrbitControls interference)
+        let meshMouseDownPos = null;
+        let meshMouseDownTime = 0;
 
-            const rect = meshCanvas.getBoundingClientRect();
-            const mouse = new THREE.Vector2(
-                ((event.clientX - rect.left) / rect.width) * 2 - 1,
-                -((event.clientY - rect.top) / rect.height) * 2 + 1
-            );
+        meshCanvas.addEventListener('mousedown', (event) => {
+            meshMouseDownPos = new THREE.Vector2(event.clientX, event.clientY);
+            meshMouseDownTime = Date.now();
+            console.log('[GeomPack UV Viewer DEBUG] Mesh mousedown at:', event.clientX, event.clientY);
+        });
 
-            meshRaycaster.setFromCamera(mouse, meshCamera);
-            const intersects = meshRaycaster.intersectObject(currentMesh, true);
+        meshCanvas.addEventListener('mouseup', (event) => {
+            console.log('[GeomPack UV Viewer DEBUG] Mesh mouseup - currentMesh:', !!currentMesh, 'uvData:', !!uvData, 'mouseDownPos:', !!meshMouseDownPos);
 
-            if (intersects.length > 0) {
-                const hit = intersects[0];
-                const faceIndex = hit.faceIndex;
-                const face = uvData.faces[faceIndex];
+            if (!currentMesh || !uvData || !meshMouseDownPos) return;
 
-                if (face) {
-                    // Get barycentric coordinates of hit point
-                    const bary = hit.uv ? hit.uv : new THREE.Vector2(0.33, 0.33);
+            const mouseUpPos = new THREE.Vector2(event.clientX, event.clientY);
+            const dragDistance = meshMouseDownPos.distanceTo(mouseUpPos);
+            const dragTime = Date.now() - meshMouseDownTime;
 
-                    // Interpolate UV coordinates
-                    const uv0 = uvData.uvs[face[0]];
-                    const uv1 = uvData.uvs[face[1]];
-                    const uv2 = uvData.uvs[face[2]];
+            console.log('[GeomPack UV Viewer DEBUG] Drag distance:', dragDistance.toFixed(2), 'px, Time:', dragTime, 'ms');
 
-                    // Simple center of triangle for now
-                    const uvPoint = new THREE.Vector2(
-                        (uv0[0] + uv1[0] + uv2[0]) / 3,
-                        (uv0[1] + uv1[1] + uv2[1]) / 3
-                    );
+            // Only treat as click if mouse moved less than 5 pixels and took less than 300ms
+            if (dragDistance < 5 && dragTime < 300) {
+                console.log('[GeomPack UV Viewer DEBUG] Click threshold met, raycasting...');
 
-                    highlightPoint(hit.point, uvPoint);
-                    console.log('[GeomPack UV Viewer] Clicked face:', faceIndex, 'UV:', uvPoint);
+                const rect = meshCanvas.getBoundingClientRect();
+                const mouse = new THREE.Vector2(
+                    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                    -((event.clientY - rect.top) / rect.height) * 2 + 1
+                );
+
+                meshRaycaster.setFromCamera(mouse, meshCamera);
+                const intersects = meshRaycaster.intersectObject(currentMesh, true);
+
+                console.log('[GeomPack UV Viewer DEBUG] Intersections found:', intersects.length);
+
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    const hitMesh = hit.object;
+                    const faceIndex = hit.faceIndex;
+
+                    console.log('[GeomPack UV Viewer DEBUG] Hit face index:', faceIndex);
+
+                    // Get the 3 vertex positions from the hit face
+                    const geometry = hitMesh.geometry;
+                    const position = geometry.attributes.position;
+                    const index = geometry.index;
+
+                    if (index && faceIndex * 3 + 2 < index.count) {
+                        const i0 = index.array[faceIndex * 3];
+                        const i1 = index.array[faceIndex * 3 + 1];
+                        const i2 = index.array[faceIndex * 3 + 2];
+
+                        // Get vertex positions in local space
+                        const v0 = new THREE.Vector3(position.getX(i0), position.getY(i0), position.getZ(i0));
+                        const v1 = new THREE.Vector3(position.getX(i1), position.getY(i1), position.getZ(i1));
+                        const v2 = new THREE.Vector3(position.getX(i2), position.getY(i2), position.getZ(i2));
+
+                        console.log('[GeomPack UV Viewer DEBUG] Hit face vertices:', v0.toArray(), v1.toArray(), v2.toArray());
+
+                        // Find matching face in uvData by comparing vertex positions
+                        let matchedFaceIdx = -1;
+                        const tolerance = 0.0001;
+
+                        currentMesh.traverse((child) => {
+                            if (child.isMesh && child.geometry && matchedFaceIdx === -1) {
+                                const childPos = child.geometry.attributes.position;
+
+                                // Search through all faces to find matching vertices
+                                for (let fIdx = 0; fIdx < uvData.faces.length; fIdx++) {
+                                    const face = uvData.faces[fIdx];
+                                    const fv0 = new THREE.Vector3(childPos.getX(face[0]), childPos.getY(face[0]), childPos.getZ(face[0]));
+                                    const fv1 = new THREE.Vector3(childPos.getX(face[1]), childPos.getY(face[1]), childPos.getZ(face[1]));
+                                    const fv2 = new THREE.Vector3(childPos.getX(face[2]), childPos.getY(face[2]), childPos.getZ(face[2]));
+
+                                    // Check if vertices match (in any order)
+                                    if ((v0.distanceTo(fv0) < tolerance && v1.distanceTo(fv1) < tolerance && v2.distanceTo(fv2) < tolerance) ||
+                                        (v0.distanceTo(fv0) < tolerance && v1.distanceTo(fv2) < tolerance && v2.distanceTo(fv1) < tolerance) ||
+                                        (v0.distanceTo(fv1) < tolerance && v1.distanceTo(fv0) < tolerance && v2.distanceTo(fv2) < tolerance) ||
+                                        (v0.distanceTo(fv1) < tolerance && v1.distanceTo(fv2) < tolerance && v2.distanceTo(fv0) < tolerance) ||
+                                        (v0.distanceTo(fv2) < tolerance && v1.distanceTo(fv0) < tolerance && v2.distanceTo(fv1) < tolerance) ||
+                                        (v0.distanceTo(fv2) < tolerance && v1.distanceTo(fv1) < tolerance && v2.distanceTo(fv0) < tolerance)) {
+                                        matchedFaceIdx = fIdx;
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+
+                        if (matchedFaceIdx >= 0) {
+                            const face = uvData.faces[matchedFaceIdx];
+                            console.log('[GeomPack UV Viewer DEBUG] Matched to uvData face index:', matchedFaceIdx);
+
+                            // Interpolate UV coordinates
+                            const uv0 = uvData.uvs[face[0]];
+                            const uv1 = uvData.uvs[face[1]];
+                            const uv2 = uvData.uvs[face[2]];
+
+                            // Simple center of triangle for now
+                            const uvPoint = new THREE.Vector2(
+                                (uv0[0] + uv1[0] + uv2[0]) / 3,
+                                (uv0[1] + uv1[1] + uv2[1]) / 3
+                            );
+
+                            highlightPoint(hit.point, uvPoint);
+                            console.log('[GeomPack UV Viewer] Clicked face:', matchedFaceIdx, 'UV:', uvPoint);
+                        } else {
+                            console.log('[GeomPack UV Viewer DEBUG] No matching face found in uvData');
+                        }
+                    } else {
+                        console.log('[GeomPack UV Viewer DEBUG] Invalid face index or geometry');
+                    }
+                } else {
+                    console.log('[GeomPack UV Viewer DEBUG] No intersections - missed the mesh');
                 }
+            } else {
+                console.log('[GeomPack UV Viewer DEBUG] Click threshold NOT met (drag or too slow)');
             }
+
+            meshMouseDownPos = null;
         });
 
         // UV canvas click handler
@@ -582,8 +702,10 @@
                             point3D = new THREE.Vector3()
                                 .addVectors(v0, v1)
                                 .add(v2)
-                                .divideScalar(3)
-                                .sub(currentMesh.position);
+                                .divideScalar(3);
+
+                            // Transform from local object space to world space
+                            child.localToWorld(point3D);
                         }
                     }
                 });
