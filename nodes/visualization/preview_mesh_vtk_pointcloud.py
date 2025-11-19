@@ -2,8 +2,8 @@
 Preview mesh with VTK.js viewer optimized for scalar field visualization.
 
 Specifically designed for visualizing vertex scalar fields (like boundary edges,
-curvature, distance fields, etc.) with color mapping. Always exports as VTP
-format to preserve scalar data.
+curvature, distance fields, etc.) and face scalar fields (like segmentation labels).
+Always exports as VTP format to preserve scalar data.
 """
 
 import trimesh as trimesh_module
@@ -24,8 +24,8 @@ class PreviewMeshVTKPointCloudNode:
     Preview mesh with VTK.js viewer optimized for scalar field visualization.
 
     Specifically designed for visualizing vertex scalar fields (like boundary edges,
-    curvature, distance fields, etc.) with color mapping. Always exports as VTP
-    format to preserve scalar data.
+    curvature, distance fields, etc.) and face scalar fields (like segmentation labels).
+    Always exports as VTP format to preserve scalar data.
     """
 
     @classmethod
@@ -53,15 +53,20 @@ class PreviewMeshVTKPointCloudNode:
         """
         print(f"[PreviewMeshVTKPointCloud] Preparing preview: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
 
-        # Check if mesh has vertex attributes (scalar fields)
+        # Check if mesh has vertex or face attributes (scalar fields)
         has_vertex_attrs = hasattr(trimesh, 'vertex_attributes') and len(trimesh.vertex_attributes) > 0
+        has_face_attrs = hasattr(trimesh, 'face_attributes') and len(trimesh.face_attributes) > 0
 
         if hasattr(trimesh, 'vertex_attributes'):
             print(f"[PreviewMeshVTKPointCloud] trimesh.vertex_attributes: {trimesh.vertex_attributes.keys()}")
             print(f"[PreviewMeshVTKPointCloud] Number of vertex attributes: {len(trimesh.vertex_attributes)}")
 
-        if not has_vertex_attrs:
-            print(f"[PreviewMeshVTKPointCloud] WARNING: No vertex attributes found. This node is for scalar field visualization.")
+        if hasattr(trimesh, 'face_attributes'):
+            print(f"[PreviewMeshVTKPointCloud] trimesh.face_attributes: {trimesh.face_attributes.keys()}")
+            print(f"[PreviewMeshVTKPointCloud] Number of face attributes: {len(trimesh.face_attributes)}")
+
+        if not has_vertex_attrs and not has_face_attrs:
+            print(f"[PreviewMeshVTKPointCloud] WARNING: No vertex or face attributes found. This node is for scalar field visualization.")
 
         # Always use VTP format for this node (designed for scalar fields)
         filename = f"preview_vtk_pointcloud_{uuid.uuid4().hex[:8]}.vtp"
@@ -72,11 +77,12 @@ class PreviewMeshVTKPointCloudNode:
         else:
             filepath = os.path.join(tempfile.gettempdir(), filename)
 
-        # Export mesh with vertex attributes as VTP
+        # Export mesh with vertex and face attributes as VTP
         try:
             export_mesh_with_scalars_vtp(trimesh, filepath)
-            num_fields = len(trimesh.vertex_attributes) if has_vertex_attrs else 0
-            print(f"[PreviewMeshVTKPointCloud] Exported VTP with {num_fields} scalar fields to: {filepath}")
+            num_vertex_fields = len(trimesh.vertex_attributes) if has_vertex_attrs else 0
+            num_face_fields = len(trimesh.face_attributes) if has_face_attrs else 0
+            print(f"[PreviewMeshVTKPointCloud] Exported VTP with {num_vertex_fields} vertex fields and {num_face_fields} face fields to: {filepath}")
         except Exception as e:
             print(f"[PreviewMeshVTKPointCloud] Export failed: {e}")
             import traceback

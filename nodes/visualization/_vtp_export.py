@@ -1,8 +1,8 @@
 """
-Helper function for exporting mesh to VTK PolyData XML format (.vtp) with vertex scalar attributes.
+Helper function for exporting mesh to VTK PolyData XML format (.vtp) with scalar attributes.
 
-VTP format preserves vertex attributes (scalar fields) which can be visualized
-in VTK.js with color mapping.
+VTP format preserves vertex attributes (PointData) and face attributes (CellData)
+which can be visualized in VTK.js with color mapping.
 """
 
 import trimesh as trimesh_module
@@ -11,13 +11,13 @@ import xml.etree.ElementTree as ET
 
 def export_mesh_with_scalars_vtp(trimesh: trimesh_module.Trimesh, filepath: str):
     """
-    Export trimesh to VTK PolyData XML format (.vtp) with vertex scalar attributes.
+    Export trimesh to VTK PolyData XML format (.vtp) with scalar attributes.
 
-    VTP format preserves vertex attributes (scalar fields) which can be visualized
-    in VTK.js with color mapping.
+    VTP format preserves vertex attributes (PointData) and face attributes (CellData)
+    which can be visualized in VTK.js with color mapping.
 
     Args:
-        trimesh: Trimesh object with optional vertex_attributes
+        trimesh: Trimesh object with optional vertex_attributes and face_attributes
         filepath: Output .vtp file path
     """
     print(f"[_export_mesh_with_scalars_vtp] Exporting to VTP: {filepath}")
@@ -49,6 +49,19 @@ def export_mesh_with_scalars_vtp(trimesh: trimesh_module.Trimesh, filepath: str)
         for attr_name, attr_values in trimesh.vertex_attributes.items():
             print(f"[_export_mesh_with_scalars_vtp]   Adding scalar field: {attr_name}")
             scalar_array = ET.SubElement(point_data, 'DataArray',
+                                          type='Float32',
+                                          Name=attr_name,
+                                          format='ascii')
+            scalar_array.text = ' '.join(map(str, attr_values.flatten()))
+
+    # CellData section (face attributes)
+    cell_data = ET.SubElement(piece, 'CellData')
+
+    # Add face attributes as scalar arrays
+    if hasattr(trimesh, 'face_attributes') and trimesh.face_attributes:
+        for attr_name, attr_values in trimesh.face_attributes.items():
+            print(f"[_export_mesh_with_scalars_vtp]   Adding face field: {attr_name}")
+            scalar_array = ET.SubElement(cell_data, 'DataArray',
                                           type='Float32',
                                           Name=attr_name,
                                           format='ascii')

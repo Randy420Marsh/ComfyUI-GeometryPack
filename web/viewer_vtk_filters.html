@@ -575,15 +575,36 @@
                     for (let i = 0; i < numArrays; i++) {
                         const array = pointData.getArray(i);
                         const arrayName = array.getName();
-                        console.log(`[GeomPack VTK Filters] Found scalar field: ${arrayName}`);
+                        console.log(`[GeomPack VTK Filters] Found point field: ${arrayName}`);
                         const option = document.createElement('option');
-                        option.value = arrayName;
-                        option.textContent = arrayName;
+                        option.value = `point:${arrayName}`;
+                        option.textContent = `${arrayName} (vertex)`;
                         scalarSelector.appendChild(option);
                     }
                     scalarLabel.style.display = 'flex';
-                    console.log('[GeomPack VTK Filters] Scalar field selector populated with', numArrays, 'fields');
-                } else {
+                    console.log('[GeomPack VTK Filters] Point data selector populated with', numArrays, 'fields');
+                }
+
+                // Check for scalar fields in cell data (face attributes)
+                const cellData = polydata.getCellData();
+                const numCellArrays = cellData.getNumberOfArrays();
+                console.log('[GeomPack VTK Filters] Cell data arrays:', numCellArrays);
+
+                if (numCellArrays > 0) {
+                    for (let i = 0; i < numCellArrays; i++) {
+                        const array = cellData.getArray(i);
+                        const arrayName = array.getName();
+                        console.log(`[GeomPack VTK Filters] Found face field: ${arrayName}`);
+                        const option = document.createElement('option');
+                        option.value = `cell:${arrayName}`;
+                        option.textContent = `${arrayName} (face)`;
+                        scalarSelector.appendChild(option);
+                    }
+                    scalarLabel.style.display = 'flex';
+                    console.log('[GeomPack VTK Filters] Cell data selector populated with', numCellArrays, 'fields');
+                }
+
+                if (numArrays === 0 && numCellArrays === 0) {
                     scalarLabel.style.display = 'none';
                     console.log('[GeomPack VTK Filters] No scalar fields found');
                 }
@@ -591,7 +612,7 @@
                 // Populate colormap selector
                 const colormapSelector = document.getElementById('colormapSelector');
                 const colormapLabel = document.getElementById('colormapLabel');
-                if (numArrays > 0) {
+                if (numArrays > 0 || numCellArrays > 0) {
                     colormapSelector.innerHTML = '';
 
                     // Add popular colormaps first
@@ -1096,24 +1117,54 @@
             if (fieldName && currentReader) {
                 // Get the polydata with scalar field (from mapper's input, not reader)
                 const polydata = mapper.getInputData();
-                const pointData = polydata.getPointData();
-                const scalarArray = pointData.getArrayByName(fieldName);
 
-                if (scalarArray) {
-                    // Set the scalar array as active scalars
-                    pointData.setActiveScalars(fieldName);
+                // Check if this is a cell data field (face attribute) or point data field (vertex attribute)
+                if (fieldName.startsWith('cell:')) {
+                    // Handle cell data (face attributes)
+                    const actualFieldName = fieldName.substring(5); // Remove "cell:" prefix
+                    const cellData = polydata.getCellData();
+                    const scalarArray = cellData.getArrayByName(actualFieldName);
 
-                    // Configure mapper for scalar coloring
-                    mapper.setScalarVisibility(true);
-                    mapper.setScalarModeToUsePointData();
-                    mapper.setScalarRange(scalarArray.getRange());
+                    if (scalarArray) {
+                        // Set the scalar array as active scalars
+                        cellData.setActiveScalars(actualFieldName);
 
-                    // Apply colormap using the updateColormap function
-                    updateColormap();
+                        // Configure mapper for scalar coloring using cell data
+                        mapper.setScalarVisibility(true);
+                        mapper.setScalarModeToUseCellData();
+                        mapper.setScalarRange(scalarArray.getRange());
 
-                    console.log(`[GeomPack VTK Filters] Scalar field '${fieldName}' activated, range:`, scalarArray.getRange());
+                        // Apply colormap using the updateColormap function
+                        updateColormap();
+
+                        console.log(`[GeomPack VTK Filters] Face field '${actualFieldName}' activated, range:`, scalarArray.getRange());
+                    } else {
+                        console.warn(`[GeomPack VTK Filters] Face field '${actualFieldName}' not found`);
+                    }
+                } else if (fieldName.startsWith('point:')) {
+                    // Handle point data (vertex attributes)
+                    const actualFieldName = fieldName.substring(6); // Remove "point:" prefix
+                    const pointData = polydata.getPointData();
+                    const scalarArray = pointData.getArrayByName(actualFieldName);
+
+                    if (scalarArray) {
+                        // Set the scalar array as active scalars
+                        pointData.setActiveScalars(actualFieldName);
+
+                        // Configure mapper for scalar coloring using point data
+                        mapper.setScalarVisibility(true);
+                        mapper.setScalarModeToUsePointData();
+                        mapper.setScalarRange(scalarArray.getRange());
+
+                        // Apply colormap using the updateColormap function
+                        updateColormap();
+
+                        console.log(`[GeomPack VTK Filters] Vertex field '${actualFieldName}' activated, range:`, scalarArray.getRange());
+                    } else {
+                        console.warn(`[GeomPack VTK Filters] Vertex field '${actualFieldName}' not found`);
+                    }
                 } else {
-                    console.warn(`[GeomPack VTK Filters] Scalar field '${fieldName}' not found`);
+                    console.warn(`[GeomPack VTK Filters] Unknown field type: ${fieldName}`);
                 }
             } else {
                 // Disable scalar coloring, use solid color
