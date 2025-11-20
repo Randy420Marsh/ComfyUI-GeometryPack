@@ -9,6 +9,7 @@ scipy>=1.7.0
 trimesh>=3.15.0
 pymeshlab>=2022.2
 cgal  # Official CGAL Python bindings for isotropic remeshing
+rtree
 
 # Visualization
 matplotlib>=3.5.0
