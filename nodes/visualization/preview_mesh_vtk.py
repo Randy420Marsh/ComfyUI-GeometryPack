@@ -39,6 +39,7 @@ class PreviewMeshVTKNode:
         return {
             "required": {
                 "trimesh": ("TRIMESH",),
+                "mode": (["fields", "texture"], {"default": "fields"}),
             },
         }
 
@@ -47,15 +48,17 @@ class PreviewMeshVTKNode:
     FUNCTION = "preview_mesh_vtk"
     CATEGORY = "geompack/visualization"
 
-    def preview_mesh_vtk(self, trimesh):
+    def preview_mesh_vtk(self, trimesh, mode="fields"):
         """
         Export mesh and prepare for VTK.js preview.
 
-        Automatically detects scalar fields (vertex/face attributes) and exports
-        to VTP format if present, otherwise exports to STL.
+        Supports two visualization modes:
+        - fields: Scientific visualization with scalar fields and colormaps (VTP/STL export)
+        - texture: Textured mesh visualization with materials (GLB export)
 
         Args:
             trimesh: Input trimesh_module.Trimesh object
+            mode: Visualization mode - "fields" or "texture"
 
         Returns:
             dict: UI data for frontend widget
@@ -79,17 +82,36 @@ class PreviewMeshVTKNode:
         print(f"[PreviewMeshVTK] DEBUG - has_face_attrs: {has_face_attrs}")
         print(f"[PreviewMeshVTK] DEBUG - has_fields: {has_fields}")
 
+        # Check for visual data (textures/vertex colors)
+        has_visual = hasattr(trimesh, 'visual') and trimesh.visual is not None
+        visual_kind = trimesh.visual.kind if has_visual else None
+        has_texture = visual_kind == 'texture' and hasattr(trimesh.visual, 'material') if has_visual else False
+        has_vertex_colors = visual_kind == 'vertex' if has_visual else False
+        has_material = has_texture
+
+        print(f"[PreviewMeshVTK] Mode: {mode}")
+        print(f"[PreviewMeshVTK] Visual data - has_visual: {has_visual}, kind: {visual_kind}, texture: {has_texture}, vertex_colors: {has_vertex_colors}")
+
         # Check if this is a point cloud
         is_pc = is_point_cloud(trimesh)
 
-        # Choose export format based on whether fields exist or if it's a point cloud
-        if has_fields or is_pc:
-            # Export to VTP for: scalar fields OR point clouds (STL doesn't support point clouds)
-            filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.vtp"
-            print(f"[PreviewMeshVTK] Using VTP format (fields={has_fields}, point_cloud={is_pc})")
+        # Choose export format based on visualization mode
+        if mode == "texture":
+            # Texture mode: Export GLB to preserve textures/materials/UVs
+            filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.glb"
+            viewer_type = "texture"
+            print(f"[PreviewMeshVTK] Using texture mode - GLB export")
         else:
-            # Export to STL (compact format for simple surface meshes)
-            filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.stl"
+            # Fields mode: Export VTP/STL for scalar field visualization
+            if has_fields or is_pc:
+                # Export to VTP for: scalar fields OR point clouds (STL doesn't support point clouds)
+                filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.vtp"
+                print(f"[PreviewMeshVTK] Using VTP format (fields={has_fields}, point_cloud={is_pc})")
+            else:
+                # Export to STL (compact format for simple surface meshes)
+                filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.stl"
+            viewer_type = "fields"
+            print(f"[PreviewMeshVTK] Using fields mode - VTP/STL export")
 
         # Use ComfyUI's output directory
         if COMFYUI_OUTPUT_FOLDER:
@@ -99,7 +121,11 @@ class PreviewMeshVTKNode:
 
         # Export mesh
         try:
-            if has_fields or is_pc:
+            if mode == "texture":
+                # Export GLB for texture rendering
+                trimesh.export(filepath, file_type='glb', include_normals=True)
+                print(f"[PreviewMeshVTK] Exported GLB to: {filepath}")
+            elif has_fields or is_pc:
                 # Use VTP exporter for fields or point clouds
                 export_mesh_with_scalars_vtp(trimesh, filepath)
                 print(f"[PreviewMeshVTK] Exported VTP to: {filepath}")
@@ -146,6 +172,8 @@ class PreviewMeshVTKNode:
         # Return metadata for frontend widget
         ui_data = {
             "mesh_file": [filename],
+            "viewer_type": [viewer_type],  # "fields" or "texture" - tells frontend which viewer to load
+            "mode": [mode],  # User-selected mode
             "vertex_count": [len(trimesh.vertices)],
             "face_count": [get_face_count(trimesh)],
             "bounds_min": [bounds[0].tolist()],
@@ -153,8 +181,20 @@ class PreviewMeshVTKNode:
             "extents": [extents.tolist()],
             "max_extent": [float(max_extent)],
             "is_watertight": [bool(is_watertight)],
-            "field_names": [field_names],  # Always include (empty array if no fields)
         }
+
+        # Add mode-specific metadata
+        if viewer_type == "texture":
+            # Texture mode metadata
+            ui_data.update({
+                "has_texture": [has_texture],
+                "has_vertex_colors": [has_vertex_colors],
+                "has_material": [has_material],
+                "visual_kind": [visual_kind if visual_kind else "none"],
+            })
+        else:
+            # Fields mode metadata
+            ui_data["field_names"] = [field_names]  # Field visualization data
 
         # Add optional fields if available
         if volume is not None:
@@ -162,10 +202,12 @@ class PreviewMeshVTKNode:
         if area is not None:
             ui_data["area"] = [area]
 
-        if field_names:
-            print(f"[PreviewMeshVTK] Mesh info: watertight={is_watertight}, volume={volume}, area={area}, fields={field_names}")
+        if viewer_type == "texture":
+            print(f"[PreviewMeshVTK] Texture mode info: watertight={is_watertight}, volume={volume}, area={area}, texture={has_texture}, vertex_colors={has_vertex_colors}")
+        elif field_names:
+            print(f"[PreviewMeshVTK] Fields mode info: watertight={is_watertight}, volume={volume}, area={area}, fields={field_names}")
         else:
-            print(f"[PreviewMeshVTK] Mesh info: watertight={is_watertight}, volume={volume}, area={area}, no fields")
+            print(f"[PreviewMeshVTK] Fields mode info: watertight={is_watertight}, volume={volume}, area={area}, no fields")
 
         return {"ui": ui_data}
 

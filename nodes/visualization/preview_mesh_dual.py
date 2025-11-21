@@ -46,6 +46,22 @@ def has_fields(mesh):
     return has_vertex_attrs or has_face_attrs
 
 
+def get_texture_info(mesh):
+    """Extract texture/visual information from a mesh."""
+    has_visual = hasattr(mesh, 'visual') and mesh.visual is not None
+    visual_kind = mesh.visual.kind if has_visual else None
+    has_texture = visual_kind == 'texture' and hasattr(mesh.visual, 'material') if has_visual else False
+    has_vertex_colors = visual_kind == 'vertex' if has_visual else False
+    has_material = has_texture
+    return {
+        'has_visual': has_visual,
+        'visual_kind': visual_kind,
+        'has_texture': has_texture,
+        'has_vertex_colors': has_vertex_colors,
+        'has_material': has_material
+    }
+
+
 class PreviewMeshDualNode:
     """
     Unified dual mesh preview with VTK.js - supports both side-by-side and overlay layouts.
@@ -63,6 +79,7 @@ class PreviewMeshDualNode:
             },
             "optional": {
                 "layout": (["side_by_side", "overlay"], {"default": "side_by_side"}),
+                "mode": (["fields", "texture"], {"default": "fields"}),
                 "opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
             }
         }
@@ -72,20 +89,21 @@ class PreviewMeshDualNode:
     FUNCTION = "preview_dual"
     CATEGORY = "geompack/visualization"
 
-    def preview_dual(self, mesh_1, mesh_2, layout="side_by_side", opacity=1.0):
+    def preview_dual(self, mesh_1, mesh_2, layout="side_by_side", mode="fields", opacity=1.0):
         """
-        Preview two meshes with chosen layout and field visualization.
+        Preview two meshes with chosen layout and visualization mode.
 
         Args:
             mesh_1: First trimesh object
             mesh_2: Second trimesh object
             layout: "side_by_side" or "overlay"
+            mode: "fields" (scientific visualization) or "texture" (textured rendering)
             opacity: Opacity for both meshes (0.0-1.0)
 
         Returns:
             dict: UI data for frontend widget
         """
-        print(f"[PreviewMeshDual] Layout: {layout}")
+        print(f"[PreviewMeshDual] Layout: {layout}, Mode: {mode}")
         print(f"[PreviewMeshDual] Mesh 1: {get_geometry_type(mesh_1)} - {len(mesh_1.vertices)} vertices, {get_face_count(mesh_1)} faces")
         print(f"[PreviewMeshDual] Mesh 2: {get_geometry_type(mesh_2)} - {len(mesh_2.vertices)} vertices, {get_face_count(mesh_2)} faces")
 
@@ -100,6 +118,13 @@ class PreviewMeshDualNode:
         print(f"[PreviewMeshDual] Mesh 2 fields: {field_names_2}")
         print(f"[PreviewMeshDual] Common fields: {common_fields}")
 
+        # Check for texture/visual data
+        texture_info_1 = get_texture_info(mesh_1)
+        texture_info_2 = get_texture_info(mesh_2)
+
+        print(f"[PreviewMeshDual] Mesh 1 visual: kind={texture_info_1['visual_kind']}, texture={texture_info_1['has_texture']}, vertex_colors={texture_info_1['has_vertex_colors']}")
+        print(f"[PreviewMeshDual] Mesh 2 visual: kind={texture_info_2['visual_kind']}, texture={texture_info_2['has_texture']}, vertex_colors={texture_info_2['has_vertex_colors']}")
+
         # Check if meshes are point clouds (need VTP, STL doesn't support point clouds)
         mesh_1_is_pc = is_point_cloud(mesh_1)
         mesh_2_is_pc = is_point_cloud(mesh_2)
@@ -108,13 +133,20 @@ class PreviewMeshDualNode:
         preview_id = uuid.uuid4().hex[:8]
 
         if layout == "side_by_side":
-            # Export meshes separately - use VTP for fields OR point clouds
-            filename_1, filepath_1 = self._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", mesh_1_has_fields or mesh_1_is_pc)
-            filename_2, filepath_2 = self._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", mesh_2_has_fields or mesh_2_is_pc)
+            # Export meshes separately based on mode
+            if mode == "texture":
+                # Texture mode: export as GLB
+                filename_1, filepath_1 = self._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", use_vtp=False, use_glb=True)
+                filename_2, filepath_2 = self._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", use_vtp=False, use_glb=True)
+            else:
+                # Fields mode: use VTP for fields OR point clouds
+                filename_1, filepath_1 = self._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", use_vtp=(mesh_1_has_fields or mesh_1_is_pc), use_glb=False)
+                filename_2, filepath_2 = self._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", use_vtp=(mesh_2_has_fields or mesh_2_is_pc), use_glb=False)
 
             # Build UI data for side-by-side mode
             ui_data = {
                 "layout": [layout],
+                "mode": [mode],
                 "mesh_1_file": [filename_1],
                 "mesh_2_file": [filename_2],
                 "vertex_count_1": [len(mesh_1.vertices)],
@@ -129,17 +161,44 @@ class PreviewMeshDualNode:
                 "extents_2": [mesh_2.extents.tolist()],
                 "is_watertight_1": [bool(mesh_1.is_watertight) if not is_point_cloud(mesh_1) else False],
                 "is_watertight_2": [bool(mesh_2.is_watertight) if not is_point_cloud(mesh_2) else False],
-                "field_names_1": [field_names_1],
-                "field_names_2": [field_names_2],
-                "common_fields": [common_fields],
             }
+
+            # Add mode-specific metadata
+            if mode == "texture":
+                # Texture mode metadata
+                ui_data.update({
+                    "has_texture_1": [texture_info_1['has_texture']],
+                    "has_texture_2": [texture_info_2['has_texture']],
+                    "visual_kind_1": [texture_info_1['visual_kind'] if texture_info_1['visual_kind'] else "none"],
+                    "visual_kind_2": [texture_info_2['visual_kind'] if texture_info_2['visual_kind'] else "none"],
+                    "has_vertex_colors_1": [texture_info_1['has_vertex_colors']],
+                    "has_vertex_colors_2": [texture_info_2['has_vertex_colors']],
+                    "has_material_1": [texture_info_1['has_material']],
+                    "has_material_2": [texture_info_2['has_material']],
+                })
+            else:
+                # Fields mode metadata
+                ui_data.update({
+                    "field_names_1": [field_names_1],
+                    "field_names_2": [field_names_2],
+                    "common_fields": [common_fields],
+                })
+
 
         else:  # overlay
             # Combine meshes with color coding
-            filename, filepath = self._export_combined_mesh(
-                mesh_1, mesh_2, preview_id, opacity,
-                mesh_1_has_fields, mesh_2_has_fields
-            )
+            if mode == "texture":
+                # Texture mode: export combined mesh as GLB
+                filename, filepath = self._export_combined_mesh(
+                    mesh_1, mesh_2, preview_id, opacity,
+                    mesh_1_has_fields, mesh_2_has_fields, use_glb=True
+                )
+            else:
+                # Fields mode: export combined mesh as VTP
+                filename, filepath = self._export_combined_mesh(
+                    mesh_1, mesh_2, preview_id, opacity,
+                    mesh_1_has_fields, mesh_2_has_fields, use_glb=False
+                )
 
             # Calculate combined bounds
             combined_bounds_min = np.minimum(mesh_1.bounds[0], mesh_2.bounds[0])
@@ -149,6 +208,7 @@ class PreviewMeshDualNode:
             # Build UI data for overlay mode
             ui_data = {
                 "layout": [layout],
+                "mode": [mode],
                 "mesh_file": [filename],
                 "vertex_count_1": [len(mesh_1.vertices)],
                 "vertex_count_2": [len(mesh_2.vertices)],
@@ -160,17 +220,37 @@ class PreviewMeshDualNode:
                 "opacity": [float(opacity)],
                 "is_watertight_1": [bool(mesh_1.is_watertight) if not is_point_cloud(mesh_1) else False],
                 "is_watertight_2": [bool(mesh_2.is_watertight) if not is_point_cloud(mesh_2) else False],
-                "field_names_1": [field_names_1],
-                "field_names_2": [field_names_2],
-                "common_fields": [common_fields],
             }
+
+            # Add mode-specific metadata
+            if mode == "texture":
+                # Texture mode metadata
+                ui_data.update({
+                    "has_texture_1": [texture_info_1['has_texture']],
+                    "has_texture_2": [texture_info_2['has_texture']],
+                    "visual_kind_1": [texture_info_1['visual_kind'] if texture_info_1['visual_kind'] else "none"],
+                    "visual_kind_2": [texture_info_2['visual_kind'] if texture_info_2['visual_kind'] else "none"],
+                    "has_vertex_colors_1": [texture_info_1['has_vertex_colors']],
+                    "has_vertex_colors_2": [texture_info_2['has_vertex_colors']],
+                    "has_material_1": [texture_info_1['has_material']],
+                    "has_material_2": [texture_info_2['has_material']],
+                })
+            else:
+                # Fields mode metadata
+                ui_data.update({
+                    "field_names_1": [field_names_1],
+                    "field_names_2": [field_names_2],
+                    "common_fields": [common_fields],
+                })
 
         print(f"[PreviewMeshDual] Preview ready")
         return {"ui": ui_data}
 
-    def _export_mesh(self, mesh, base_filename, use_vtp):
+    def _export_mesh(self, mesh, base_filename, use_vtp, use_glb):
         """Export a single mesh to appropriate format."""
-        if use_vtp:
+        if use_glb:
+            filename = f"{base_filename}.glb"
+        elif use_vtp:
             filename = f"{base_filename}.vtp"
         else:
             filename = f"{base_filename}.stl"
@@ -181,7 +261,10 @@ class PreviewMeshDualNode:
             filepath = os.path.join(tempfile.gettempdir(), filename)
 
         try:
-            if use_vtp:
+            if use_glb:
+                mesh.export(filepath, file_type='glb', include_normals=True)
+                print(f"[PreviewMeshDual] Exported GLB: {filepath}")
+            elif use_vtp:
                 export_mesh_with_scalars_vtp(mesh, filepath)
                 print(f"[PreviewMeshDual] Exported VTP with fields: {filepath}")
             else:
@@ -190,29 +273,38 @@ class PreviewMeshDualNode:
         except Exception as e:
             print(f"[PreviewMeshDual] Export failed: {e}, trying fallback")
             # Fallback to OBJ
-            filename = filename.replace('.vtp', '.obj').replace('.stl', '.obj')
-            filepath = filepath.replace('.vtp', '.obj').replace('.stl', '.obj')
+            filename = filename.replace('.vtp', '.obj').replace('.stl', '.obj').replace('.glb', '.obj')
+            filepath = filepath.replace('.vtp', '.obj').replace('.stl', '.obj').replace('.glb', '.obj')
             mesh.export(filepath, file_type='obj')
             print(f"[PreviewMeshDual] Exported OBJ fallback: {filepath}")
 
         return filename, filepath
 
     def _export_combined_mesh(self, mesh_1, mesh_2, preview_id, opacity,
-                              mesh_1_has_fields, mesh_2_has_fields):
-        """Export combined mesh for overlay mode as VTP."""
+                              mesh_1_has_fields, mesh_2_has_fields, use_glb):
+        """Export combined mesh for overlay mode as VTP or GLB."""
 
         # Combine meshes (with or without fields)
         try:
             combined = trimesh_module.util.concatenate([mesh_1, mesh_2])
-            filename = f"preview_dual_overlay_{preview_id}.vtp"
+
+            if use_glb:
+                filename = f"preview_dual_overlay_{preview_id}.glb"
+            else:
+                filename = f"preview_dual_overlay_{preview_id}.vtp"
 
             if COMFYUI_OUTPUT_FOLDER:
                 filepath = os.path.join(COMFYUI_OUTPUT_FOLDER, filename)
             else:
                 filepath = os.path.join(tempfile.gettempdir(), filename)
 
-            export_mesh_with_scalars_vtp(combined, filepath)
-            print(f"[PreviewMeshDual] Exported combined VTP: {filepath}")
+            if use_glb:
+                combined.export(filepath, file_type='glb', include_normals=True)
+                print(f"[PreviewMeshDual] Exported combined GLB: {filepath}")
+            else:
+                export_mesh_with_scalars_vtp(combined, filepath)
+                print(f"[PreviewMeshDual] Exported combined VTP: {filepath}")
+
             print(f"[PreviewMeshDual] Combined {get_geometry_type(combined)}: {len(combined.vertices)} vertices, {get_face_count(combined)} faces")
             return filename, filepath
         except Exception as e:
