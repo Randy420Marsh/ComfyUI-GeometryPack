@@ -100,7 +100,7 @@ def _load_as_comfy_image(texture_path):
     return torch.from_numpy(img_array)[None,]
 
 
-class BlenderRemeshWithTexture:
+class RemeshWithTexture:
     """
     Remesh with texture preservation using Blender baking.
 
@@ -485,9 +485,9 @@ Texture Transfer: Closest-Point Projection{placeholder_warning}
 
 # Node mappings
 NODE_CLASS_MAPPINGS = {
-    "GeomPackBlenderRemeshWithTexture": BlenderRemeshWithTexture,
+    "GeomPackRemeshWithTexture": RemeshWithTexture,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackBlenderRemeshWithTexture": "Remesh with Texture",
+    "GeomPackRemeshWithTexture": "Remesh with Texture",
 }

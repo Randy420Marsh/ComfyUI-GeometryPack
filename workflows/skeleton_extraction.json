@@ -1,0 +1,214 @@
+{
+  "id": "a1b2c3d4-5678-90ab-cdef-123456789abc",
+  "revision": 0,
+  "last_node_id": 4,
+  "last_link_id": 4,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "GeomPackLoadMesh",
+      "pos": [
+        -600,
+        0
+      ],
+      "size": [
+        320,
+        150
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "mesh",
+          "type": "TRIMESH",
+          "links": [
+            1,
+            4
+          ]
+        },
+        {
+          "name": "texture",
+          "type": "IMAGE",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "main",
+        "Node name for S&R": "GeomPackLoadMesh"
+      },
+      "widgets_values": [
+        "3d/cow.off"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "GeomPackExtractSkeleton",
+      "pos": [
+        -200,
+        0
+      ],
+      "size": [
+        320,
+        200
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "skeleton",
+          "type": "SKELETON",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "main",
+        "Node name for S&R": "GeomPackExtractSkeleton"
+      },
+      "widgets_values": [
+        "wavefront",
+        true,
+        1,
+        1.0
+      ]
+    },
+    {
+      "id": 3,
+      "type": "GeomPackMeshFromSkeleton",
+      "pos": [
+        200,
+        0
+      ],
+      "size": [
+        320,
+        150
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "skeleton",
+          "type": "SKELETON",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "main",
+        "Node name for S&R": "GeomPackMeshFromSkeleton"
+      },
+      "widgets_values": [
+        0.02,
+        0.01
+      ]
+    },
+    {
+      "id": 4,
+      "type": "GeomPackPreviewMeshDual",
+      "pos": [
+        600,
+        -100
+      ],
+      "size": [
+        768,
+        746
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh_1",
+          "type": "TRIMESH",
+          "link": 4
+        },
+        {
+          "name": "mesh_2",
+          "type": "TRIMESH",
+          "link": 3
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "main",
+        "Node name for S&R": "GeomPackPreviewMeshDual"
+      },
+      "widgets_values": [
+        "side_by_side",
+        1.0,
+        ""
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "TRIMESH"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "SKELETON"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      1,
+      "TRIMESH"
+    ],
+    [
+      4,
+      1,
+      0,
+      4,
+      0,
+      "TRIMESH"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "frontendVersion": "1.28.8"
+  },
+  "version": 0.4
+}
