@@ -151,18 +151,19 @@ class PreviewMeshVTKWithTextureNode:
         extents = trimesh.extents
         max_extent = max(extents)
 
-        # Check if mesh is watertight
-        is_watertight = trimesh.is_watertight
+        # Check if mesh is watertight (only for actual meshes, not point clouds)
+        is_watertight = False if is_point_cloud(trimesh) else trimesh.is_watertight
 
-        # Calculate volume and area
+        # Calculate volume and area (only for meshes with faces, not point clouds)
         volume = None
         area = None
-        try:
-            if is_watertight:
-                volume = float(trimesh.volume)
-            area = float(trimesh.area)
-        except Exception as e:
-            print(f"[PreviewMeshVTKWithTexture] Could not calculate volume/area: {e}")
+        if not is_point_cloud(trimesh):
+            try:
+                if is_watertight:
+                    volume = float(trimesh.volume)
+                area = float(trimesh.area)
+            except Exception as e:
+                print(f"[PreviewMeshVTKWithTexture] Could not calculate volume/area: {e}")
 
         # Return metadata for frontend widget
         ui_data = {

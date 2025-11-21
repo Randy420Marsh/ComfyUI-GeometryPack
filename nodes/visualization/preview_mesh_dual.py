@@ -100,13 +100,17 @@ class PreviewMeshDualNode:
         print(f"[PreviewMeshDual] Mesh 2 fields: {field_names_2}")
         print(f"[PreviewMeshDual] Common fields: {common_fields}")
 
+        # Check if meshes are point clouds (need VTP, STL doesn't support point clouds)
+        mesh_1_is_pc = is_point_cloud(mesh_1)
+        mesh_2_is_pc = is_point_cloud(mesh_2)
+
         # Generate unique ID for this preview
         preview_id = uuid.uuid4().hex[:8]
 
         if layout == "side_by_side":
-            # Export meshes separately
-            filename_1, filepath_1 = self._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", mesh_1_has_fields)
-            filename_2, filepath_2 = self._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", mesh_2_has_fields)
+            # Export meshes separately - use VTP for fields OR point clouds
+            filename_1, filepath_1 = self._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", mesh_1_has_fields or mesh_1_is_pc)
+            filename_2, filepath_2 = self._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", mesh_2_has_fields or mesh_2_is_pc)
 
             # Build UI data for side-by-side mode
             ui_data = {
@@ -123,8 +127,8 @@ class PreviewMeshDualNode:
                 "bounds_max_2": [mesh_2.bounds[1].tolist()],
                 "extents_1": [mesh_1.extents.tolist()],
                 "extents_2": [mesh_2.extents.tolist()],
-                "is_watertight_1": [bool(mesh_1.is_watertight)],
-                "is_watertight_2": [bool(mesh_2.is_watertight)],
+                "is_watertight_1": [bool(mesh_1.is_watertight) if not is_point_cloud(mesh_1) else False],
+                "is_watertight_2": [bool(mesh_2.is_watertight) if not is_point_cloud(mesh_2) else False],
                 "field_names_1": [field_names_1],
                 "field_names_2": [field_names_2],
                 "common_fields": [common_fields],
@@ -154,8 +158,8 @@ class PreviewMeshDualNode:
                 "bounds_max": [combined_bounds_max.tolist()],
                 "extents": [combined_extents.tolist()],
                 "opacity": [float(opacity)],
-                "is_watertight_1": [bool(mesh_1.is_watertight)],
-                "is_watertight_2": [bool(mesh_2.is_watertight)],
+                "is_watertight_1": [bool(mesh_1.is_watertight) if not is_point_cloud(mesh_1) else False],
+                "is_watertight_2": [bool(mesh_2.is_watertight) if not is_point_cloud(mesh_2) else False],
                 "field_names_1": [field_names_1],
                 "field_names_2": [field_names_2],
                 "common_fields": [common_fields],

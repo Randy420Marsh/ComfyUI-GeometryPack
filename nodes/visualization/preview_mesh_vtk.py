@@ -79,13 +79,16 @@ class PreviewMeshVTKNode:
         print(f"[PreviewMeshVTK] DEBUG - has_face_attrs: {has_face_attrs}")
         print(f"[PreviewMeshVTK] DEBUG - has_fields: {has_fields}")
 
-        # Choose export format based on whether fields exist
-        if has_fields:
-            # Export to VTP to preserve scalar fields
+        # Check if this is a point cloud
+        is_pc = is_point_cloud(trimesh)
+
+        # Choose export format based on whether fields exist or if it's a point cloud
+        if has_fields or is_pc:
+            # Export to VTP for: scalar fields OR point clouds (STL doesn't support point clouds)
             filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.vtp"
-            print(f"[PreviewMeshVTK] Detected scalar fields, using VTP format")
+            print(f"[PreviewMeshVTK] Using VTP format (fields={has_fields}, point_cloud={is_pc})")
         else:
-            # Export to STL (compact format for simple meshes)
+            # Export to STL (compact format for simple surface meshes)
             filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.stl"
 
         # Use ComfyUI's output directory
@@ -96,12 +99,12 @@ class PreviewMeshVTKNode:
 
         # Export mesh
         try:
-            if has_fields:
-                # Use VTP exporter to preserve fields
+            if has_fields or is_pc:
+                # Use VTP exporter for fields or point clouds
                 export_mesh_with_scalars_vtp(trimesh, filepath)
-                print(f"[PreviewMeshVTK] Exported VTP with fields to: {filepath}")
+                print(f"[PreviewMeshVTK] Exported VTP to: {filepath}")
             else:
-                # Use STL for simple meshes
+                # Use STL for simple surface meshes
                 trimesh.export(filepath, file_type='stl')
                 print(f"[PreviewMeshVTK] Exported STL to: {filepath}")
         except Exception as e:
@@ -117,18 +120,19 @@ class PreviewMeshVTKNode:
         extents = trimesh.extents
         max_extent = max(extents)
 
-        # Check if mesh is watertight
-        is_watertight = trimesh.is_watertight
+        # Check if mesh is watertight (only for actual meshes, not point clouds)
+        is_watertight = False if is_point_cloud(trimesh) else trimesh.is_watertight
 
-        # Calculate volume and area (only if watertight)
+        # Calculate volume and area (only for meshes with faces, not point clouds)
         volume = None
         area = None
-        try:
-            if is_watertight:
-                volume = float(trimesh.volume)
-            area = float(trimesh.area)
-        except Exception as e:
-            print(f"[PreviewMeshVTK] Could not calculate volume/area: {e}")
+        if not is_point_cloud(trimesh):
+            try:
+                if is_watertight:
+                    volume = float(trimesh.volume)
+                area = float(trimesh.area)
+            except Exception as e:
+                print(f"[PreviewMeshVTK] Could not calculate volume/area: {e}")
 
         # Get field names (vertex/face data arrays) - for field visualization UI
         field_names = []
