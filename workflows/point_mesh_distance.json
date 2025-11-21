@@ -1,15 +1,15 @@
 {
   "id": "fb7bc5d6-aeb1-47ae-8e7c-69dec20b3cf2",
   "revision": 0,
-  "last_node_id": 5,
-  "last_link_id": 5,
+  "last_node_id": 7,
+  "last_link_id": 11,
   "nodes": [
     {
-      "id": 2,
+      "id": 1,
       "type": "GeomPackCreatePrimitive",
       "pos": [
         -385.07737412512756,
-        169.36276444668482
+        -80.63723555331518
       ],
       "size": [
         300,
@@ -24,42 +24,8 @@
           "name": "mesh",
           "type": "TRIMESH",
           "links": [
-            5
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "8b8322e2f784d84097cd3427f097b55dc9a29d2a",
-        "Node name for S&R": "GeomPackCreatePrimitive"
-      },
-      "widgets_values": [
-        "sphere",
-        2.5,
-        2
-      ]
-    },
-    {
-      "id": 1,
-      "type": "GeomPackCreatePrimitive",
-      "pos": [
-        -385.07737412512756,
-        -80.63723555331518
-      ],
-      "size": [
-        300,
-        150
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "mesh",
-          "type": "TRIMESH",
-          "links": [
-            3
+            3,
+            6
           ]
         }
       ],
@@ -98,9 +64,9 @@
       "outputs": [
         {
           "name": "point_cloud",
-          "type": "POINT_CLOUD",
+          "type": "TRIMESH",
           "links": [
-            4
+            10
           ]
         }
       ],
@@ -116,40 +82,185 @@
       ]
     },
     {
-      "id": 5,
-      "type": "GeomPackPointToMeshDistance",
+      "id": 6,
+      "type": "GeomPackPreviewMeshDual",
       "pos": [
-        356.9688874967723,
-        55.10495194668466
+        289.7878441083421,
+        272.1762329384197
       ],
       "size": [
-        278.064453125,
-        118
+        768,
+        738
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh_1",
+          "type": "TRIMESH",
+          "link": 8
+        },
+        {
+          "name": "mesh_2",
+          "type": "TRIMESH",
+          "link": 11
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "a22feb725fe9afaf6cdcfa75002a514292fcec9a",
+        "Node name for S&R": "GeomPackPreviewMeshDual"
+      },
+      "widgets_values": [
+        "side_by_side",
+        1,
+        ""
+      ]
+    },
+    {
+      "id": 2,
+      "type": "GeomPackCreatePrimitive",
+      "pos": [
+        -385.07737412512756,
+        169.36276444668482
+      ],
+      "size": [
+        300,
+        150
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "mesh",
+          "type": "TRIMESH",
+          "links": [
+            7,
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "8b8322e2f784d84097cd3427f097b55dc9a29d2a",
+        "Node name for S&R": "GeomPackCreatePrimitive"
+      },
+      "widgets_values": [
+        "sphere",
+        2.5,
+        2
+      ]
+    },
+    {
+      "id": 7,
+      "type": "GeomPackCombineMeshes",
+      "pos": [
+        -0.5014120900042822,
+        276.30846434337855
+      ],
+      "size": [
+        175.740234375,
+        86
       ],
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [
         {
-          "name": "trimesh",
+          "name": "mesh_a",
           "type": "TRIMESH",
-          "link": 5
+          "link": 6
         },
         {
-          "name": "point_cloud",
-          "type": "POINT_CLOUD",
-          "link": 4
+          "name": "mesh_b",
+          "shape": 7,
+          "type": "TRIMESH",
+          "link": 7
+        },
+        {
+          "name": "mesh_c",
+          "shape": 7,
+          "type": "TRIMESH",
+          "link": null
+        },
+        {
+          "name": "mesh_d",
+          "shape": 7,
+          "type": "TRIMESH",
+          "link": null
         }
       ],
       "outputs": [
         {
-          "name": "min_distance",
-          "type": "FLOAT",
-          "links": null
+          "name": "combined_mesh",
+          "type": "TRIMESH",
+          "links": [
+            8
+          ]
         },
         {
-          "name": "max_distance",
-          "type": "FLOAT",
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "a22feb725fe9afaf6cdcfa75002a514292fcec9a",
+        "Node name for S&R": "GeomPackCombineMeshes"
+      }
+    },
+    {
+      "id": 5,
+      "type": "GeomPackPointToMeshDistance",
+      "pos": [
+        367.29946600916907,
+        46.84048913676731
+      ],
+      "size": [
+        278.064453125,
+        118
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "target_mesh",
+          "type": "TRIMESH",
+          "link": 9
+        },
+        {
+          "name": "pointcloud",
+          "type": "TRIMESH",
+          "link": 10
+        },
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": null
+        },
+        {
+          "name": "point_cloud",
+          "type": "POINT_CLOUD",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "pointcloud",
+          "type": "TRIMESH",
+          "links": [
+            11
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
           "links": null
         },
         {
@@ -168,9 +279,7 @@
         "ver": "d616ab2f28493cf34f723ed59ea6747b61519c9d",
         "Node name for S&R": "GeomPackPointToMeshDistance"
       },
-      "widgets_values": [
-        "false"
-      ]
+      "widgets_values": []
     }
   ],
   "links": [
@@ -183,19 +292,51 @@
       "TRIMESH"
     ],
     [
-      4,
-      4,
-      0,
-      5,
+      6,
       1,
-      "POINT_CLOUD"
+      0,
+      7,
+      0,
+      "TRIMESH"
     ],
     [
-      5,
+      7,
+      2,
+      0,
+      7,
+      1,
+      "TRIMESH"
+    ],
+    [
+      8,
+      7,
+      0,
+      6,
+      0,
+      "TRIMESH"
+    ],
+    [
+      9,
       2,
       0,
       5,
       0,
+      "TRIMESH"
+    ],
+    [
+      10,
+      4,
+      0,
+      5,
+      1,
+      "TRIMESH"
+    ],
+    [
+      11,
+      5,
+      0,
+      6,
+      1,
       "TRIMESH"
     ]
   ],
@@ -205,8 +346,8 @@
     "ds": {
       "scale": 0.9680000000000015,
       "offset": [
-        485.00554432140837,
-        232.9890563177778
+        729.8402550652099,
+        219.55930425166196
       ]
     },
     "frontendVersion": "1.28.8"

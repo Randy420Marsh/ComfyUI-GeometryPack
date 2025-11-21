@@ -1,9 +1,47 @@
 {
   "id": "fb7bc5d6-aeb1-47ae-8e7c-69dec20b3cf2",
   "revision": 0,
-  "last_node_id": 3,
-  "last_link_id": 2,
+  "last_node_id": 6,
+  "last_link_id": 6,
   "nodes": [
+    {
+      "id": 4,
+      "type": "GeomPackPreviewMeshDual",
+      "pos": [
+        -1.939460901987207,
+        267.6457900148659
+      ],
+      "size": [
+        768,
+        738
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh_1",
+          "type": "TRIMESH",
+          "link": 3
+        },
+        {
+          "name": "mesh_2",
+          "type": "TRIMESH",
+          "link": 4
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "a22feb725fe9afaf6cdcfa75002a514292fcec9a",
+        "Node name for S&R": "GeomPackPreviewMeshDual"
+      },
+      "widgets_values": [
+        "side_by_side",
+        1,
+        ""
+      ]
+    },
     {
       "id": 2,
       "type": "GeomPackCreatePrimitive",
@@ -24,7 +62,8 @@
           "name": "mesh",
           "type": "TRIMESH",
           "links": [
-            2
+            2,
+            4
           ]
         }
       ],
@@ -43,8 +82,8 @@
       "id": 1,
       "type": "GeomPackCreatePrimitive",
       "pos": [
-        -385.07737412512756,
-        -80.63723555331518
+        -406.77158900116063,
+        -81.67029340455487
       ],
       "size": [
         300,
@@ -59,7 +98,8 @@
           "name": "mesh",
           "type": "TRIMESH",
           "links": [
-            1
+            1,
+            3
           ]
         }
       ],
@@ -75,11 +115,40 @@
       ]
     },
     {
+      "id": 5,
+      "type": "PreviewAny",
+      "pos": [
+        468.1018614120618,
+        -148.67652403472005
+      ],
+      "size": [
+        140,
+        76
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 5
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.70",
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": []
+    },
+    {
       "id": 3,
       "type": "GeomPackMeshToMeshDistance",
       "pos": [
-        28.65018914966536,
-        36.021629374370555
+        76.17085030669006,
+        -21.829610295050838
       ],
       "size": [
         270,
@@ -104,12 +173,16 @@
         {
           "name": "distance",
           "type": "FLOAT",
-          "links": null
+          "links": [
+            5
+          ]
         },
         {
           "name": "info",
           "type": "STRING",
-          "links": null
+          "links": [
+            6
+          ]
         }
       ],
       "properties": {
@@ -122,6 +195,35 @@
         10000,
         "true"
       ]
+    },
+    {
+      "id": 6,
+      "type": "PreviewAny",
+      "pos": [
+        469.13491926330113,
+        7.3152115024697695
+      ],
+      "size": [
+        140,
+        76
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 6
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.70",
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": []
     }
   ],
   "links": [
@@ -140,6 +242,38 @@
       3,
       1,
       "TRIMESH"
+    ],
+    [
+      3,
+      1,
+      0,
+      4,
+      0,
+      "TRIMESH"
+    ],
+    [
+      4,
+      2,
+      0,
+      4,
+      1,
+      "TRIMESH"
+    ],
+    [
+      5,
+      3,
+      0,
+      5,
+      0,
+      "*"
+    ],
+    [
+      6,
+      3,
+      1,
+      6,
+      0,
+      "*"
     ]
   ],
   "groups": [],
@@ -148,8 +282,8 @@
     "ds": {
       "scale": 0.9680000000000015,
       "offset": [
-        609.5737584226475,
-        249.11040833224055
+        896.5675600755394,
+        327.3955322991826
       ]
     },
     "frontendVersion": "1.28.8"

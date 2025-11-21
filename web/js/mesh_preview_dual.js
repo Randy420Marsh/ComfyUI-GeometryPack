@@ -6,14 +6,19 @@
 
 import { app } from "../../../scripts/app.js";
 
+console.log('[GeomPack Dual JS] Loading mesh_preview_dual.js extension - v2 WITH INCREASED NODE HEIGHT (680px)');
+
 app.registerExtension({
     name: "geompack.meshpreview.dual",
 
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
+        console.log('[GeomPack Dual JS] beforeRegisterNodeDef called for:', nodeData.name);
         if (nodeData.name === "GeomPackPreviewMeshDual") {
             const onNodeCreated = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function() {
                 const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
+
+                console.log('[GeomPack Dual JS] Creating PreviewMeshDual node widget');
 
                 // Create container for viewer + info panel
                 const container = document.createElement("div");
@@ -22,15 +27,16 @@ app.registerExtension({
                 container.style.display = "flex";
                 container.style.flexDirection = "column";
                 container.style.backgroundColor = "#2a2a2a";
-                container.style.overflow = "hidden";
 
                 // Create iframe for VTK.js viewer
                 const iframe = document.createElement("iframe");
                 iframe.style.width = "100%";
-                iframe.style.flex = "1 1 0";
-                iframe.style.minHeight = "0";
+                iframe.style.flex = "1";
+                iframe.style.minHeight = "550px";
                 iframe.style.border = "none";
                 iframe.style.backgroundColor = "#2a2a2a";
+
+                console.log('[GeomPack Dual] Created iframe with minHeight:', iframe.style.minHeight);
 
                 // Point to unified dual VTK.js HTML viewer (with cache buster)
                 iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_dual.html?v=" + Date.now();
@@ -59,7 +65,7 @@ app.registerExtension({
                 });
 
                 // Default widget size (will be wider for side-by-side)
-                widget.computeSize = () => [768, 640];
+                widget.computeSize = () => [768, 680];
 
                 // Store iframe and info panel references
                 this.meshViewerIframeDual = iframe;
@@ -69,6 +75,13 @@ app.registerExtension({
                 let iframeLoaded = false;
                 iframe.addEventListener('load', () => {
                     iframeLoaded = true;
+                    console.log('[GeomPack Dual] Iframe loaded successfully');
+                    console.log('[GeomPack Dual] Iframe dimensions:', {
+                        width: iframe.offsetWidth,
+                        height: iframe.offsetHeight,
+                        clientWidth: iframe.clientWidth,
+                        clientHeight: iframe.clientHeight
+                    });
                 });
 
                 // Listen for messages from iframe
@@ -83,7 +96,25 @@ app.registerExtension({
                 });
 
                 // Set initial node size
-                this.setSize([768, 640]);
+                this.setSize([768, 680]);
+
+                // Debug: Log container and iframe info after setup
+                setTimeout(() => {
+                    console.log('[GeomPack Dual JS] Container dimensions:', {
+                        width: container.offsetWidth,
+                        height: container.offsetHeight,
+                        clientWidth: container.clientWidth,
+                        clientHeight: container.clientHeight
+                    });
+                    console.log('[GeomPack Dual JS] Iframe dimensions after setup:', {
+                        width: iframe.offsetWidth,
+                        height: iframe.offsetHeight,
+                        clientWidth: iframe.clientWidth,
+                        clientHeight: iframe.clientHeight,
+                        minHeight: iframe.style.minHeight,
+                        flex: iframe.style.flex
+                    });
+                }, 500);
 
                 // Handle execution
                 const onExecuted = this.onExecuted;
@@ -227,7 +258,10 @@ app.registerExtension({
                     // Function to send message
                     const sendMessage = () => {
                         if (iframe.contentWindow) {
+                            console.log('[GeomPack Dual] Sending message to iframe:', postMessageData);
                             iframe.contentWindow.postMessage(postMessageData, "*");
+                        } else {
+                            console.warn('[GeomPack Dual] iframe.contentWindow not available');
                         }
                     };
 

@@ -1,8 +1,8 @@
 {
   "id": "ecdb61a5-195b-4c1c-b3d9-08e897cdf20b",
   "revision": 0,
-  "last_node_id": 10,
-  "last_link_id": 11,
+  "last_node_id": 11,
+  "last_link_id": 13,
   "nodes": [
     {
       "id": 3,
@@ -25,7 +25,8 @@
           "type": "TRIMESH",
           "links": [
             7,
-            11
+            11,
+            12
           ]
         },
         {
@@ -71,7 +72,8 @@
           "name": "remeshed_mesh",
           "type": "TRIMESH",
           "links": [
-            8
+            8,
+            13
           ]
         },
         {
@@ -172,7 +174,7 @@
         246
       ],
       "flags": {},
-      "order": 5,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
@@ -219,6 +221,44 @@
       "widgets_values": [
         ""
       ]
+    },
+    {
+      "id": 11,
+      "type": "GeomPackPreviewMeshDual",
+      "pos": [
+        761.2342949993473,
+        450.4074403210589
+      ],
+      "size": [
+        768,
+        738
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh_1",
+          "type": "TRIMESH",
+          "link": 12
+        },
+        {
+          "name": "mesh_2",
+          "type": "TRIMESH",
+          "link": 13
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "a22feb725fe9afaf6cdcfa75002a514292fcec9a",
+        "Node name for S&R": "GeomPackPreviewMeshDual"
+      },
+      "widgets_values": [
+        "side_by_side",
+        1,
+        ""
+      ]
     }
   ],
   "links": [
@@ -261,6 +301,22 @@
       10,
       0,
       "TRIMESH"
+    ],
+    [
+      12,
+      3,
+      0,
+      11,
+      0,
+      "TRIMESH"
+    ],
+    [
+      13,
+      7,
+      0,
+      11,
+      1,
+      "TRIMESH"
     ]
   ],
   "groups": [],
@@ -269,8 +325,8 @@
     "ds": {
       "scale": 0.7513148009015777,
       "offset": [
-        867.9097050006526,
-        184.479559678941
+        654.9497050006527,
+        -137.62244032105897
       ]
     },
     "frontendVersion": "1.28.8"

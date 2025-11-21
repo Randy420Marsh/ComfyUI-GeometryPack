@@ -57,8 +57,6 @@ class PreviewMeshDualNode:
             },
             "optional": {
                 "layout": (["side_by_side", "overlay"], {"default": "side_by_side"}),
-                "mesh_1_color": (["default", "red", "blue", "green", "yellow", "cyan", "magenta", "orange", "purple"], {"default": "default"}),
-                "mesh_2_color": (["default", "red", "blue", "green", "yellow", "cyan", "magenta", "orange", "purple"], {"default": "default"}),
                 "opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
             }
         }
@@ -68,8 +66,7 @@ class PreviewMeshDualNode:
     FUNCTION = "preview_dual"
     CATEGORY = "geompack/visualization"
 
-    def preview_dual(self, mesh_1, mesh_2, layout="side_by_side",
-                     mesh_1_color="default", mesh_2_color="default", opacity=1.0):
+    def preview_dual(self, mesh_1, mesh_2, layout="side_by_side", opacity=1.0):
         """
         Preview two meshes with chosen layout and field visualization.
 
@@ -77,8 +74,6 @@ class PreviewMeshDualNode:
             mesh_1: First trimesh object
             mesh_2: Second trimesh object
             layout: "side_by_side" or "overlay"
-            mesh_1_color: Color for mesh_1 (overlay mode only, ignored if fields present)
-            mesh_2_color: Color for mesh_2 (overlay mode only, ignored if fields present)
             opacity: Opacity for both meshes (0.0-1.0)
 
         Returns:
@@ -132,8 +127,7 @@ class PreviewMeshDualNode:
         else:  # overlay
             # Combine meshes with color coding
             filename, filepath = self._export_combined_mesh(
-                mesh_1, mesh_2, preview_id,
-                mesh_1_color, mesh_2_color, opacity,
+                mesh_1, mesh_2, preview_id, opacity,
                 mesh_1_has_fields, mesh_2_has_fields
             )
 
@@ -153,8 +147,6 @@ class PreviewMeshDualNode:
                 "bounds_min": [combined_bounds_min.tolist()],
                 "bounds_max": [combined_bounds_max.tolist()],
                 "extents": [combined_extents.tolist()],
-                "mesh_1_color": [mesh_1_color],
-                "mesh_2_color": [mesh_2_color],
                 "opacity": [float(opacity)],
                 "is_watertight_1": [bool(mesh_1.is_watertight)],
                 "is_watertight_2": [bool(mesh_2.is_watertight)],
@@ -195,88 +187,27 @@ class PreviewMeshDualNode:
 
         return filename, filepath
 
-    def _export_combined_mesh(self, mesh_1, mesh_2, preview_id,
-                              color_1, color_2, opacity,
+    def _export_combined_mesh(self, mesh_1, mesh_2, preview_id, opacity,
                               mesh_1_has_fields, mesh_2_has_fields):
-        """Export combined mesh for overlay mode."""
+        """Export combined mesh for overlay mode as VTP."""
 
-        # If both meshes have fields, export as VTP
-        if mesh_1_has_fields and mesh_2_has_fields:
-            # Combine meshes preserving their fields
-            try:
-                combined = trimesh_module.util.concatenate([mesh_1, mesh_2])
-                filename = f"preview_dual_overlay_{preview_id}.vtp"
-
-                if COMFYUI_OUTPUT_FOLDER:
-                    filepath = os.path.join(COMFYUI_OUTPUT_FOLDER, filename)
-                else:
-                    filepath = os.path.join(tempfile.gettempdir(), filename)
-
-                export_mesh_with_scalars_vtp(combined, filepath)
-                print(f"[PreviewMeshDual] Exported combined VTP with fields: {filepath}")
-                return filename, filepath
-            except Exception as e:
-                print(f"[PreviewMeshDual] Failed to combine meshes with fields: {e}")
-                # Fall through to color-based export
-
-        # Otherwise, use vertex coloring for distinction
-        color_map = {
-            "red": [255, 100, 100],
-            "blue": [100, 150, 255],
-            "green": [100, 255, 100],
-            "yellow": [255, 255, 100],
-            "cyan": [100, 255, 255],
-            "magenta": [255, 100, 255],
-            "orange": [255, 180, 100],
-            "purple": [200, 100, 255],
-            "default": [255, 255, 255],  # White
-        }
-
-        alpha = int(opacity * 255)
-
-        # Create colored copies
-        mesh_1_colored = mesh_1.copy()
-        mesh_2_colored = mesh_2.copy()
-
-        # Assign vertex colors
-        color_1_rgba = color_map.get(color_1, [255, 100, 100]) + [alpha]
-        mesh_1_colored.visual.vertex_colors = np.tile(
-            color_1_rgba, (len(mesh_1.vertices), 1)
-        ).astype(np.uint8)
-
-        color_2_rgba = color_map.get(color_2, [100, 150, 255]) + [alpha]
-        mesh_2_colored.visual.vertex_colors = np.tile(
-            color_2_rgba, (len(mesh_2.vertices), 1)
-        ).astype(np.uint8)
-
-        # Combine meshes
+        # Combine meshes (with or without fields)
         try:
-            combined = trimesh_module.util.concatenate([mesh_1_colored, mesh_2_colored])
+            combined = trimesh_module.util.concatenate([mesh_1, mesh_2])
+            filename = f"preview_dual_overlay_{preview_id}.vtp"
+
+            if COMFYUI_OUTPUT_FOLDER:
+                filepath = os.path.join(COMFYUI_OUTPUT_FOLDER, filename)
+            else:
+                filepath = os.path.join(tempfile.gettempdir(), filename)
+
+            export_mesh_with_scalars_vtp(combined, filepath)
+            print(f"[PreviewMeshDual] Exported combined VTP: {filepath}")
             print(f"[PreviewMeshDual] Combined mesh: {len(combined.vertices)} vertices, {len(combined.faces)} faces")
+            return filename, filepath
         except Exception as e:
-            print(f"[PreviewMeshDual] Failed to combine meshes: {e}")
-            combined = mesh_1_colored
-
-        # Export to GLB (preserves vertex colors)
-        filename = f"preview_dual_overlay_{preview_id}.glb"
-
-        if COMFYUI_OUTPUT_FOLDER:
-            filepath = os.path.join(COMFYUI_OUTPUT_FOLDER, filename)
-        else:
-            filepath = os.path.join(tempfile.gettempdir(), filename)
-
-        try:
-            combined.export(filepath, file_type='glb', include_normals=True)
-            print(f"[PreviewMeshDual] Exported combined GLB: {filepath}")
-        except Exception as e:
-            print(f"[PreviewMeshDual] GLB export failed: {e}")
-            # Fallback to OBJ
-            filename = filename.replace('.glb', '.obj')
-            filepath = filepath.replace('.glb', '.obj')
-            combined.export(filepath, file_type='obj')
-            print(f"[PreviewMeshDual] Exported OBJ fallback: {filepath}")
-
-        return filename, filepath
+            print(f"[PreviewMeshDual] Failed to export combined mesh: {e}")
+            raise
 
 
 NODE_CLASS_MAPPINGS = {

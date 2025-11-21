@@ -1,40 +1,9 @@
 {
   "id": "58a80d52-612a-405e-b687-4696702fb5a6",
   "revision": 1,
-  "last_node_id": 19,
-  "last_link_id": 24,
+  "last_node_id": 20,
+  "last_link_id": 26,
   "nodes": [
-    {
-      "id": 4,
-      "type": "GeomPackPreviewMeshVTK",
-      "pos": [
-        46.75901565551733,
-        -173.09612621307397
-      ],
-      "size": [
-        450,
-        678
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 3
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "8b8322e2f784d84097cd3427f097b55dc9a29d2a",
-        "Node name for S&R": "GeomPackPreviewMeshVTK"
-      },
-      "widgets_values": [
-        ""
-      ]
-    },
     {
       "id": 3,
       "type": "GeomPackBooleanOp",
@@ -72,9 +41,7 @@
         {
           "name": "info",
           "type": "STRING",
-          "links": [
-            22
-          ]
+          "links": []
         }
       ],
       "properties": {
@@ -86,35 +53,6 @@
         "union",
         "libigl_cgal"
       ]
-    },
-    {
-      "id": 18,
-      "type": "PreviewAny",
-      "pos": [
-        -280.61808267817673,
-        57.969546505383164
-      ],
-      "size": [
-        291.2499999999998,
-        320.4200092315672
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "source",
-          "type": "*",
-          "link": 22
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.3.70",
-        "Node name for S&R": "PreviewAny"
-      },
-      "widgets_values": []
     },
     {
       "id": 1,
@@ -137,7 +75,7 @@
           "type": "TRIMESH",
           "links": [
             1,
-            23
+            25
           ]
         }
       ],
@@ -173,7 +111,7 @@
           "type": "TRIMESH",
           "links": [
             2,
-            24
+            26
           ]
         }
       ],
@@ -189,41 +127,71 @@
       ]
     },
     {
-      "id": 19,
-      "type": "GeomPackPreviewMeshVTKDual",
+      "id": 4,
+      "type": "GeomPackPreviewMeshVTK",
       "pos": [
-        -481.5729971526634,
-        155.11454028742656
+        379.50901565551703,
+        -289.55862621307386
       ],
       "size": [
-        512,
-        830
+        450,
+        678
       ],
       "flags": {},
-      "order": 3,
+      "order": 4,
       "mode": 0,
       "inputs": [
         {
-          "name": "mesh_a",
+          "name": "trimesh",
           "type": "TRIMESH",
-          "link": 23
-        },
-        {
-          "name": "mesh_b",
-          "type": "TRIMESH",
-          "link": 24
+          "link": 3
         }
       ],
       "outputs": [],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
         "ver": "8b8322e2f784d84097cd3427f097b55dc9a29d2a",
-        "Node name for S&R": "GeomPackPreviewMeshVTKDual"
+        "Node name for S&R": "GeomPackPreviewMeshVTK"
       },
       "widgets_values": [
-        "red",
-        "blue",
-        0.5,
+        ""
+      ]
+    },
+    {
+      "id": 20,
+      "type": "GeomPackPreviewMeshDual",
+      "pos": [
+        -436.01592816696603,
+        2.102509733358315
+      ],
+      "size": [
+        768,
+        738
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh_1",
+          "type": "TRIMESH",
+          "link": 25
+        },
+        {
+          "name": "mesh_2",
+          "type": "TRIMESH",
+          "link": 26
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "a22feb725fe9afaf6cdcfa75002a514292fcec9a",
+        "Node name for S&R": "GeomPackPreviewMeshDual"
+      },
+      "widgets_values": [
+        "side_by_side",
+        1,
         ""
       ]
     }
@@ -254,26 +222,18 @@
       "TRIMESH"
     ],
     [
-      22,
-      3,
-      1,
-      18,
-      0,
-      "*"
-    ],
-    [
-      23,
+      25,
       1,
       0,
-      19,
+      20,
       0,
       "TRIMESH"
     ],
     [
-      24,
+      26,
       2,
       0,
-      19,
+      20,
       1,
       "TRIMESH"
     ]
@@ -284,8 +244,8 @@
     "ds": {
       "scale": 0.6611570247933891,
       "offset": [
-        1335.9534281669653,
-        339.7224902666414
+        1552.2409281669657,
+        395.6849902666413
       ]
     },
     "frontendVersion": "1.28.8"
