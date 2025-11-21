@@ -272,7 +272,6 @@
         const vtkOBJReader = vtk.IO.Misc.vtkOBJReader;
         const vtkPolyDataNormals = vtk.Filters.Core.vtkPolyDataNormals;
 
-        console.log('[GeomPack VTK Textured Viewer] Initializing (GLTF support:', gltfSupported, ')');
 
         // Helper function to convert RGB values (0-1 range) to RGB string
         function createRGBStringFromRGBValues(r, g, b) {
@@ -374,7 +373,6 @@
                 // Wait for GLTF parsing to complete using onReady callback
                 await new Promise((resolve, reject) => {
                     importer.onReady(() => {
-                        console.log('[GeomPack VTK Textured] GLTF parsing completed');
                         resolve();
                     });
 
@@ -382,13 +380,11 @@
                     importer.loadData().catch(reject);
                 });
 
-                console.log('[GeomPack VTK Textured] GLTF data loaded successfully');
 
                 // Debug: Check internal GLTF model state
                 const state = importer.getState();
                 if (state.glTFTree?.json) {
                     const json = state.glTFTree.json;
-                    console.log('[GeomPack VTK Textured] GLTF contains:', json.images?.length || 0, 'images,', json.textures?.length || 0, 'textures,', json.materials?.length || 0, 'materials');
                 }
 
                 // Now import actors (creates VTK actors and adds them to renderer)
@@ -406,58 +402,43 @@
                     const property = actor.getProperty();
                     const input = mapper?.getInputData();
 
-                    if (input) {
-                        const points = input.getNumberOfPoints();
-                        const hasTCoords = input.getPointData().getTCoords() !== null;
-
-                        // Only process actors with geometry
-                        if (points > 0) {
-                            // Apply texture and material fixes
-                            if (property) {
-                                const diffuseTexture = property.getDiffuseTexture();
-
-                                // Add texture directly to actor (required for WebGL rendering)
-                                if (diffuseTexture) {
-                                    actor.addTexture(diffuseTexture);
-                                }
-
-                                // Set Phong shading and remove metallic-roughness texture
-                                property.setInterpolation(2); // Phong mode
-                                if (property.getRMTexture?.()) {
-                                    property.setRMTexture(null);
-                                }
-
-                                // Configure material properties for non-metallic diffuse rendering
-                                property.setMetallic(0.0);
-                                property.setRoughness(1.0);
-                                property.setAmbient(0.2);
-                                property.setDiffuse(0.9);
-                                property.setSpecular(0.1);
-                                property.setSpecularPower(10.0);
-                                property.modified();
+                    if (input && input.getNumberOfPoints() > 0) {
+                        if (property) {
+                            // CRITICAL FIX: Remove metallicRoughnessTexture if present
+                            // VTK.js GLTFImporter may use this instead of baseColorTexture
+                            if (typeof property.setRMTexture === 'function') {
+                                property.setRMTexture(null);
+                            }
+                            if (typeof property.setMetallicRoughnessTexture === 'function') {
+                                property.setMetallicRoughnessTexture(null);
                             }
 
-                            // Configure mapper for texture rendering
-                            if (mapper) {
-                                // Disable scalar coloring to use textures
-                                mapper.setScalarVisibility(false);
-
-                                // Set DEFAULT color mode instead of DIRECT_SCALARS
-                                mapper.setColorMode(0);
-
-                                // Disable scalar interpolation
-                                if (mapper.setInterpolateScalarsBeforeMapping) {
-                                    mapper.setInterpolateScalarsBeforeMapping(false);
-                                }
-
-                                // Rebuild shaders with new settings
-                                mapper.modified();
+                            // Try multiple methods to get the base color texture
+                            let texture = null;
+                            if (typeof property.getBaseColorTexture === 'function') {
+                                texture = property.getBaseColorTexture();
+                            }
+                            if (!texture && typeof property.getDiffuseTexture === 'function') {
+                                texture = property.getDiffuseTexture();
+                            }
+                            if (!texture && typeof property.getTexture === 'function') {
+                                texture = property.getTexture();
                             }
 
-                            // Warn if UVs exist but no texture
-                            if (hasTCoords && property && !property.getDiffuseTexture()) {
-                                console.warn(`[GeomPack VTK Textured] ⚠ Actor ${index} has UVs but no diffuse texture applied!`);
+                            if (texture) {
+                                actor.addTexture(texture);
                             }
+
+                            // Set material to non-metallic for proper texture display
+                            property.setMetallic(0.0);
+                            property.setRoughness(1.0);
+                            property.setInterpolation(2);
+                        }
+
+                        // Configure mapper for texture rendering
+                        if (mapper) {
+                            mapper.setScalarVisibility(false);
+                            mapper.modified();
                         }
                     }
                 });
@@ -492,7 +473,6 @@
                 }, 100);
 
                 loading.style.display = 'none';
-                console.log(`[GeomPack VTK Textured] ✓ Scene loaded with ${actors.length} actor(s)`);
 
                 return true;
             } catch (error) {
@@ -510,7 +490,6 @@
 
         // Fallback loader for OBJ files
         async function loadOBJMesh(filepath) {
-            console.log('[GeomPack VTK Textured] Falling back to OBJ loader:', filepath);
             loading.textContent = 'Loading mesh (fallback OBJ)...';
 
             try {
@@ -564,7 +543,6 @@
 
         // Main load function
         async function loadMesh(filepath, metadata = {}) {
-            console.log('[GeomPack VTK Textured] Loading:', filepath.split('filename=')[1]?.split('&')[0] || filepath);
 
             // Update info panel
             if (metadata.visual_kind) {
@@ -737,7 +715,6 @@
         window.loadMesh = loadMesh;
         window.gltfSupported = gltfSupported;
 
-        console.log('[GeomPack VTK Textured Viewer] ✓ Ready');
 
         // Listen for postMessage from parent widget
         window.addEventListener('message', async (event) => {

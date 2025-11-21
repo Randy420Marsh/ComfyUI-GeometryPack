@@ -44,14 +44,14 @@
     },
     {
       "id": 12,
-      "type": "GeomPackPreviewMeshVTKWithTexture",
+      "type": "GeomPackPreviewMeshVTK",
       "pos": [
         101.0390177641855,
         135.1548295021259
       ],
       "size": [
         246.8443359375,
-        26
+        46
       ],
       "flags": {},
       "order": 1,
@@ -67,9 +67,11 @@
       "properties": {
         "cnr_id": "comfyui-geometrypack",
         "ver": "e59ff5e433b8da6f9374944a69a618a2c8401f95",
-        "Node name for S&R": "GeomPackPreviewMeshVTKWithTexture"
+        "Node name for S&R": "GeomPackPreviewMeshVTK"
       },
-      "widgets_values": []
+      "widgets_values": [
+        "texture"
+      ]
     }
   ],
   "links": [

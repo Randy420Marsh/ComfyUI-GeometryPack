@@ -339,7 +339,6 @@
         const vtkColorMaps = vtk.Rendering.Core.vtkColorTransferFunction.vtkColorMaps;
         const vtkGLTFImporter = vtk.IO.Geometry.vtkGLTFImporter;
 
-        console.log('[GeomPack VTK Dual Viewer] Initializing...');
 
         const loading = document.getElementById('loading');
         const sideBySideContainer = document.getElementById('sideBySideContainer');
@@ -553,7 +552,6 @@
         // Load GLB mesh using vtkGLTFImporter (texture mode)
         async function loadGLBMesh(filepath, targetRenderer, isMesh1 = true, isOverlay = false) {
             const meshLabel = isOverlay ? 'combined' : (isMesh1 ? '1' : '2');
-            console.log(`[GeomPack VTK Dual Textured] Loading GLB ${meshLabel}:`, filepath);
 
             try {
                 const importer = vtkGLTFImporter.newInstance();
@@ -563,7 +561,6 @@
                 // Wait for GLTF parsing
                 await new Promise((resolve, reject) => {
                     importer.onReady(() => {
-                        console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} parsing completed`);
                         resolve();
                     });
                     importer.loadData().catch(reject);
@@ -576,7 +573,6 @@
                 const actorsMap = importer.getActors();
                 const actors = Array.from(actorsMap.values());
 
-                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} loaded, ${actors.length} actors`);
 
                 let bounds = null;
                 actors.forEach((actor, actorIndex) => {
@@ -585,7 +581,6 @@
                     const input = mapper?.getInputData();
 
                     const numPoints = input?.getNumberOfPoints() || 0;
-                    console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex}:`, {
                         points: numPoints,
                         hasDiffuseTexture: property ? !!property.getDiffuseTexture() : false,
                         hasMapper: !!mapper,
@@ -596,7 +591,6 @@
 
                     // Skip actors with no geometry - they serve no purpose and may cause rendering issues
                     if (numPoints === 0) {
-                        console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} has NO geometry, removing from renderer`);
                         targetRenderer.removeActor(actor);
                         return; // Skip this actor entirely
                     }
@@ -617,68 +611,42 @@
                             ];
                         }
 
-                        // Apply texture fixes from viewer_vtk_textured.html
+                        // Apply texture fixes
                         if (property) {
-                            const diffuseTexture = property.getDiffuseTexture();
-                            if (diffuseTexture) {
-                                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} HAS diffuseTexture, applying...`);
-                                actor.addTexture(diffuseTexture);
-
-                                // CRITICAL FIX: Set texture repeat mode to handle out-of-range UVs
-                                // By default, textures clamp which causes zoomed-in appearance when UVs > 1.0
-                                // Setting to REPEAT makes UVs wrap around correctly
-                                diffuseTexture.setRepeat(true);
-                                diffuseTexture.setEdgeClamp(false);
-
-                                // Also set interpolation for better quality
-                                diffuseTexture.setInterpolate(true);
-
-                                // Debug texture info
-                                const img = diffuseTexture.getImage?.();
-                                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} texture image:`, img ? `${img.width}x${img.height}` : 'null (loading async)');
-
-                                // Verify texture was added to actor
-                                const actorTextures = actor.getTextures();
-                                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} textures count after addTexture:`, actorTextures ? actorTextures.length : 0);
-                            } else {
-                                console.warn(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} has NO diffuseTexture!`);
-                            }
-
-                            // Set Phong shading
-                            property.setInterpolation(2);
-                            if (property.getRMTexture?.()) {
+                            // CRITICAL FIX: Remove metallicRoughnessTexture if present
+                            if (typeof property.setRMTexture === 'function') {
                                 property.setRMTexture(null);
                             }
+                            if (typeof property.setMetallicRoughnessTexture === 'function') {
+                                property.setMetallicRoughnessTexture(null);
+                            }
 
-                            // Configure material properties
+                            // Try multiple texture getter methods for compatibility
+                            let texture = null;
+                            if (typeof property.getBaseColorTexture === 'function') {
+                                texture = property.getBaseColorTexture();
+                            }
+                            if (!texture && typeof property.getDiffuseTexture === 'function') {
+                                texture = property.getDiffuseTexture();
+                            }
+                            if (!texture && typeof property.getTexture === 'function') {
+                                texture = property.getTexture();
+                            }
+
+                            if (texture) {
+                                actor.addTexture(texture);
+                            }
+
+                            // Set material to non-metallic for proper texture display
                             property.setMetallic(0.0);
                             property.setRoughness(1.0);
-                            property.setAmbient(0.2);
-                            property.setDiffuse(0.9);
-                            property.setSpecular(0.1);
-                            property.setSpecularPower(10.0);
-                            property.modified();
+                            property.setInterpolation(2);
                         }
 
-                        // Configure mapper and check UV coordinates
+                        // Configure mapper for texture rendering
                         if (mapper) {
                             mapper.setScalarVisibility(false);
-                            mapper.setColorMode(0);
-                            if (mapper.setInterpolateScalarsBeforeMapping) {
-                                mapper.setInterpolateScalarsBeforeMapping(false);
-                            }
-
-                            // Debug: Check UV coordinates
-                            if (input) {
-                                const tcoords = input.getPointData().getTCoords();
-                                if (tcoords) {
-                                    const range = tcoords.getRange();
-                                    const numTuples = tcoords.getNumberOfTuples();
-                                    console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} UVs: ${numTuples} coords, range=[${range[0].toFixed(4)}, ${range[1].toFixed(4)}]`);
-                                } else {
-                                    console.warn(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} has NO UV coordinates!`);
-                                }
-                            }
+                            mapper.modified();
                         }
                     }
                 });
@@ -695,7 +663,6 @@
                     rightActors = actors;
                 }
 
-                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} loaded successfully, bounds:`, bounds);
             } catch (error) {
                 console.error(`[GeomPack VTK Dual Textured] Error loading GLB ${meshLabel}:`, error);
                 throw error;
@@ -923,7 +890,6 @@
             if (event.data.type === 'LOAD_DUAL_MESH') {
                 const data = event.data;
 
-                console.log('[GeomPack VTK Dual Textured] Received LOAD_DUAL_MESH message:', data);
 
                 viewerLayout = data.layout;
 
@@ -999,7 +965,6 @@
                     isInitialized = true;
 
                     loading.style.display = 'none';
-                    console.log('[GeomPack VTK Dual Textured] Meshes loaded successfully');
 
                 } catch (error) {
                     console.error('[GeomPack VTK Dual Textured] Error loading meshes:', error);
@@ -1061,7 +1026,6 @@
             const newRepresentation = parseInt(representationSettings.value);
             const newParallelProjection = parallelProjectionInput.checked;
 
-            console.log('[GeomPack VTK Dual Viewer] Applying settings - Point Size:', newPointSize, 'Color:', newColor, 'Edge Width:', newEdgeWidth, 'Representation:', newRepresentation, 'Parallel:', newParallelProjection);
 
             // Convert hex color to RGB (0-1 range)
             const r = parseInt(newColor.substr(1, 2), 16) / 255;
@@ -1121,7 +1085,6 @@
             currentRepresentation = newRepresentation;
             currentParallelProjection = newParallelProjection;
 
-            console.log('[GeomPack VTK Dual Viewer] Settings applied - RGB:', [r, g, b], 'Point Size:', newPointSize, 'Line Width:', newEdgeWidth, 'Representation:', newRepresentation, 'Parallel:', newParallelProjection);
 
             // Close panel
             closeSettingsPanel();
@@ -1130,7 +1093,6 @@
         // Event handlers
         document.getElementById('showEdges').addEventListener('change', (e) => {
             const edgeViz = e.target.checked;
-            console.log(`[GeomPack VTK Dual Textured] Edges toggle: ${edgeViz}`);
 
             if (viewerLayout === 'side_by_side') {
                 // Apply to all actors in left and right (GLB can have multiple actors)
@@ -1352,7 +1314,6 @@
             }
         });
 
-        console.log('[GeomPack VTK Dual Viewer] Ready');
 
         // Debug: Check if edges button is visible
         setTimeout(() => {
@@ -1360,15 +1321,12 @@
             const controlsDiv = document.getElementById('controls');
             const bodyEl = document.body;
 
-            console.log('[GeomPack VTK Dual Viewer] DEBUG - Edges checkbox element:', showEdgesCheckbox);
-            console.log('[GeomPack VTK Dual Viewer] DEBUG - Controls div:', controlsDiv);
 
             if (showEdgesCheckbox) {
                 const rect = showEdgesCheckbox.getBoundingClientRect();
                 const computedStyle = window.getComputedStyle(showEdgesCheckbox);
                 const parentStyle = window.getComputedStyle(controlsDiv);
 
-                console.log('[GeomPack VTK Dual Viewer] DEBUG - Edges checkbox position:', {
                     top: rect.top,
                     left: rect.left,
                     width: rect.width,
@@ -1376,26 +1334,22 @@
                     bottom: rect.bottom,
                     right: rect.right
                 });
-                console.log('[GeomPack VTK Dual Viewer] DEBUG - Edges checkbox style:', {
                     display: computedStyle.display,
                     visibility: computedStyle.visibility,
                     opacity: computedStyle.opacity,
                     position: computedStyle.position
                 });
-                console.log('[GeomPack VTK Dual Viewer] DEBUG - Controls div style:', {
                     display: parentStyle.display,
                     visibility: parentStyle.visibility,
                     position: parentStyle.position,
                     bottom: parentStyle.bottom,
                     height: parentStyle.height
                 });
-                console.log('[GeomPack VTK Dual Viewer] DEBUG - Body/viewport dimensions:', {
                     bodyHeight: bodyEl.offsetHeight,
                     bodyScrollHeight: bodyEl.scrollHeight,
                     windowHeight: window.innerHeight,
                     viewportHeight: document.documentElement.clientHeight
                 });
-                console.log('[GeomPack VTK Dual Viewer] DEBUG - Is edges checkbox visible in viewport?',
                     rect.top >= 0 && rect.bottom <= window.innerHeight);
             } else {
                 console.error('[GeomPack VTK Dual Viewer] DEBUG - Edges checkbox NOT FOUND!');

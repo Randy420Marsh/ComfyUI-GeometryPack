@@ -287,9 +287,212 @@ def create_plane(size: float = 1.0, subdivisions: int = 1) -> trimesh.Trimesh:
     return mesh
 
 
+def extract_visual_info(mesh: trimesh.Trimesh) -> dict:
+    """
+    Extract comprehensive visual and material information from a mesh.
+
+    Args:
+        mesh: Trimesh object
+
+    Returns:
+        Dictionary with visual information
+    """
+    info = {
+        'visual_type': 'none',
+        'has_material': False,
+        'material_type': None,
+        'has_uv': False,
+        'uv_count': 0,
+        'uv_range_u': None,
+        'uv_range_v': None,
+        'has_vertex_colors': False,
+        'has_face_colors': False,
+        'texture_dimensions': None,
+        'texture_format': None,
+    }
+
+    if not hasattr(mesh, 'visual') or mesh.visual is None:
+        return info
+
+    visual = mesh.visual
+
+    # Determine visual type
+    visual_class = type(visual).__name__
+    if 'TextureVisuals' in visual_class:
+        info['visual_type'] = 'texture'
+    elif 'ColorVisuals' in visual_class:
+        info['visual_type'] = 'color'
+    else:
+        info['visual_type'] = visual_class.lower()
+
+    # Check for material
+    if hasattr(visual, 'material') and visual.material is not None:
+        info['has_material'] = True
+        info['material_type'] = type(visual.material).__name__
+
+    # Check for UV coordinates
+    if hasattr(visual, 'uv') and visual.uv is not None and len(visual.uv) > 0:
+        info['has_uv'] = True
+        info['uv_count'] = len(visual.uv)
+        uv_array = np.array(visual.uv)
+        info['uv_range_u'] = (float(uv_array[:, 0].min()), float(uv_array[:, 0].max()))
+        info['uv_range_v'] = (float(uv_array[:, 1].min()), float(uv_array[:, 1].max()))
+
+    # Check for vertex colors
+    if hasattr(visual, 'vertex_colors') and visual.vertex_colors is not None and len(visual.vertex_colors) > 0:
+        info['has_vertex_colors'] = True
+
+    # Check for face colors
+    if hasattr(visual, 'face_colors') and visual.face_colors is not None and len(visual.face_colors) > 0:
+        info['has_face_colors'] = True
+
+    # Check for texture image
+    if hasattr(visual, 'material') and visual.material is not None:
+        material = visual.material
+        # Try to get texture image from various sources
+        texture_image = None
+        if hasattr(material, 'image') and material.image is not None:
+            texture_image = material.image
+        elif hasattr(material, 'baseColorTexture') and material.baseColorTexture is not None:
+            texture_image = material.baseColorTexture
+
+        if texture_image is not None:
+            # PIL Image object
+            if hasattr(texture_image, 'size'):
+                info['texture_dimensions'] = texture_image.size
+                info['texture_format'] = texture_image.format or 'unknown'
+
+    return info
+
+
+def extract_pbr_properties(material) -> dict:
+    """
+    Extract PBR material properties from a trimesh material object.
+
+    Args:
+        material: trimesh material object (e.g., PBRMaterial, SimpleMaterial)
+
+    Returns:
+        Dictionary with PBR properties
+    """
+    props = {
+        'has_base_color_texture': False,
+        'has_metallic_roughness_texture': False,
+        'has_normal_texture': False,
+        'has_occlusion_texture': False,
+        'has_emissive_texture': False,
+        'metallic_factor': None,
+        'roughness_factor': None,
+        'base_color_factor': None,
+        'emissive_factor': None,
+        'alpha_mode': None,
+        'alpha_cutoff': None,
+        'double_sided': None,
+    }
+
+    if material is None:
+        return props
+
+    # Base color texture
+    if hasattr(material, 'baseColorTexture') and material.baseColorTexture is not None:
+        props['has_base_color_texture'] = True
+
+    # Metallic/roughness texture
+    if hasattr(material, 'metallicRoughnessTexture') and material.metallicRoughnessTexture is not None:
+        props['has_metallic_roughness_texture'] = True
+
+    # Normal texture
+    if hasattr(material, 'normalTexture') and material.normalTexture is not None:
+        props['has_normal_texture'] = True
+
+    # Occlusion texture
+    if hasattr(material, 'occlusionTexture') and material.occlusionTexture is not None:
+        props['has_occlusion_texture'] = True
+
+    # Emissive texture
+    if hasattr(material, 'emissiveTexture') and material.emissiveTexture is not None:
+        props['has_emissive_texture'] = True
+
+    # Metallic factor
+    if hasattr(material, 'metallicFactor'):
+        props['metallic_factor'] = material.metallicFactor
+
+    # Roughness factor
+    if hasattr(material, 'roughnessFactor'):
+        props['roughness_factor'] = material.roughnessFactor
+
+    # Base color factor
+    if hasattr(material, 'baseColorFactor'):
+        props['base_color_factor'] = material.baseColorFactor
+
+    # Emissive factor
+    if hasattr(material, 'emissiveFactor'):
+        props['emissive_factor'] = material.emissiveFactor
+
+    # Alpha mode
+    if hasattr(material, 'alphaMode'):
+        props['alpha_mode'] = material.alphaMode
+
+    # Alpha cutoff
+    if hasattr(material, 'alphaCutoff'):
+        props['alpha_cutoff'] = material.alphaCutoff
+
+    # Double sided
+    if hasattr(material, 'doubleSided'):
+        props['double_sided'] = material.doubleSided
+
+    return props
+
+
+def extract_custom_attributes(mesh: trimesh.Trimesh) -> dict:
+    """
+    Extract custom vertex and face attributes from a mesh.
+
+    Args:
+        mesh: Trimesh object
+
+    Returns:
+        Dictionary with attribute information
+    """
+    attrs = {
+        'vertex_attributes': {},
+        'face_attributes': {},
+    }
+
+    # Vertex attributes
+    if hasattr(mesh, 'vertex_attributes') and mesh.vertex_attributes:
+        for name, values in mesh.vertex_attributes.items():
+            attr_info = {
+                'count': len(values),
+                'dtype': str(values.dtype) if hasattr(values, 'dtype') else 'unknown',
+                'shape': values.shape if hasattr(values, 'shape') else None,
+            }
+            # Add value range if numeric
+            if hasattr(values, 'dtype') and np.issubdtype(values.dtype, np.number):
+                attr_info['min'] = float(np.min(values))
+                attr_info['max'] = float(np.max(values))
+            attrs['vertex_attributes'][name] = attr_info
+
+    # Face attributes
+    if hasattr(mesh, 'face_attributes') and mesh.face_attributes:
+        for name, values in mesh.face_attributes.items():
+            attr_info = {
+                'count': len(values),
+                'dtype': str(values.dtype) if hasattr(values, 'dtype') else 'unknown',
+                'shape': values.shape if hasattr(values, 'shape') else None,
+            }
+            # Add value range if numeric
+            if hasattr(values, 'dtype') and np.issubdtype(values.dtype, np.number):
+                attr_info['min'] = float(np.min(values))
+                attr_info['max'] = float(np.max(values))
+            attrs['face_attributes'][name] = attr_info
+
+    return attrs
+
+
 def compute_mesh_info(mesh: trimesh.Trimesh) -> str:
     """
-    Generate a formatted string with mesh information.
+    Generate a formatted string with comprehensive mesh information including PBR materials.
 
     Args:
         mesh: Trimesh object
@@ -322,20 +525,216 @@ def compute_mesh_info(mesh: trimesh.Trimesh) -> str:
     info += f"  Center: [{center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f}]\n"
     info += f"  Extents: [{extents[0]:.3f}, {extents[1]:.3f}, {extents[2]:.3f}]\n\n"
 
-    # Additional data
-    if hasattr(mesh.visual, 'vertex_colors') and mesh.visual.vertex_colors is not None:
-        info += f"Vertex Colors: Yes\n"
+    # Visual & Material information
+    visual_info = extract_visual_info(mesh)
+    info += "=== Visual & Material ===\n\n"
+    info += f"Visual Type: {visual_info['visual_type']}\n"
+    info += f"Has Material: {visual_info['has_material']}\n"
+    if visual_info['material_type']:
+        info += f"Material Type: {visual_info['material_type']}\n"
+    info += f"UV Coordinates: {'Yes' if visual_info['has_uv'] else 'No'}"
+    if visual_info['has_uv']:
+        info += f" ({visual_info['uv_count']:,} entries)\n"
+        if visual_info['uv_range_u'] and visual_info['uv_range_v']:
+            info += f"  UV Range: U[{visual_info['uv_range_u'][0]:.3f}, {visual_info['uv_range_u'][1]:.3f}], "
+            info += f"V[{visual_info['uv_range_v'][0]:.3f}, {visual_info['uv_range_v'][1]:.3f}]\n"
+    else:
+        info += "\n"
+    info += f"Vertex Colors: {'Yes' if visual_info['has_vertex_colors'] else 'No'}\n"
+    info += f"Face Colors: {'Yes' if visual_info['has_face_colors'] else 'No'}\n"
+    if visual_info['texture_dimensions']:
+        info += f"Texture Dimensions: {visual_info['texture_dimensions'][0]}x{visual_info['texture_dimensions'][1]}\n"
+        if visual_info['texture_format']:
+            info += f"Texture Format: {visual_info['texture_format']}\n"
+    info += "\n"
 
+    # PBR Material Properties
+    if visual_info['has_material'] and hasattr(mesh.visual, 'material'):
+        pbr_props = extract_pbr_properties(mesh.visual.material)
+        info += "=== PBR Material Properties ===\n\n"
+        info += f"Base Color Texture: {'Yes' if pbr_props['has_base_color_texture'] else 'No'}\n"
+        info += f"Metallic/Roughness Texture: {'Yes' if pbr_props['has_metallic_roughness_texture'] else 'No'}\n"
+        info += f"Normal Map: {'Yes' if pbr_props['has_normal_texture'] else 'No'}\n"
+        info += f"Occlusion Texture: {'Yes' if pbr_props['has_occlusion_texture'] else 'No'}\n"
+        info += f"Emissive Texture: {'Yes' if pbr_props['has_emissive_texture'] else 'No'}\n"
+
+        if pbr_props['metallic_factor'] is not None:
+            info += f"Metallic Factor: {pbr_props['metallic_factor']:.3f}\n"
+        if pbr_props['roughness_factor'] is not None:
+            info += f"Roughness Factor: {pbr_props['roughness_factor']:.3f}\n"
+        if pbr_props['base_color_factor'] is not None:
+            bcf = pbr_props['base_color_factor']
+            if hasattr(bcf, '__len__') and len(bcf) >= 3:
+                info += f"Base Color Factor: [{bcf[0]:.3f}, {bcf[1]:.3f}, {bcf[2]:.3f}"
+                if len(bcf) >= 4:
+                    info += f", {bcf[3]:.3f}]\n"
+                else:
+                    info += "]\n"
+            else:
+                info += f"Base Color Factor: {bcf}\n"
+        if pbr_props['emissive_factor'] is not None:
+            ef = pbr_props['emissive_factor']
+            if hasattr(ef, '__len__') and len(ef) >= 3:
+                info += f"Emissive Factor: [{ef[0]:.3f}, {ef[1]:.3f}, {ef[2]:.3f}]\n"
+            else:
+                info += f"Emissive Factor: {ef}\n"
+        if pbr_props['alpha_mode'] is not None:
+            info += f"Alpha Mode: {pbr_props['alpha_mode']}\n"
+        if pbr_props['alpha_cutoff'] is not None:
+            info += f"Alpha Cutoff: {pbr_props['alpha_cutoff']:.3f}\n"
+        if pbr_props['double_sided'] is not None:
+            info += f"Double Sided: {pbr_props['double_sided']}\n"
+        info += "\n"
+
+    # Custom Attributes
+    custom_attrs = extract_custom_attributes(mesh)
+    info += "=== Custom Attributes ===\n\n"
+
+    if custom_attrs['vertex_attributes']:
+        info += "Vertex Attributes:\n"
+        for name, attr in custom_attrs['vertex_attributes'].items():
+            info += f"  {name}: {attr['dtype']}"
+            if attr['shape']:
+                info += f" {attr['shape']}"
+            if 'min' in attr and 'max' in attr:
+                info += f" range=[{attr['min']:.3f}, {attr['max']:.3f}]"
+            info += "\n"
+    else:
+        info += "Vertex Attributes: (none)\n"
+
+    if custom_attrs['face_attributes']:
+        info += "Face Attributes:\n"
+        for name, attr in custom_attrs['face_attributes'].items():
+            info += f"  {name}: {attr['dtype']}"
+            if attr['shape']:
+                info += f" {attr['shape']}"
+            if 'min' in attr and 'max' in attr:
+                info += f" range=[{attr['min']:.3f}, {attr['max']:.3f}]"
+            info += "\n"
+    else:
+        info += "Face Attributes: (none)\n"
+
+    # Vertex normals
     if mesh.vertex_normals is not None and len(mesh.vertex_normals) > 0:
-        info += f"Vertex Normals: Yes\n"
+        info += f"\nVertex Normals: Yes ({len(mesh.vertex_normals):,} vectors)\n"
 
     # Metadata
     if mesh.metadata:
-        info += "\nMetadata:\n"
+        info += "\n=== Metadata ===\n\n"
         for key, value in mesh.metadata.items():
             info += f"  {key}: {value}\n"
 
     return info
+
+
+def transfer_texture_via_closest_point(original_mesh: trimesh.Trimesh,
+                                       remeshed_mesh: trimesh.Trimesh) -> trimesh.Trimesh:
+    """
+    Transfer texture from original mesh to remeshed mesh using closest-point projection.
+
+    For each vertex on the remeshed mesh:
+    1. Find closest point on original mesh surface
+    2. Determine which triangle contains that point
+    3. Compute barycentric coordinates within the triangle
+    4. Interpolate original UV coordinates using barycentric weights
+    5. Sample original texture at interpolated UV position
+    6. Store sampled color as vertex color on remeshed mesh
+
+    Args:
+        original_mesh: Original mesh with texture (must have visual.uv and visual.material)
+        remeshed_mesh: Remeshed mesh (will receive vertex colors)
+
+    Returns:
+        Remeshed mesh with vertex colors from texture transfer
+    """
+    print(f"[transfer_texture] Starting texture transfer via closest-point projection")
+    print(f"[transfer_texture] Original: {len(original_mesh.vertices)} verts, {len(original_mesh.faces)} faces")
+    print(f"[transfer_texture] Remeshed: {len(remeshed_mesh.vertices)} verts, {len(remeshed_mesh.faces)} faces")
+
+    # Check original mesh has texture data
+    if not hasattr(original_mesh, 'visual') or original_mesh.visual is None:
+        raise ValueError("Original mesh has no visual data")
+
+    if not hasattr(original_mesh.visual, 'uv') or original_mesh.visual.uv is None:
+        raise ValueError("Original mesh has no UV coordinates")
+
+    if not hasattr(original_mesh.visual, 'material') or original_mesh.visual.material is None:
+        raise ValueError("Original mesh has no material")
+
+    # Get texture image
+    texture_image = None
+    if hasattr(original_mesh.visual.material, 'baseColorTexture'):
+        texture_image = original_mesh.visual.material.baseColorTexture
+    elif hasattr(original_mesh.visual.material, 'image'):
+        texture_image = original_mesh.visual.material.image
+
+    if texture_image is None:
+        raise ValueError("Original mesh material has no texture image")
+
+    print(f"[transfer_texture] Original texture size: {texture_image.size}")
+
+    # Convert texture to numpy array for fast sampling
+    texture_array = np.array(texture_image)
+    tex_height, tex_width = texture_array.shape[:2]
+    print(f"[transfer_texture] Texture array shape: {texture_array.shape}")
+
+    # Get original UVs
+    original_uvs = original_mesh.visual.uv
+    print(f"[transfer_texture] Original UVs: {len(original_uvs)} entries")
+
+    # Step 1: Find closest point on original mesh for each remeshed vertex
+    print(f"[transfer_texture] Finding closest points...")
+    closest_points, distances, triangle_ids = original_mesh.nearest.on_surface(remeshed_mesh.vertices)
+
+    print(f"[transfer_texture] Closest points found, max distance: {distances.max():.6f}")
+
+    # Step 2: Get barycentric coordinates of closest points within their triangles
+    print(f"[transfer_texture] Computing barycentric coordinates...")
+    triangles = original_mesh.vertices[original_mesh.faces[triangle_ids]]
+    bary_coords = trimesh.triangles.points_to_barycentric(triangles, closest_points)
+
+    # Step 3: Interpolate original UVs using barycentric coordinates
+    print(f"[transfer_texture] Interpolating UV coordinates...")
+    triangle_uvs = original_uvs[original_mesh.faces[triangle_ids]]  # Shape: (N, 3, 2)
+    interpolated_uvs = np.einsum('ij,ijk->ik', bary_coords, triangle_uvs)  # Shape: (N, 2)
+
+    # Clamp UVs to [0, 1] range
+    interpolated_uvs = np.clip(interpolated_uvs, 0.0, 1.0)
+
+    print(f"[transfer_texture] UV range: U[{interpolated_uvs[:, 0].min():.3f}, {interpolated_uvs[:, 0].max():.3f}], "
+          f"V[{interpolated_uvs[:, 1].min():.3f}, {interpolated_uvs[:, 1].max():.3f}]")
+
+    # Step 4: Sample texture at interpolated UV positions
+    print(f"[transfer_texture] Sampling texture...")
+
+    # Convert UV [0,1] to pixel coordinates
+    # UV convention: (0,0) = bottom-left, but image array is top-left origin
+    pixel_x = (interpolated_uvs[:, 0] * (tex_width - 1)).astype(int)
+    pixel_y = ((1.0 - interpolated_uvs[:, 1]) * (tex_height - 1)).astype(int)  # Flip V
+
+    # Clamp to image bounds
+    pixel_x = np.clip(pixel_x, 0, tex_width - 1)
+    pixel_y = np.clip(pixel_y, 0, tex_height - 1)
+
+    # Sample colors from texture
+    vertex_colors = texture_array[pixel_y, pixel_x]  # Shape: (N, 3) or (N, 4)
+
+    # Ensure we have RGBA (add alpha channel if missing)
+    if vertex_colors.shape[1] == 3:
+        alpha = np.full((len(vertex_colors), 1), 255, dtype=vertex_colors.dtype)
+        vertex_colors = np.hstack([vertex_colors, alpha])
+
+    # Check how many colors are non-black
+    non_black = np.sum((vertex_colors[:, 0] > 10) | (vertex_colors[:, 1] > 10) | (vertex_colors[:, 2] > 10))
+    print(f"[transfer_texture] Non-black vertices: {non_black}/{len(vertex_colors)} ({100*non_black/len(vertex_colors):.1f}%)")
+
+    # Step 5: Create a copy of remeshed mesh and assign vertex colors
+    result_mesh = remeshed_mesh.copy()
+    result_mesh.visual.vertex_colors = vertex_colors
+
+    print(f"[transfer_texture] Texture transfer complete")
+
+    return result_mesh
 
 
 # ============================================================================

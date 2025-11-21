@@ -5,22 +5,17 @@
 
 import { app } from "../../../scripts/app.js";
 
-console.log("[GeomPack] Loading VTK.js mesh preview extension...");
 
 app.registerExtension({
     name: "geompack.meshpreview.vtk",
 
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeData.name === "GeomPackPreviewMeshVTK") {
-            console.log("[GeomPack] Registering Preview Mesh (VTK) node");
 
             const onNodeCreated = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function() {
                 const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
 
-                console.log("[GeomPack VTK DEBUG] this.widgets before:", this.widgets);
-                console.log("[GeomPack VTK DEBUG] nodeData:", nodeData);
-                console.log("[GeomPack] VTK node created, adding widget");
 
                 // Create container for viewer + info panel
                 const container = document.createElement("div");
@@ -64,18 +59,12 @@ app.registerExtension({
                 container.appendChild(infoPanel);
 
                 // Add widget with required options
-                console.log("[GeomPack VTK DEBUG] About to call addDOMWidget");
-                console.log("[GeomPack VTK DEBUG] typeof this.addDOMWidget:", typeof this.addDOMWidget);
 
                 const widget = this.addDOMWidget("preview_vtk", "MESH_PREVIEW_VTK", container, {
                     getValue() { return ""; },
                     setValue(v) { }
                 });
 
-                console.log("[GeomPack VTK DEBUG] Widget created:", widget);
-                console.log("[GeomPack VTK DEBUG] Widget properties:", Object.keys(widget || {}));
-                console.log("[GeomPack VTK DEBUG] Widget.id:", widget?.id);
-                console.log("[GeomPack VTK DEBUG] this.widgets after addDOMWidget:", this.widgets);
 
                 widget.computeSize = () => [512, 640];  // Increased height for viewer + info panel
 
@@ -86,7 +75,6 @@ app.registerExtension({
                 // Track iframe load state
                 let iframeLoaded = false;
                 iframe.addEventListener('load', () => {
-                    console.log("[GeomPack VTK DEBUG] Iframe loaded");
                     iframeLoaded = true;
                 });
 
@@ -94,7 +82,6 @@ app.registerExtension({
                 window.addEventListener('message', async (event) => {
                     // Handle screenshot messages
                     if (event.data.type === 'SCREENSHOT' && event.data.image) {
-                        console.log('[GeomPack VTK] Received screenshot from iframe');
 
                         try {
                             // Convert base64 data URL to blob
@@ -120,7 +107,6 @@ app.registerExtension({
                             formData.append('subfolder', '');   // Root of output folder
 
                             // Upload to ComfyUI backend
-                            console.log('[GeomPack VTK] Uploading screenshot to server...');
                             const response = await fetch('/upload/image', {
                                 method: 'POST',
                                 body: formData
@@ -128,7 +114,6 @@ app.registerExtension({
 
                             if (response.ok) {
                                 const result = await response.json();
-                                console.log('[GeomPack VTK] Screenshot saved to outputs folder:', result.name);
                             } else {
                                 throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
                             }
@@ -148,12 +133,10 @@ app.registerExtension({
 
                 // Set initial node size (increased for info panel)
                 this.setSize([512, 640]);
-                console.log("[GeomPack VTK DEBUG] Node size set to [512, 640]");
 
                 // Handle execution
                 const onExecuted = this.onExecuted;
                 this.onExecuted = function(message) {
-                    console.log("[GeomPack VTK] onExecuted called with message:", message);
                     onExecuted?.apply(this, arguments);
 
                     // The message IS the UI data (not message.ui)
@@ -161,7 +144,6 @@ app.registerExtension({
                         const filename = message.mesh_file[0];
                         const viewerType = message.viewer_type?.[0] || "fields";
                         const mode = message.mode?.[0] || "fields";
-                        console.log(`[GeomPack VTK] Loading mesh: ${filename}, viewer type: ${viewerType}, mode: ${mode}`);
 
                         // Determine which viewer HTML to use
                         const viewerUrl = viewerType === "texture"
@@ -270,7 +252,6 @@ app.registerExtension({
                         // Function to send message
                         const sendMessage = () => {
                             if (iframe.contentWindow) {
-                                console.log(`[GeomPack VTK] Sending postMessage to iframe: ${filepath}`);
                                 iframe.contentWindow.postMessage({
                                     type: "LOAD_MESH",
                                     filepath: filepath,
@@ -283,13 +264,11 @@ app.registerExtension({
 
                         // Reload iframe if viewer type changed
                         if (viewerType !== currentViewerType) {
-                            console.log(`[GeomPack VTK] Switching viewer from ${currentViewerType} to ${viewerType}`);
                             currentViewerType = viewerType;
                             iframeLoaded = false;
 
                             // Set up one-time load listener before changing src
                             const onViewerLoaded = () => {
-                                console.log("[GeomPack VTK] New viewer loaded, sending mesh");
                                 iframeLoaded = true;
                                 sendMessage();
                             };
@@ -300,15 +279,12 @@ app.registerExtension({
                         } else {
                             // No viewer change needed, send message immediately or after short delay
                             if (iframeLoaded) {
-                                console.log("[GeomPack VTK DEBUG] Iframe already loaded, sending immediately");
                                 sendMessage();
                             } else {
-                                console.log("[GeomPack VTK DEBUG] Waiting for iframe to load...");
                                 setTimeout(sendMessage, 500);
                             }
                         }
                     } else {
-                        console.log("[GeomPack VTK] No mesh_file in message data. Keys:", Object.keys(message || {}));
                     }
                 };
 
@@ -318,4 +294,3 @@ app.registerExtension({
     }
 });
 
-console.log("[GeomPack] VTK.js mesh preview extension registered");

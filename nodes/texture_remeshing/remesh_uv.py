@@ -146,13 +146,11 @@ class BlenderRemeshWithTexture:
 
     def remesh_with_texture(self, trimesh, method, remesh_method, voxel_size, target_face_count,
                            bake_margin):
-        """Remesh a textured mesh while preserving texture through Blender baking."""
-        # Check if xatlas method is requested
-        if method == "xatlas":
-            raise NotImplementedError(
-                "XAtlas remeshing method is not yet implemented. "
-                "Please use 'blender' method or help contribute an implementation!"
-            )
+        """Remesh a textured mesh while preserving texture through Python closest-point projection."""
+        raise NotImplementedError(
+            "Remesh with Texture is not yet implemented. "
+            "Please use regular remeshing nodes instead."
+        )
 
         if not PIL_AVAILABLE:
             raise RuntimeError("PIL required. Install: pip install Pillow")
@@ -161,8 +159,10 @@ class BlenderRemeshWithTexture:
             raise RuntimeError("torch required. Install: pip install torch")
 
         from .._utils import blender_bridge
+        from .._utils import mesh_ops
 
         print(f"[BlenderRemeshWithTexture] Input: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        print(f"[BlenderRemeshWithTexture] Using Python texture transfer (no Blender baking)")
 
         # Extract texture from source mesh
         texture_path, original_uvs, is_placeholder = _extract_texture(trimesh)
@@ -191,6 +191,7 @@ class BlenderRemeshWithTexture:
         source_glb = tempfile.NamedTemporaryFile(suffix='_source.glb', delete=False)
         output_glb = tempfile.NamedTemporaryFile(suffix='_output.glb', delete=False)
         baked_texture = tempfile.NamedTemporaryFile(suffix='_baked.png', delete=False)
+        baked_roughness = tempfile.NamedTemporaryFile(suffix='_roughness.png', delete=False)
 
         try:
             # Export source mesh as GLB (GLB format automatically includes textures)
@@ -198,6 +199,7 @@ class BlenderRemeshWithTexture:
             source_glb.close()
             output_glb.close()  # Close so Blender can write to it
             baked_texture.close()  # Close so Blender can write to it
+            baked_roughness.close()  # Close so Blender can write to it
 
             # Calculate appropriate voxel size based on mesh bounds
             bounds = trimesh.bounds
@@ -336,115 +338,16 @@ remeshed_obj.data.uv_layers.active = new_uv
 # Generate NEW UVs (high quality settings for better texture coverage)
 bpy.ops.object.mode_set(mode='EDIT')
 bpy.ops.mesh.select_all(action='SELECT')
-bpy.ops.uv.smart_project(angle_limit=89.0, island_margin=0.001)
+bpy.ops.uv.smart_project(
+    angle_limit=89.0,
+    island_margin=0.001,
+    scale_to_bounds=True,  # Scale UVs to fill [0,1] texture space
+    correct_aspect=True    # Respect texture aspect ratio
+)
 bpy.ops.object.mode_set(mode='OBJECT')
 print(f"[Blender] Generated new UV layer 'RemeshedUV' on remeshed object")
 
-# Set up material on ORIGINAL mesh (SOURCE for baking)
-if len(obj.data.materials) > 0:
-    source_mat = obj.data.materials[0]
-else:
-    source_mat = bpy.data.materials.new('SourceMaterial')
-    obj.data.materials.append(source_mat)
-
-# Find the texture image that was imported with GLB
-source_texture = None
-if source_mat.use_nodes:
-    for node in source_mat.node_tree.nodes:
-        if node.type == 'TEX_IMAGE' and node.image:
-            source_texture = node.image
-            print(f"[Blender] Found texture in material: {{source_texture.size[0]}}x{{source_texture.size[1]}}")
-            break
-
-# If no texture found in material, try loading from file
-if source_texture is None:
-    print(f"[Blender] No texture in material, loading from file")
-    source_texture = bpy.data.images.load('{texture_path}')
-    print(f"[Blender] Loaded texture: {{source_texture.size[0]}}x{{source_texture.size[1]}}")
-
-# Keep the original material setup simple for baking
-source_mat.use_nodes = True
-source_nodes = source_mat.node_tree.nodes
-source_nodes.clear()
-source_tex = source_nodes.new('ShaderNodeTexImage')
-source_tex.image = source_texture
-source_bsdf = source_nodes.new('ShaderNodeBsdfDiffuse')
-source_output = source_nodes.new('ShaderNodeOutputMaterial')
-source_mat.node_tree.links.new(source_tex.outputs['Color'], source_bsdf.inputs['Color'])
-source_mat.node_tree.links.new(source_bsdf.outputs['BSDF'], source_output.inputs['Surface'])
-print(f"[Blender] Source material setup (original mesh with original UVs)")
-
-# Set up material on REMESHED mesh (TARGET for baking)
-target_mat = bpy.data.materials.new('TargetMaterial')
-remeshed_obj.data.materials.clear()
-remeshed_obj.data.materials.append(target_mat)
-target_mat.use_nodes = True
-target_nodes = target_mat.node_tree.nodes
-target_nodes.clear()
-
-# Create bake target image
-bake_image = bpy.data.images.new('BakedTexture', {actual_texture_size}, {actual_texture_size})
-print(f"[Blender] Created bake target image: {actual_texture_size}x{actual_texture_size}")
-
-# Add bake target node to remeshed object's material
-bake_node = target_nodes.new('ShaderNodeTexImage')
-bake_node.image = bake_image
-bake_node.select = True
-target_nodes.active = bake_node
-print(f"[Blender] Target material setup (remeshed mesh with new UVs)")
-
-# Bake settings for selected-to-active
-bpy.context.scene.render.engine = 'CYCLES'
-bpy.context.scene.cycles.device = 'CPU'
-bpy.context.scene.cycles.samples = 64
-bpy.context.scene.render.bake.use_selected_to_active = True
-bpy.context.scene.render.bake.cage_extrusion = 0.1
-bpy.context.scene.render.bake.max_ray_distance = 0.0
-bpy.context.scene.render.bake.margin = {bake_margin}
-bpy.context.scene.render.bake.use_pass_direct = False
-bpy.context.scene.render.bake.use_pass_indirect = False
-bpy.context.scene.render.bake.use_pass_color = True
-
-# Select objects for baking: source selected, target active
-bpy.ops.object.select_all(action='DESELECT')
-obj.select_set(True)  # Source (selected)
-remeshed_obj.select_set(True)  # Target (also selected)
-bpy.context.view_layer.objects.active = remeshed_obj  # Target must be active
-
-print(f"[Blender] Baking DIFFUSE (selected-to-active, 64 samples, {bake_margin}px margin)...")
-print(f"[Blender] Source: {{obj.name}} ({{len(obj.data.vertices)}} verts), Target: {{remeshed_obj.name}} ({{len(remeshed_obj.data.vertices)}} verts)")
-
-try:
-    result = bpy.ops.object.bake(type='DIFFUSE')
-    print(f"[Blender] Bake result: {{result}}")
-except Exception as e:
-    print(f"[Blender] BAKE ERROR: {{e}}")
-    import traceback
-    traceback.print_exc()
-    raise
-
-# Check if baked image has data
-pixels_sample = list(bake_image.pixels[0:120])
-non_black = sum(1 for i in range(0, 120, 4) if pixels_sample[i] > 0.01 or pixels_sample[i+1] > 0.01 or pixels_sample[i+2] > 0.01)
-print(f"[Blender] Non-black pixels in first 30: {{non_black}}/30")
-
-# Save baked texture
-bake_image.filepath_raw = '{baked_texture.name}'
-bake_image.file_format = 'PNG'
-bake_image.save()
-print(f"[Blender] Saved baked texture")
-
-# Reconnect baked texture to remeshed object's material for export
-target_nodes.clear()
-bake_tex_node = target_nodes.new('ShaderNodeTexImage')
-bake_tex_node.image = bake_image
-bsdf_node = target_nodes.new('ShaderNodeBsdfPrincipled')
-output_node = target_nodes.new('ShaderNodeOutputMaterial')
-target_mat.node_tree.links.new(bake_tex_node.outputs['Color'], bsdf_node.inputs['Base Color'])
-target_mat.node_tree.links.new(bsdf_node.outputs['BSDF'], output_node.inputs['Surface'])
-print(f"[Blender] Reconnected baked texture to remeshed object material for export")
-
-# Export ONLY the remeshed object (not the original)
+# Export ONLY the remeshed object (no texture baking - Python will handle texture transfer)
 bpy.ops.object.select_all(action='DESELECT')
 remeshed_obj.select_set(True)
 bpy.context.view_layer.objects.active = remeshed_obj
@@ -503,49 +406,76 @@ print(f"[Blender] Export complete")
 
             if isinstance(remeshed, trimesh_module.Scene):
                 print(f"[BlenderRemeshWithTexture] Scene contains {len(remeshed.geometry)} geometries")
-                for name, geom in remeshed.geometry.items():
-                    print(f"  - {name}: {len(geom.vertices)} vertices, {len(geom.faces)} faces")
-                    if hasattr(geom, 'visual') and hasattr(geom.visual, 'material'):
-                        if hasattr(geom.visual.material, 'baseColorTexture'):
-                            tex = geom.visual.material.baseColorTexture
-                            if tex is not None:
-                                print(f"    Has baseColorTexture: {tex.size if hasattr(tex, 'size') else 'yes'}")
-
                 # Concatenate
                 remeshed = remeshed.dump(concatenate=True)
                 print(f"[BlenderRemeshWithTexture] After concatenate: {len(remeshed.vertices)} vertices, {len(remeshed.faces)} faces")
 
-                # Merge duplicate vertices from GLB export
-                remeshed.merge_vertices()
-                print(f"[BlenderRemeshWithTexture] After merge_vertices: {len(remeshed.vertices)} vertices, {len(remeshed.faces)} faces")
-
-                if hasattr(remeshed, 'visual') and hasattr(remeshed.visual, 'material'):
-                    if hasattr(remeshed.visual.material, 'baseColorTexture'):
-                        tex = remeshed.visual.material.baseColorTexture
-                        print(f"[BlenderRemeshWithTexture] Final mesh has texture: {tex.size if hasattr(tex, 'size') else 'yes'}")
+            # Merge duplicate vertices from GLB export
+            remeshed.merge_vertices()
+            print(f"[BlenderRemeshWithTexture] After merge_vertices: {len(remeshed.vertices)} vertices, {len(remeshed.faces)} faces")
 
             # Validate remesh results
             if len(remeshed.faces) == len(trimesh.faces):
                 print(f"[WARNING] Face count unchanged ({len(remeshed.faces)}) - remesh may have failed!")
                 print(f"[WARNING] Check Blender output above for details")
 
-            # Load texture as ComfyUI IMAGE
-            comfy_image = _load_as_comfy_image(baked_texture.name)
+            # PYTHON TEXTURE TRANSFER: Use closest-point projection instead of Blender baking
+            print(f"[BlenderRemeshWithTexture] Applying Python texture transfer...")
+            remeshed_with_colors = mesh_ops.transfer_texture_via_closest_point(trimesh, remeshed)
+
+            # Create visualization texture from vertex colors for IMAGE output
+            # Simple approach: render a small texture showing the vertex color distribution
+            if hasattr(remeshed_with_colors.visual, 'vertex_colors'):
+                # Create a simple 256x256 texture showing vertex colors (for visualization)
+                viz_size = 256
+                vertex_colors_rgb = remeshed_with_colors.visual.vertex_colors[:, :3]  # RGB only
+
+                # Reshape to image (simple grid layout)
+                num_verts = len(vertex_colors_rgb)
+                grid_size = int(np.ceil(np.sqrt(num_verts)))
+
+                # Pad to fill grid
+                padded_colors = np.zeros((grid_size * grid_size, 3), dtype=np.uint8)
+                padded_colors[:num_verts] = vertex_colors_rgb
+
+                # Reshape to 2D grid
+                color_grid = padded_colors.reshape((grid_size, grid_size, 3))
+
+                # Resize to viz_size using PIL
+                color_img = Image.fromarray(color_grid)
+                color_img = color_img.resize((viz_size, viz_size), Image.NEAREST)
+
+                # Convert to ComfyUI format [1, H, W, 3] float32 in [0,1]
+                comfy_image = np.array(color_img).astype(np.float32) / 255.0
+                comfy_image = comfy_image[np.newaxis, ...]  # Add batch dimension
+
+                # Convert to torch if needed
+                if TORCH_AVAILABLE:
+                    import torch
+                    comfy_image = torch.from_numpy(comfy_image)
+
+                print(f"[BlenderRemeshWithTexture] Created vertex color visualization: {viz_size}x{viz_size}")
+            else:
+                # Fallback: black image
+                comfy_image = np.zeros((1, 256, 256, 3), dtype=np.float32)
+                if TORCH_AVAILABLE:
+                    import torch
+                    comfy_image = torch.from_numpy(comfy_image)
 
             placeholder_warning = "\n⚠️  WARNING: Used placeholder texture (no embedded texture in input)" if is_placeholder else ""
-            info = f"""Remesh with Texture (Blender)
+            info = f"""Remesh with Texture (Python Transfer)
 Method: {remesh_method}
-Vertices: {len(trimesh.vertices)} -> {len(remeshed.vertices)}
-Faces: {len(trimesh.faces)} -> {len(remeshed.faces)}
-Texture size: {actual_texture_size}x{actual_texture_size}{placeholder_warning}
+Vertices: {len(trimesh.vertices)} -> {len(remeshed_with_colors.vertices)}
+Faces: {len(trimesh.faces)} -> {len(remeshed_with_colors.faces)}
+Texture Transfer: Closest-Point Projection{placeholder_warning}
 """
 
             print(f"[BlenderRemeshWithTexture] Complete")
-            return (remeshed, comfy_image, info)
+            return (remeshed_with_colors, comfy_image, info)
 
         finally:
             # Cleanup
-            for path in [source_glb.name, output_glb.name, texture_path, baked_texture.name]:
+            for path in [source_glb.name, output_glb.name, texture_path, baked_texture.name, baked_roughness.name]:
                 if os.path.exists(path):
                     try:
                         os.unlink(path)
