@@ -930,6 +930,22 @@
 
                         synchronizeCameras(leftRenderer.getActiveCamera(), rightRenderer.getActiveCamera());
 
+                        // Apply opacity values to all actors
+                        if (data.opacity1 !== undefined) {
+                            leftActors.forEach(actor => {
+                                if (actor && actor.getProperty) {
+                                    actor.getProperty().setOpacity(data.opacity1);
+                                }
+                            });
+                        }
+                        if (data.opacity2 !== undefined) {
+                            rightActors.forEach(actor => {
+                                if (actor && actor.getProperty) {
+                                    actor.getProperty().setOpacity(data.opacity2);
+                                }
+                            });
+                        }
+
                         renderWithClippingRangeUpdate(leftRenderer, leftRenderWindow);
                         renderWithClippingRangeUpdate(rightRenderer, rightRenderWindow);
 
@@ -952,6 +968,17 @@
 
                         updateCombinedBounds();
                         positionCamera(singleRenderer, combinedBounds);
+
+                        // Apply average opacity for overlay mode to all actors
+                        if (data.opacity1 !== undefined && data.opacity2 !== undefined) {
+                            const avgOpacity = (data.opacity1 + data.opacity2) / 2.0;
+                            singleActors.forEach(actor => {
+                                if (actor && actor.getProperty) {
+                                    actor.getProperty().setOpacity(avgOpacity);
+                                }
+                            });
+                        }
+
                         renderWithClippingRangeUpdate(singleRenderer, singleRenderWindow);
                     }
 

@@ -26,19 +26,28 @@ class MeshInfoNode:
     RETURN_NAMES = ("info",)
     FUNCTION = "get_mesh_info"
     CATEGORY = "geompack/analysis"
+    INPUT_IS_LIST = True
 
     def get_mesh_info(self, trimesh):
         """
-        Get information about the trimesh.
+        Get information about the trimesh(es).
 
         Args:
-            trimesh: trimesh.Trimesh object
+            trimesh: list of trimesh.Trimesh objects (when INPUT_IS_LIST=True)
 
         Returns:
-            tuple: (info_string,)
+            tuple: (concatenated_info_string,)
         """
-        info = mesh_ops.compute_mesh_info(trimesh)
-        return (info,)
+        # Handle batch processing - concatenate all info
+        all_info = []
+        for i, mesh in enumerate(trimesh):
+            mesh_info = mesh_ops.compute_mesh_info(mesh)
+            batch_header = f"{'='*60}\n=== Batch Item {i+1}/{len(trimesh)} ===\n{'='*60}\n\n"
+            all_info.append(batch_header + mesh_info)
+
+        # Join all info with separators
+        combined_info = "\n\n".join(all_info)
+        return (combined_info,)
 
 
 # Node mappings
