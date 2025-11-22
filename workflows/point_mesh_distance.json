@@ -1,8 +1,8 @@
 {
   "id": "fb7bc5d6-aeb1-47ae-8e7c-69dec20b3cf2",
   "revision": 0,
-  "last_node_id": 7,
-  "last_link_id": 11,
+  "last_node_id": 8,
+  "last_link_id": 13,
   "nodes": [
     {
       "id": 1,
@@ -79,44 +79,6 @@
         10000,
         "uniform",
         "true"
-      ]
-    },
-    {
-      "id": 6,
-      "type": "GeomPackPreviewMeshDual",
-      "pos": [
-        289.7878441083421,
-        272.1762329384197
-      ],
-      "size": [
-        768,
-        738
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "mesh_1",
-          "type": "TRIMESH",
-          "link": 8
-        },
-        {
-          "name": "mesh_2",
-          "type": "TRIMESH",
-          "link": 11
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "a22feb725fe9afaf6cdcfa75002a514292fcec9a",
-        "Node name for S&R": "GeomPackPreviewMeshDual"
-      },
-      "widgets_values": [
-        "side_by_side",
-        1,
-        ""
       ]
     },
     {
@@ -199,7 +161,7 @@
           "name": "combined_mesh",
           "type": "TRIMESH",
           "links": [
-            8
+            12
           ]
         },
         {
@@ -212,7 +174,8 @@
         "cnr_id": "comfyui-geometrypack",
         "ver": "a22feb725fe9afaf6cdcfa75002a514292fcec9a",
         "Node name for S&R": "GeomPackCombineMeshes"
-      }
+      },
+      "widgets_values": []
     },
     {
       "id": 5,
@@ -223,7 +186,7 @@
       ],
       "size": [
         278.064453125,
-        118
+        142
       ],
       "flags": {},
       "order": 4,
@@ -255,7 +218,7 @@
           "name": "pointcloud",
           "type": "TRIMESH",
           "links": [
-            11
+            13
           ]
         },
         {
@@ -279,7 +242,50 @@
         "ver": "d616ab2f28493cf34f723ed59ea6747b61519c9d",
         "Node name for S&R": "GeomPackPointToMeshDistance"
       },
-      "widgets_values": []
+      "widgets_values": [
+        "unsigned",
+        "default"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "GeomPackPreviewMeshDual",
+      "pos": [
+        286.9770169577036,
+        257.7295645499901
+      ],
+      "size": [
+        768,
+        826
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh_1",
+          "type": "TRIMESH",
+          "link": 12
+        },
+        {
+          "name": "mesh_2",
+          "type": "TRIMESH",
+          "link": 13
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "991c7a75886f50d567e5ed6d36aed06d0729a938",
+        "Node name for S&R": "GeomPackPreviewMeshDual"
+      },
+      "widgets_values": [
+        "side_by_side",
+        "fields",
+        1,
+        1,
+        ""
+      ]
     }
   ],
   "links": [
@@ -308,14 +314,6 @@
       "TRIMESH"
     ],
     [
-      8,
-      7,
-      0,
-      6,
-      0,
-      "TRIMESH"
-    ],
-    [
       9,
       2,
       0,
@@ -332,10 +330,18 @@
       "TRIMESH"
     ],
     [
-      11,
+      12,
+      7,
+      0,
+      8,
+      0,
+      "TRIMESH"
+    ],
+    [
+      13,
       5,
       0,
-      6,
+      8,
       1,
       "TRIMESH"
     ]
@@ -344,13 +350,13 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.9680000000000015,
+      "scale": 0.8000000000000012,
       "offset": [
-        729.8402550652099,
-        219.55930425166196
+        456.1522091880507,
+        62.153820240580465
       ]
     },
-    "frontendVersion": "1.28.8"
+    "frontendVersion": "1.30.6"
   },
   "version": 0.4
 }

@@ -65,12 +65,26 @@ class ComputeNormalsNode:
             # Store in mesh (note: trimesh will override this with smoothed normals)
             # So we need to mark it in metadata
             result_mesh.metadata['normals_smoothed'] = False
+
+            # Store normals as vertex attributes for visualization
+            result_mesh.vertex_attributes['normal_x'] = vertex_normals[:, 0]
+            result_mesh.vertex_attributes['normal_y'] = vertex_normals[:, 1]
+            result_mesh.vertex_attributes['normal_z'] = vertex_normals[:, 2]
+            result_mesh.vertex_attributes['normal_magnitude'] = np.linalg.norm(vertex_normals, axis=1)
+
             print(f"[ComputeNormals] Computed faceted (non-smooth) normals")
         else:
             # Trimesh automatically computes smooth vertex normals
             # Just access them to ensure they're computed
-            _ = result_mesh.vertex_normals
+            vertex_normals = result_mesh.vertex_normals
             result_mesh.metadata['normals_smoothed'] = True
+
+            # Store normals as vertex attributes for visualization
+            result_mesh.vertex_attributes['normal_x'] = vertex_normals[:, 0]
+            result_mesh.vertex_attributes['normal_y'] = vertex_normals[:, 1]
+            result_mesh.vertex_attributes['normal_z'] = vertex_normals[:, 2]
+            result_mesh.vertex_attributes['normal_magnitude'] = np.linalg.norm(vertex_normals, axis=1)
+
             print(f"[ComputeNormals] Computed smooth vertex normals")
 
         return (result_mesh,)

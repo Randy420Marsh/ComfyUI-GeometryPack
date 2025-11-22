@@ -26,8 +26,8 @@ class MeshQualityNode:
                 "trimesh": ("TRIMESH",),
             },
             "optional": {
-                "include_face_quality": (["true", "false"], {"default": "true"}),
-                "include_edge_stats": (["true", "false"], {"default": "true"}),
+                "include_face_quality": ("BOOLEAN", {"default": True}),
+                "include_edge_stats": ("BOOLEAN", {"default": True}),
             }
         }
 
@@ -36,7 +36,7 @@ class MeshQualityNode:
     FUNCTION = "analyze_quality"
     CATEGORY = "geompack/analysis"
 
-    def analyze_quality(self, trimesh, include_face_quality="true", include_edge_stats="true"):
+    def analyze_quality(self, trimesh, include_face_quality=True, include_edge_stats=True):
         """
         Analyze mesh quality metrics.
 
@@ -67,7 +67,7 @@ class MeshQualityNode:
 
         # Face quality metrics
         face_qualities = None
-        if include_face_quality == "true":
+        if include_face_quality:
             face_qualities = self._compute_face_quality(trimesh)
 
             min_quality = float(np.min(face_qualities))
@@ -91,7 +91,7 @@ class MeshQualityNode:
             mean_quality = 1.0
 
         # Edge length statistics
-        if include_edge_stats == "true":
+        if include_edge_stats:
             edge_lengths = self._compute_edge_lengths(trimesh)
 
             min_edge = float(np.min(edge_lengths))
@@ -129,7 +129,7 @@ class MeshQualityNode:
   Degenerate Faces (area < 1e-10): {degenerate_faces:,}""")
 
         # Angle analysis
-        if include_face_quality == "true":
+        if include_face_quality:
             angles = self._compute_face_angles(trimesh)
             min_angle = float(np.min(angles))
             max_angle = float(np.max(angles))

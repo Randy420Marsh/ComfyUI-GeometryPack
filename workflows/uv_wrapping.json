@@ -1,8 +1,8 @@
 {
   "id": "746d1571-2318-46e2-88e9-43a1d2f60fd2",
   "revision": 0,
-  "last_node_id": 9,
-  "last_link_id": 11,
+  "last_node_id": 10,
+  "last_link_id": 12,
   "nodes": [
     {
       "id": 4,
@@ -13,7 +13,7 @@
       ],
       "size": [
         270,
-        58
+        78
       ],
       "flags": {},
       "order": 0,
@@ -24,9 +24,14 @@
           "name": "mesh",
           "type": "TRIMESH",
           "links": [
-            9,
-            10
+            10,
+            12
           ]
+        },
+        {
+          "name": "texture",
+          "type": "IMAGE",
+          "links": null
         }
       ],
       "properties": {
@@ -39,37 +44,6 @@
       ]
     },
     {
-      "id": 5,
-      "type": "GeomPackPreviewMeshVTK",
-      "pos": [
-        453.93463488093937,
-        -381.8701468139127
-      ],
-      "size": [
-        512,
-        678
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 9
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "6d317434425ba8f2c60d04a4b19d3fb67ef4b099",
-        "Node name for S&R": "GeomPackPreviewMeshVTK"
-      },
-      "widgets_values": [
-        ""
-      ]
-    },
-    {
       "id": 8,
       "type": "GeomPackUVUnwrap",
       "pos": [
@@ -78,10 +52,10 @@
       ],
       "size": [
         270,
-        222
+        78
       ],
       "flags": {},
-      "order": 2,
+      "order": 1,
       "mode": 0,
       "inputs": [
         {
@@ -110,13 +84,7 @@
         "Node name for S&R": "GeomPackUVUnwrap"
       },
       "widgets_values": [
-        "xatlas",
-        10,
-        66,
-        0.02,
-        "true",
-        1,
-        1
+        "xatlas"
       ]
     },
     {
@@ -151,17 +119,41 @@
         false,
         ""
       ]
+    },
+    {
+      "id": 10,
+      "type": "GeomPackPreviewMeshVTK",
+      "pos": [
+        546.1872867870737,
+        -380.0417506449053
+      ],
+      "size": [
+        512,
+        694
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 12
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "991c7a75886f50d567e5ed6d36aed06d0729a938",
+        "Node name for S&R": "GeomPackPreviewMeshVTK"
+      },
+      "widgets_values": [
+        "fields",
+        ""
+      ]
     }
   ],
   "links": [
-    [
-      9,
-      4,
-      0,
-      5,
-      0,
-      "TRIMESH"
-    ],
     [
       10,
       4,
@@ -177,6 +169,14 @@
       9,
       0,
       "TRIMESH"
+    ],
+    [
+      12,
+      4,
+      0,
+      10,
+      0,
+      "TRIMESH"
     ]
   ],
   "groups": [],
@@ -185,11 +185,11 @@
     "ds": {
       "scale": 0.9090909090909091,
       "offset": [
-        451.9424007129265,
-        -169.99262435509468
+        635.3115413379264,
+        272.57261001990526
       ]
     },
-    "frontendVersion": "1.28.8"
+    "frontendVersion": "1.30.6"
   },
   "version": 0.4
 }

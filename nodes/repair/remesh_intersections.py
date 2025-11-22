@@ -20,7 +20,7 @@ class RemeshSelfIntersectionsNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "trimesh": ("TRIMESH",),
+                "mesh": ("TRIMESH",),
                 "detect_only": ("BOOLEAN", {"default": False}),
                 "remove_unreferenced": ("BOOLEAN", {"default": True}),
                 "extract_outer_hull": ("BOOLEAN", {"default": False}),
@@ -33,13 +33,13 @@ class RemeshSelfIntersectionsNode:
     FUNCTION = "remesh_intersections"
     CATEGORY = "geompack/repair"
 
-    def remesh_intersections(self, trimesh, detect_only=False, remove_unreferenced=True,
+    def remesh_intersections(self, mesh, detect_only=False, remove_unreferenced=True,
                            extract_outer_hull=False, stitch_all=True):
         """
         Remesh self-intersections using libigl CGAL.
 
         Args:
-            trimesh: Input trimesh.Trimesh object
+            mesh: Input trimesh.Trimesh object
             detect_only: Only detect intersections, don't remesh
             remove_unreferenced: Remove unreferenced vertices after remeshing
             extract_outer_hull: Extract outer hull for manifold result (slow)
@@ -48,7 +48,7 @@ class RemeshSelfIntersectionsNode:
         Returns:
             tuple: (remeshed_mesh, report_string)
         """
-        print(f"[RemeshSelfIntersections] Processing mesh: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        print(f"[RemeshSelfIntersections] Processing mesh: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
         print(f"[RemeshSelfIntersections] Options: detect_only={detect_only}, remove_unreferenced={remove_unreferenced}, extract_outer_hull={extract_outer_hull}, stitch_all={stitch_all}")
 
         try:
@@ -71,13 +71,13 @@ Install with: pip install cgal
 Returning mesh unchanged.
 """
                 print("[RemeshSelfIntersections] CGAL not available")
-                return (trimesh, error_msg)
+                return (mesh, error_msg)
 
             print("[RemeshSelfIntersections] Using libigl CGAL method")
 
             # Convert mesh to numpy arrays with proper dtypes
-            V = np.asarray(trimesh.vertices, dtype=np.float64)
-            F = np.asarray(trimesh.faces, dtype=np.int64)
+            V = np.asarray(mesh.vertices, dtype=np.float64)
+            F = np.asarray(mesh.faces, dtype=np.int64)
 
             initial_vertices = len(V)
             initial_faces = len(F)
@@ -95,7 +95,7 @@ Returning mesh unchanged.
 
                 if detect_only:
                     print(f"[RemeshSelfIntersections] Detected {num_intersection_pairs} intersection pairs")
-                    result_mesh = trimesh.copy()
+                    result_mesh = mesh.copy()
 
                     if num_intersection_pairs > 0:
                         # Mark intersecting faces
@@ -195,7 +195,7 @@ Status:
 Returning mesh unchanged. Check console for details.
 """
                 print(f"[RemeshSelfIntersections] Remeshing error: {e}")
-                return (trimesh, error_msg)
+                return (mesh, error_msg)
 
         except ImportError as e:
             error_msg = f"""Error: libigl not available
@@ -208,7 +208,7 @@ Install with: pip install libigl cgal
 Returning mesh unchanged.
 """
             print(f"[RemeshSelfIntersections] libigl import error: {e}")
-            return (trimesh, error_msg)
+            return (mesh, error_msg)
 
         except Exception as e:
             import traceback
@@ -220,7 +220,7 @@ Returning mesh unchanged.
 Returning mesh unchanged. Check console for details.
 """
             print(f"[RemeshSelfIntersections] Unexpected error: {e}")
-            return (trimesh, error_msg)
+            return (mesh, error_msg)
 
 
 NODE_CLASS_MAPPINGS = {

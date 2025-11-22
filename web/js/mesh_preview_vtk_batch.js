@@ -135,6 +135,23 @@ app.registerExtension({
                 let currentBatchSize = 1;
                 let currentIndex = 0;
 
+                // Add callback to auto-execute when index changes manually
+                if (indexWidget) {
+                    const originalCallback = indexWidget.callback;
+                    indexWidget.callback = function(value) {
+                        // Call original callback if it exists
+                        const result = originalCallback?.apply(this, arguments);
+
+                        // Update tracked index
+                        currentIndex = value;
+
+                        // Trigger re-execution (same as button clicks)
+                        app.queuePrompt();
+
+                        return result;
+                    };
+                }
+
                 // Button click handlers
                 prevButton.addEventListener("click", () => {
                     if (indexWidget && currentIndex > 0) {
@@ -249,6 +266,16 @@ app.registerExtension({
                         // Update navigation controls
                         indexLabel.textContent = `${currentIndex + 1} / ${currentBatchSize}`;
                         updateNavigationButtons();
+
+                        // Dynamically update index widget max based on actual batch size
+                        if (indexWidget) {
+                            indexWidget.options.max = currentBatchSize - 1;
+
+                            // Clamp current value if out of range
+                            if (indexWidget.value >= currentBatchSize) {
+                                indexWidget.value = currentBatchSize - 1;
+                            }
+                        }
 
                         // Determine which viewer HTML to use
                         const viewerUrl = viewerType === "texture"

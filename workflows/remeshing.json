@@ -1,49 +1,9 @@
 {
   "id": "fc31dc6e-fd82-4f42-9d3a-57283ccfadba",
   "revision": 0,
-  "last_node_id": 24,
-  "last_link_id": 27,
+  "last_node_id": 25,
+  "last_link_id": 29,
   "nodes": [
-    {
-      "id": 1,
-      "type": "GeomPackLoadMesh",
-      "pos": [
-        -502.81561847832234,
-        -58.160239777583065
-      ],
-      "size": [
-        270,
-        78
-      ],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "mesh",
-          "type": "TRIMESH",
-          "links": [
-            24,
-            26
-          ]
-        },
-        {
-          "name": "texture",
-          "type": "IMAGE",
-          "links": null
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "253a956368261760da54dc96750c2ab0224e2b1f",
-        "Node name for S&R": "GeomPackLoadMesh",
-        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack"
-      },
-      "widgets_values": [
-        "3d/Stanford_Bunny.stl"
-      ]
-    },
     {
       "id": 23,
       "type": "GeomPackRemesh",
@@ -70,7 +30,7 @@
           "name": "remeshed_mesh",
           "type": "TRIMESH",
           "links": [
-            27
+            28
           ]
         },
         {
@@ -90,15 +50,55 @@
       ]
     },
     {
-      "id": 24,
-      "type": "GeomPackPreviewMeshDual",
+      "id": 1,
+      "type": "GeomPackLoadMesh",
       "pos": [
-        -120.55991705927408,
-        145.98998940655042
+        -502.81561847832234,
+        -58.160239777583065
       ],
       "size": [
-        802.606,
-        848.473
+        270,
+        78
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "mesh",
+          "type": "TRIMESH",
+          "links": [
+            24,
+            29
+          ]
+        },
+        {
+          "name": "texture",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "253a956368261760da54dc96750c2ab0224e2b1f",
+        "Node name for S&R": "GeomPackLoadMesh",
+        "aux_id": "PozzettiAndrea/ComfyUI-GeometryPack"
+      },
+      "widgets_values": [
+        "3d/Stanford_Bunny.stl"
+      ]
+    },
+    {
+      "id": 25,
+      "type": "GeomPackPreviewMeshDual",
+      "pos": [
+        -288.0410052280236,
+        142.2919197315505
+      ],
+      "size": [
+        768,
+        826
       ],
       "flags": {},
       "order": 2,
@@ -107,22 +107,24 @@
         {
           "name": "mesh_1",
           "type": "TRIMESH",
-          "link": 26
+          "link": 29
         },
         {
           "name": "mesh_2",
           "type": "TRIMESH",
-          "link": 27
+          "link": 28
         }
       ],
       "outputs": [],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "a22feb725fe9afaf6cdcfa75002a514292fcec9a",
+        "ver": "991c7a75886f50d567e5ed6d36aed06d0729a938",
         "Node name for S&R": "GeomPackPreviewMeshDual"
       },
       "widgets_values": [
         "side_by_side",
+        "fields",
+        1,
         1,
         ""
       ]
@@ -138,19 +140,19 @@
       "TRIMESH"
     ],
     [
-      26,
+      28,
+      23,
+      0,
+      25,
       1,
-      0,
-      24,
-      0,
       "TRIMESH"
     ],
     [
-      27,
-      23,
-      0,
-      24,
+      29,
       1,
+      0,
+      25,
+      0,
       "TRIMESH"
     ]
   ],
@@ -164,7 +166,7 @@
         181.20347089344938
       ]
     },
-    "frontendVersion": "1.28.8"
+    "frontendVersion": "1.30.6"
   },
   "version": 0.4
 }

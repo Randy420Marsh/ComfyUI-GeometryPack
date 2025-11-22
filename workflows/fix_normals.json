@@ -1,14 +1,89 @@
 {
   "id": "fix-normals-workflow",
   "revision": 0,
-  "last_node_id": 3,
-  "last_link_id": 3,
+  "last_node_id": 7,
+  "last_link_id": 12,
   "nodes": [
+    {
+      "id": 4,
+      "type": "GeomPackPreviewMeshDual",
+      "pos": [
+        114.71875000000023,
+        226.32812500000006
+      ],
+      "size": [
+        768,
+        834
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh_1",
+          "type": "TRIMESH",
+          "link": 12
+        },
+        {
+          "name": "mesh_2",
+          "type": "TRIMESH",
+          "link": 11
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "991c7a75886f50d567e5ed6d36aed06d0729a938",
+        "Node name for S&R": "GeomPackPreviewMeshDual"
+      },
+      "widgets_values": [
+        "side_by_side",
+        "fields",
+        1,
+        1,
+        ""
+      ]
+    },
+    {
+      "id": 5,
+      "type": "PreviewAny",
+      "pos": [
+        271.2552083333335,
+        -56.734374999999986
+      ],
+      "size": [
+        322.92708333333326,
+        191.16145833333331
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 8
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.71",
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": []
+    },
     {
       "id": 1,
       "type": "GeomPackLoadMesh",
-      "pos": [-502, -58],
-      "size": [270, 78],
+      "pos": [
+        -502,
+        -58
+      ],
+      "size": [
+        270,
+        78
+      ],
       "flags": {},
       "order": 0,
       "mode": 0,
@@ -17,7 +92,10 @@
         {
           "name": "mesh",
           "type": "TRIMESH",
-          "links": [1, 2]
+          "links": [
+            1,
+            9
+          ]
         },
         {
           "name": "texture",
@@ -31,14 +109,98 @@
         "Node name for S&R": "GeomPackLoadMesh"
       },
       "widgets_values": [
-        "3d/Stanford_Bunny.stl"
+        "3d/truck.obj"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "GeomPackComputeNormals",
+      "pos": [
+        -347.74999999999943,
+        187.20312500000009
+      ],
+      "size": [
+        292.056640625,
+        58
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mesh_with_normals",
+          "type": "TRIMESH",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "991c7a75886f50d567e5ed6d36aed06d0729a938",
+        "Node name for S&R": "GeomPackComputeNormals"
+      },
+      "widgets_values": [
+        "true"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "GeomPackComputeNormals",
+      "pos": [
+        -360.8229166666663,
+        291.45312499999994
+      ],
+      "size": [
+        292.056640625,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "trimesh",
+          "type": "TRIMESH",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mesh_with_normals",
+          "type": "TRIMESH",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "991c7a75886f50d567e5ed6d36aed06d0729a938",
+        "Node name for S&R": "GeomPackComputeNormals"
+      },
+      "widgets_values": [
+        "true"
       ]
     },
     {
       "id": 2,
       "type": "GeomPackFixNormals",
-      "pos": [-175, -63],
-      "size": [270, 78],
+      "pos": [
+        -175,
+        -63
+      ],
+      "size": [
+        270,
+        78
+      ],
       "flags": {},
       "order": 1,
       "mode": 0,
@@ -53,12 +215,16 @@
         {
           "name": "fixed_mesh",
           "type": "TRIMESH",
-          "links": [3]
+          "links": [
+            10
+          ]
         },
         {
           "name": "info",
           "type": "STRING",
-          "links": null
+          "links": [
+            8
+          ]
         }
       ],
       "properties": {
@@ -66,52 +232,70 @@
         "ver": "main",
         "Node name for S&R": "GeomPackFixNormals"
       },
-      "widgets_values": []
-    },
-    {
-      "id": 3,
-      "type": "GeomPackPreviewMeshDual",
-      "pos": [120, 145],
-      "size": [802, 848],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "mesh_1",
-          "type": "TRIMESH",
-          "link": 2
-        },
-        {
-          "name": "mesh_2",
-          "type": "TRIMESH",
-          "link": 3
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
-        "Node name for S&R": "GeomPackPreviewMeshDual"
-      },
       "widgets_values": [
-        "side_by_side",
-        1,
-        ""
+        "igl_bfs"
       ]
     }
   ],
   "links": [
-    [1, 1, 0, 2, 0, "TRIMESH"],
-    [2, 1, 0, 3, 0, "TRIMESH"],
-    [3, 2, 0, 3, 1, "TRIMESH"]
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "TRIMESH"
+    ],
+    [
+      8,
+      2,
+      1,
+      5,
+      0,
+      "*"
+    ],
+    [
+      9,
+      1,
+      0,
+      6,
+      0,
+      "TRIMESH"
+    ],
+    [
+      10,
+      2,
+      0,
+      7,
+      0,
+      "TRIMESH"
+    ],
+    [
+      11,
+      7,
+      0,
+      4,
+      1,
+      "TRIMESH"
+    ],
+    [
+      12,
+      6,
+      0,
+      4,
+      0,
+      "TRIMESH"
+    ]
   ],
   "groups": [],
   "config": {},
   "extra": {
     "ds": {
       "scale": 0.75,
-      "offset": [1127, 181]
+      "offset": [
+        934.9999999999997,
+        146.08333333333334
+      ]
     },
     "frontendVersion": "1.30.6"
   },

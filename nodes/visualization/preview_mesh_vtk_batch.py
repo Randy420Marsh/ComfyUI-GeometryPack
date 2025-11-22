@@ -42,7 +42,7 @@ class PreviewMeshVTKBatchNode:
             "required": {
                 "trimesh": ("TRIMESH",),
                 "mode": (["fields", "texture"], {"default": "fields"}),
-                "index": ("INT", {"default": 0, "min": 0, "max": 999999}),
+                "index": ("INT", {"default": 0, "min": 0, "max": 100}),
             },
         }
 

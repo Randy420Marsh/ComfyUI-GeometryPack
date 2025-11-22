@@ -1,14 +1,20 @@
 {
   "id": "fill-holes-workflow",
   "revision": 0,
-  "last_node_id": 3,
-  "last_link_id": 3,
+  "last_node_id": 6,
+  "last_link_id": 10,
   "nodes": [
     {
       "id": 1,
       "type": "GeomPackLoadMesh",
-      "pos": [-502, -58],
-      "size": [270, 78],
+      "pos": [
+        -502,
+        -58
+      ],
+      "size": [
+        270,
+        78
+      ],
       "flags": {},
       "order": 0,
       "mode": 0,
@@ -17,7 +23,10 @@
         {
           "name": "mesh",
           "type": "TRIMESH",
-          "links": [1, 2]
+          "links": [
+            5,
+            9
+          ]
         },
         {
           "name": "texture",
@@ -31,48 +40,20 @@
         "Node name for S&R": "GeomPackLoadMesh"
       },
       "widgets_values": [
-        "3d/Stanford_Bunny.stl"
+        "3d/camelhead.off"
       ]
     },
     {
-      "id": 2,
-      "type": "GeomPackFillHoles",
-      "pos": [-175, -63],
-      "size": [270, 78],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "trimesh",
-          "type": "TRIMESH",
-          "link": 1
-        }
-      ],
-      "outputs": [
-        {
-          "name": "filled_mesh",
-          "type": "TRIMESH",
-          "links": [3]
-        },
-        {
-          "name": "info",
-          "type": "STRING",
-          "links": null
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
-        "Node name for S&R": "GeomPackFillHoles"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 3,
+      "id": 4,
       "type": "GeomPackPreviewMeshDual",
-      "pos": [120, 145],
-      "size": [802, 848],
+      "pos": [
+        219.76041666666663,
+        46.4947916666666
+      ],
+      "size": [
+        768,
+        834
+      ],
       "flags": {},
       "order": 2,
       "mode": 0,
@@ -80,38 +61,148 @@
         {
           "name": "mesh_1",
           "type": "TRIMESH",
-          "link": 2
+          "link": 5
         },
         {
           "name": "mesh_2",
           "type": "TRIMESH",
-          "link": 3
+          "link": 8
         }
       ],
       "outputs": [],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "991c7a75886f50d567e5ed6d36aed06d0729a938",
         "Node name for S&R": "GeomPackPreviewMeshDual"
       },
       "widgets_values": [
         "side_by_side",
+        "fields",
+        1,
         1,
         ""
+      ]
+    },
+    {
+      "id": 5,
+      "type": "PreviewAny",
+      "pos": [
+        -43.932291666666664,
+        140.42708333333326
+      ],
+      "size": [
+        210,
+        257.94791666666663
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 10
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.71",
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 6,
+      "type": "GeomPackFillHoles",
+      "pos": [
+        -166.06380208333348,
+        -51.12369791666674
+      ],
+      "size": [
+        270,
+        102
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh",
+          "type": "TRIMESH",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "filled_mesh",
+          "type": "TRIMESH",
+          "links": [
+            8
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "991c7a75886f50d567e5ed6d36aed06d0729a938",
+        "Node name for S&R": "GeomPackFillHoles"
+      },
+      "widgets_values": [
+        "igl_fan",
+        100
       ]
     }
   ],
   "links": [
-    [1, 1, 0, 2, 0, "TRIMESH"],
-    [2, 1, 0, 3, 0, "TRIMESH"],
-    [3, 2, 0, 3, 1, "TRIMESH"]
+    [
+      5,
+      1,
+      0,
+      4,
+      0,
+      "TRIMESH"
+    ],
+    [
+      8,
+      6,
+      0,
+      4,
+      1,
+      "TRIMESH"
+    ],
+    [
+      9,
+      1,
+      0,
+      6,
+      0,
+      "TRIMESH"
+    ],
+    [
+      10,
+      6,
+      1,
+      5,
+      0,
+      "*"
+    ]
   ],
   "groups": [],
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.75,
-      "offset": [1127, 181]
+      "scale": 1,
+      "offset": [
+        710.2434895833335,
+        183.89713541666674
+      ]
     },
     "frontendVersion": "1.30.6"
   },
