@@ -4,9 +4,23 @@
 
 Professional geometry processing nodes for ComfyUI. Load, analyze, remesh, unwrap, and visualize 3D meshes directly in your workflows.
 
+## Some previews
+
 ![Remeshing](docs/remeshing.png)
 ![self_intersection_fix](docs/self_intersection_fix.png)
 ![uv_unwrapping](docs/uv_unwrapping.png)
+
+https://github.com/user-attachments/assets/c2e393ba-fb57-4a46-b772-31c4b01f47f8
+
+
+https://github.com/user-attachments/assets/b1bcd570-719f-4be5-868d-f72c9f1f4c10
+
+
+https://github.com/user-attachments/assets/607e6b29-a8d4-4346-873a-5bd6b140bdba
+
+
+https://github.com/user-attachments/assets/7718a5d7-cd5b-47d3-874c-29ada4320694
+
 
 ## Features
 
