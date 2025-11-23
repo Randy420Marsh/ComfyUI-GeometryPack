@@ -36,7 +36,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackMeshFromSkeleton"
       },
       "widgets_values": [
@@ -76,7 +76,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackLoadMesh"
       },
       "widgets_values": [

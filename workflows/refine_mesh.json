@@ -1,5 +1,5 @@
 {
-  "id": "refine-mesh-workflow",
+  "id": "r6e7d8c9-0b1a-2345-f678-456789012345",
   "revision": 0,
   "last_node_id": 3,
   "last_link_id": 3,
@@ -36,11 +36,51 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackLoadMesh"
       },
       "widgets_values": [
         "3d/Stanford_Bunny.stl"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "GeomPackPreviewMeshDual",
+      "pos": [
+        120.60416666666666,
+        144.38541666666669
+      ],
+      "size": [
+        802,
+        848
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh_1",
+          "type": "TRIMESH",
+          "link": 2
+        },
+        {
+          "name": "mesh_2",
+          "type": "TRIMESH",
+          "link": 3
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-geometrypack",
+        "ver": "0.1.1",
+        "Node name for S&R": "GeomPackPreviewMeshDual"
+      },
+      "widgets_values": [
+        "side_by_side",
+        "fields",
+        1,
+        1,
+        ""
       ]
     },
     {
@@ -80,53 +120,13 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackRefineMesh"
       },
       "widgets_values": [
         "decimation",
         "trimesh",
-        5000
-      ]
-    },
-    {
-      "id": 3,
-      "type": "GeomPackPreviewMeshDual",
-      "pos": [
-        120.60416666666666,
-        144.38541666666669
-      ],
-      "size": [
-        802,
-        848
-      ],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "mesh_1",
-          "type": "TRIMESH",
-          "link": 2
-        },
-        {
-          "name": "mesh_2",
-          "type": "TRIMESH",
-          "link": 3
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
-        "Node name for S&R": "GeomPackPreviewMeshDual"
-      },
-      "widgets_values": [
-        "side_by_side",
-        "fields",
-        1,
-        1,
-        ""
+        5004
       ]
     }
   ],
@@ -162,8 +162,8 @@
     "ds": {
       "scale": 0.75,
       "offset": [
-        973.8333333333334,
-        146.3645833333333
+        1157.1250000000005,
+        204.75520833333331
       ]
     },
     "frontendVersion": "1.30.6"

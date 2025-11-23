@@ -1,5 +1,5 @@
 {
-  "id": "test-loading-workflow",
+  "id": "t8e9d0c1-2b3a-4567-890b-cdef12345678",
   "revision": 0,
   "last_node_id": 3,
   "last_link_id": 2,
@@ -27,7 +27,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackLoadMeshBlend"
       },
       "widgets_values": [
@@ -57,7 +57,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackLoadMeshFBX"
       },
       "widgets_values": [
@@ -87,7 +87,7 @@
       "outputs": [],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackPreviewMeshDual"
       },
       "widgets_values": [

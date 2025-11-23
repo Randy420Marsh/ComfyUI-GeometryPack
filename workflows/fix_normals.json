@@ -1,5 +1,5 @@
 {
-  "id": "fix-normals-workflow",
+  "id": "f3e4d5c6-7b8a-9012-cdef-123456789012",
   "revision": 0,
   "last_node_id": 7,
   "last_link_id": 12,
@@ -105,7 +105,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackLoadMesh"
       },
       "widgets_values": [
@@ -229,7 +229,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackFixNormals"
       },
       "widgets_values": [

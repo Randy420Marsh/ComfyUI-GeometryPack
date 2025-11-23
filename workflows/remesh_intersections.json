@@ -1,5 +1,5 @@
 {
-  "id": "remesh-intersections-workflow",
+  "id": "r7e8d9c0-1b2a-3456-789a-bcdef0123456",
   "revision": 0,
   "last_node_id": 13,
   "last_link_id": 21,
@@ -36,7 +36,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackLoadMesh"
       },
       "widgets_values": [

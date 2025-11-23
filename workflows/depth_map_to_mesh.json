@@ -1,5 +1,5 @@
 {
-  "id": "depth-map-to-mesh-workflow",
+  "id": "d1e2f3a4-5b6c-7d8e-9f0a-1b2c3d4e5f6a",
   "revision": 0,
   "last_node_id": 6,
   "last_link_id": 7,
@@ -141,7 +141,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-geometrypack",
-        "ver": "main",
+        "ver": "0.1.1",
         "Node name for S&R": "GeomPackTextureToGeometry"
       },
       "widgets_values": [
