@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Unified UV Unwrap Node - Multiple UV unwrapping methods in one node.
 

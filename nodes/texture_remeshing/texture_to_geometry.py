@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Texture to Geometry Node - Convert texture heightmap to 3D geometry
 """

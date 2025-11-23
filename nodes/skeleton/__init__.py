@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """Skeleton extraction and visualization module."""
 
 from .extract_skeleton import NODE_CLASS_MAPPINGS as EXTRACT_MAPPINGS

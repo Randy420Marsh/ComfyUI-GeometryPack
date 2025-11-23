@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Remesh UV Node - Remesh with texture preservation using Blender
 """
@@ -479,7 +482,7 @@ Texture Transfer: Closest-Point Projection{placeholder_warning}
                 if os.path.exists(path):
                     try:
                         os.unlink(path)
-                    except:
+                    except OSError:
                         pass
 
 

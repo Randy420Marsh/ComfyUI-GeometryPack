@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """Conversion module - mesh to point cloud."""
 
 from .mesh_to_pointcloud import NODE_CLASS_MAPPINGS as MESH_TO_PC_MAPPINGS

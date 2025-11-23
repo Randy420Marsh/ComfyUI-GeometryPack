@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 GeometryPack PreStartup Script
 Copies example 3D assets to ComfyUI input folder on startup.

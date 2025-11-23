@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """Combine/split operations module."""
 
 from .combine_meshes import NODE_CLASS_MAPPINGS as COMBINE_MAPPINGS

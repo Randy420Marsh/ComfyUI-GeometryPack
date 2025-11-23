@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Test script for CGAL isotropic remeshing with Stanford Bunny
 Uses the same approach as mesh_utils.py

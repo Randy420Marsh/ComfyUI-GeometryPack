@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """Texture remeshing module - remesh with texture preservation."""
 
 from .remesh_uv import NODE_CLASS_MAPPINGS as REMESH_UV_MAPPINGS

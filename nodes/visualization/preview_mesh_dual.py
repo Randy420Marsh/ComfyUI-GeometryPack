@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Unified dual mesh preview with VTK.js - supports both side-by-side and overlay layouts.
 
@@ -25,7 +28,7 @@ from ._vtp_export import export_mesh_with_scalars_vtp
 try:
     import folder_paths
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
-except:
+except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
 
 

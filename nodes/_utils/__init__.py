@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """Internal utility modules for GeometryPack nodes.
 
 This package contains shared utility functions used across multiple nodes.

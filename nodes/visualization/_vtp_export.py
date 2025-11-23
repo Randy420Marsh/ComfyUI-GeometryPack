@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Helper function for exporting mesh to VTK PolyData XML format (.vtp) with scalar attributes.
 

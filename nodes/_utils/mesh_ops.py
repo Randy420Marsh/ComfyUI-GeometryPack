@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Mesh utilities for ComfyUI GeomPack nodes
 Handles mesh data structures, I/O, and processing using trimesh and CGAL

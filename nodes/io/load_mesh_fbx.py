@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Load Mesh FBX Node - Load FBX files with automatic conversion to GLB
 """
@@ -9,7 +12,7 @@ import subprocess
 try:
     import folder_paths
     COMFYUI_INPUT_FOLDER = folder_paths.get_input_directory()
-except:
+except (ImportError, AttributeError):
     # Fallback if folder_paths not available (e.g., during testing)
     COMFYUI_INPUT_FOLDER = None
 

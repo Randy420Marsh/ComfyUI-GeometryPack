@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Preview mesh with interactive 3D viewer.
 
@@ -18,7 +21,7 @@ from _utils.mesh_ops import is_point_cloud, get_face_count, get_geometry_type
 try:
     import folder_paths
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
-except:
+except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
 
 

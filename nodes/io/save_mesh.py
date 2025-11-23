@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """
 Save Mesh Node - Save a mesh to file (OBJ, PLY, STL, OFF, etc.)
 """
@@ -8,7 +11,7 @@ import os
 try:
     import folder_paths
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
-except:
+except (ImportError, AttributeError):
     # Fallback if folder_paths not available (e.g., during testing)
     COMFYUI_OUTPUT_FOLDER = None
 

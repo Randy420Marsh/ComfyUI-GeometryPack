@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """Distance computation module."""
 
 from .mesh_to_mesh_distance import NODE_CLASS_MAPPINGS as MESH_DIST_MAPPINGS

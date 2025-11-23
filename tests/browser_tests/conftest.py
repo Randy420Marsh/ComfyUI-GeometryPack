@@ -13,6 +13,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
 
 
 @pytest.fixture(scope="session")
@@ -151,7 +152,7 @@ def viewer_page(browser, comfyui_url):
             try:
                 self.driver.find_element(by, selector)
                 return True
-            except:
+            except NoSuchElementException:
                 return False
 
         def get_element_text(self, selector, by=By.CSS_SELECTOR):
@@ -159,7 +160,7 @@ def viewer_page(browser, comfyui_url):
             try:
                 element = self.driver.find_element(by, selector)
                 return element.text
-            except:
+            except NoSuchElementException:
                 return None
 
     return ViewerPage(browser, comfyui_url)

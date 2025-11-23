@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 #!/usr/bin/env python3
 """
 Automated node splitting script for GeometryPack.

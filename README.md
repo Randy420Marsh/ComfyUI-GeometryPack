@@ -36,7 +36,7 @@ Professional geometry processing nodes for ComfyUI. Load, analyze, remesh, unwra
 
 ```bash
 cd ComfyUI/custom_nodes/
-git clone https://github.com/yourusername/ComfyUI-GeometryPack.git
+git clone https://github.com/PozzettiAndrea/ComfyUI-GeometryPack.git
 cd ComfyUI-GeometryPack
 pip install -r requirements.txt
 ```
@@ -62,6 +62,74 @@ Create Primitive → Mesh Info → Preview Mesh (3D)
 Load Mesh → PyMeshLab Remesh → Save Mesh
 ```
 
+## Workflow Demonstrations
+
+### Loading & Analysis
+
+**Load Mesh (Blend/FBX)**
+![Load Blend or FBX](docs/workflows/load_blend_or_fbx.png)
+
+**Mesh Information**
+![Mesh Info](docs/workflows/mesh_info.png)
+
+### Remeshing & Refinement
+
+**Remeshing**
+![Remesh](docs/workflows/remesh.png)
+
+**Batch Remeshing**
+![Batch Remesh](docs/workflows/batch_remesh.png)
+
+**Mesh Refinement**
+![Refine](docs/workflows/refine.png)
+
+### Mesh Repair
+
+**Fill Holes**
+![Fill Holes](docs/workflows/fill_holes.png)
+
+**Self-Intersection Removal**
+![Self Intersection Removal](docs/workflows/self_intersection_removal.png)
+
+**Self-Intersection Remesh**
+![Self Intersection Remesh](docs/workflows/self_intersection_remesh.png)
+
+### Boolean Operations
+
+**Boolean Operations**
+![Boolean Ops](docs/workflows/boolean_ops.png)
+
+### Distance & Analysis
+
+**Hausdorff & Chamfer Distance**
+![Hausdorff or Chamfer Distance](docs/workflows/hausdorff_or_chamfer_distance.png)
+
+**Signed Distance Function**
+![Signed Distance Function](docs/workflows/signed_distance_function.png)
+
+### Advanced Features
+
+**Skeleton Extraction**
+![Skeleton Extraction](docs/workflows/skeleton_extraction.png)
+
+**Normal Fields Visualization**
+![Normal Fields](docs/workflows/normal_fields.png)
+
+**Transform Operations**
+![Transform Operations](docs/workflows/transform_operations.png)
+
+### Texture & Conversion
+
+**Preview with Texture**
+![Preview with Texture](docs/workflows/preview_with_texture.png)
+
+**Depth Map to Mesh**
+![Depth Map to Mesh](docs/workflows/depth_map_to_mesh.png)
+
+## Demo Videos
+
+*Coming soon - video demonstrations will be added here*
+
 ## Architecture
 
 Codebase organized by function in `nodes/` directory:
@@ -83,4 +151,25 @@ Built on [trimesh](https://trimesh.org/), [libigl](https://libigl.github.io/), [
 
 ## License
 
-MIT License - See LICENSE file for details
+**GNU General Public License v3.0 or later (GPL-3.0-or-later)**
+
+This project is licensed under the GPL-3.0-or-later license to ensure compatibility with the included dependencies:
+
+- **Blender** (GPL-2.0-or-later) - Used for advanced UV unwrapping and remeshing
+- **CGAL** (GPL-3.0-or-later) - Used for boolean operations and isotropic remeshing
+- **PyMeshLab** (GPL-3.0) - Used for mesh processing operations
+
+### What This Means
+
+- ✅ You can use, modify, and distribute this software freely
+- ✅ You can use it for commercial purposes
+- ⚠️ If you distribute modified versions, you must also license them under GPL-3.0-or-later
+- ⚠️ You must share the source code of any modifications you distribute
+
+For more details, see:
+- [LICENSE](LICENSE) - Full GPL-3.0 license text
+- [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) - Detailed third-party license information
+
+### Questions?
+
+If you have questions about licensing, please open an issue on [GitHub](https://github.com/PozzettiAndrea/ComfyUI-GeometryPack/issues).

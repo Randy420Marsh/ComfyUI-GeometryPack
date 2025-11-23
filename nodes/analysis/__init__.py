@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2025 ComfyUI-GeometryPack Contributors
+
 """Analysis module - mesh information and quality metrics."""
 
 from .mesh_info import NODE_CLASS_MAPPINGS as MESH_INFO_MAPPINGS
