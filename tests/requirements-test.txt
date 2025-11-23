@@ -9,6 +9,9 @@ pytest-mock>=3.12.0
 # Browser automation (for @pytest.mark.browser tests)
 selenium>=4.0.0
 
+# Workflow execution (for @pytest.mark.workflow tests)
+websocket-client>=1.6.0
+
 # Note: CGAL and Blender need special installation for full test coverage
 # CGAL: pip install cgal (may need system dependencies)
 # Blender: Automatically downloaded by install.py
