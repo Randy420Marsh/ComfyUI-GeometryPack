@@ -10,6 +10,7 @@ from .load_mesh_batch import NODE_CLASS_MAPPINGS as LoadMeshBatch_mappings, NODE
 from .load_mesh_fbx import NODE_CLASS_MAPPINGS as LoadMeshFBX_mappings, NODE_DISPLAY_NAME_MAPPINGS as LoadMeshFBX_display
 from .load_mesh_blend import NODE_CLASS_MAPPINGS as LoadMeshBlend_mappings, NODE_DISPLAY_NAME_MAPPINGS as LoadMeshBlend_display
 from .save_mesh import NODE_CLASS_MAPPINGS as SaveMesh_mappings, NODE_DISPLAY_NAME_MAPPINGS as SaveMesh_display
+from .save_mesh_batch import NODE_CLASS_MAPPINGS as SaveMeshBatch_mappings, NODE_DISPLAY_NAME_MAPPINGS as SaveMeshBatch_display
 
 # Aggregate all node mappings
 NODE_CLASS_MAPPINGS = {
@@ -18,6 +19,7 @@ NODE_CLASS_MAPPINGS = {
     **LoadMeshFBX_mappings,
     **LoadMeshBlend_mappings,
     **SaveMesh_mappings,
+    **SaveMeshBatch_mappings,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -26,6 +28,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     **LoadMeshFBX_display,
     **LoadMeshBlend_display,
     **SaveMesh_display,
+    **SaveMeshBatch_display,
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
