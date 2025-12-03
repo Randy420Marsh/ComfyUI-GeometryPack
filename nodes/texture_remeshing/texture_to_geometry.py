@@ -26,7 +26,6 @@ class TextureToGeometryNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "mask": ("MASK",),
                 "height_scale": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.01,
@@ -36,6 +35,8 @@ class TextureToGeometryNode:
                 }),
             },
             "optional": {
+                "mask": ("MASK",),
+                "depth_image": ("IMAGE",),
                 "backend": ([
                     "grid",
                     "poisson_pymeshlab",
@@ -70,7 +71,8 @@ class TextureToGeometryNode:
     FUNCTION = "texture_to_geometry"
     CATEGORY = "geompack/texture_remeshing"
 
-    def texture_to_geometry(self, mask, height_scale,
+    def texture_to_geometry(self, height_scale,
+                           mask=None, depth_image=None,
                            backend="grid", poisson_depth=8,
                            invert_height="false", smooth_normals="true",
                            skip_black="false", black_threshold=0.01):
@@ -80,6 +82,7 @@ class TextureToGeometryNode:
         Args:
             mask: Input MASK tensor (B, H, W) from ComfyUI
             height_scale: Scale factor for height displacement
+            depth_image: Optional IMAGE tensor (B, H, W, C) - if provided, averages RGB to grayscale
             backend: Reconstruction backend (grid, poisson_pymeshlab, poisson_open3d, delaunay_2d)
             poisson_depth: Octree depth for Poisson reconstruction
             invert_height: Invert the mask (0=high, 1=low)
@@ -95,17 +98,38 @@ class TextureToGeometryNode:
         except ImportError:
             raise RuntimeError("torch required. Install with: pip install torch")
 
-        print(f"[TextureToGeometry] Converting mask to geometry using backend: {backend}")
+        # Validate that at least one input is provided
+        if mask is None and depth_image is None:
+            raise ValueError("Either 'mask' or 'depth_image' must be provided")
 
-        # Extract mask from ComfyUI tensor format (B, H, W)
-        if isinstance(mask, torch.Tensor):
-            heightmap = mask[0].cpu().numpy()
+        print(f"[TextureToGeometry] Converting to geometry using backend: {backend}")
+
+        # Use depth_image if provided, otherwise use mask
+        if depth_image is not None:
+            print(f"[TextureToGeometry] Using depth_image input (averaging RGB channels)")
+            if isinstance(depth_image, torch.Tensor):
+                img_arr = depth_image[0].cpu().numpy()
+            else:
+                img_arr = np.array(depth_image)
+
+            # Average RGB channels to create grayscale
+            if len(img_arr.shape) == 3 and img_arr.shape[2] >= 3:
+                heightmap = np.mean(img_arr[:, :, :3], axis=2)
+            elif len(img_arr.shape) == 3 and img_arr.shape[2] == 1:
+                heightmap = img_arr[:, :, 0]
+            else:
+                heightmap = img_arr
         else:
-            heightmap = np.array(mask)
+            print(f"[TextureToGeometry] Using mask input")
+            # Extract mask from ComfyUI tensor format (B, H, W)
+            if isinstance(mask, torch.Tensor):
+                heightmap = mask[0].cpu().numpy()
+            else:
+                heightmap = np.array(mask)
 
-        # Ensure 2D array (masks are single-channel)
-        if len(heightmap.shape) > 2:
-            heightmap = heightmap[:, :, 0] if heightmap.shape[2] == 1 else heightmap
+            # Ensure 2D array (masks are single-channel)
+            if len(heightmap.shape) > 2:
+                heightmap = heightmap[:, :, 0] if heightmap.shape[2] == 1 else np.mean(heightmap, axis=2)
 
         # Use native resolution
         height, width = heightmap.shape

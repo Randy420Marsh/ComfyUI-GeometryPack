@@ -81,7 +81,7 @@ class PreviewMeshDualNode:
                 "mesh_2": ("TRIMESH",),
             },
             "optional": {
-                "layout": (["side_by_side", "overlay"], {"default": "side_by_side"}),
+                "layout": (["side_by_side", "overlay", "slider"], {"default": "side_by_side"}),
                 "mode": (["fields", "texture"], {"default": "fields"}),
                 "opacity_1": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
                 "opacity_2": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
@@ -137,7 +137,7 @@ class PreviewMeshDualNode:
         # Generate unique ID for this preview
         preview_id = uuid.uuid4().hex[:8]
 
-        if layout == "side_by_side":
+        if layout == "side_by_side" or layout == "slider":
             # Export meshes separately based on mode
             if mode == "texture":
                 # Texture mode: export as GLB

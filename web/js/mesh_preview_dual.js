@@ -133,11 +133,20 @@ app.registerExtension({
                     const mode = message.mode?.[0] || "fields";
                     console.log(`[GeomPack Dual] onExecuted: layout=${layout}, mode=${mode}`);
 
-                    // Determine which viewer to use based on mode
-                    const viewerType = mode === "texture" ? "texture" : "fields";
-                    const viewerUrl = viewerType === "texture"
-                        ? "/extensions/ComfyUI-GeometryPack/viewer_dual_textured.html"
-                        : "/extensions/ComfyUI-GeometryPack/viewer_dual.html";
+                    // Determine which viewer to use based on mode and layout
+                    let viewerType;
+                    let viewerUrl;
+
+                    if (layout === 'slider') {
+                        viewerType = "slider";
+                        viewerUrl = "/extensions/ComfyUI-GeometryPack/viewer_dual_slider.html";
+                    } else if (mode === "texture") {
+                        viewerType = "texture";
+                        viewerUrl = "/extensions/ComfyUI-GeometryPack/viewer_dual_textured.html";
+                    } else {
+                        viewerType = "fields";
+                        viewerUrl = "/extensions/ComfyUI-GeometryPack/viewer_dual.html";
+                    }
 
                     let infoHTML = '';
                     let postMessageData = {
@@ -146,7 +155,7 @@ app.registerExtension({
                         timestamp: Date.now()
                     };
 
-                    if (layout === 'side_by_side') {
+                    if (layout === 'side_by_side' || layout === 'slider') {
                         // Side-by-side mode
                         if (!message?.mesh_1_file || !message?.mesh_2_file) {
                             return;
