@@ -244,11 +244,14 @@ class PreviewMeshDualNode:
                     "has_material_2": [texture_info_2['has_material']],
                 })
             else:
-                # Fields mode metadata
+                # Fields mode metadata - include mesh_id which is added during export for overlay
+                overlay_fields_1 = field_names_1 + ["mesh_id"] if layout == "overlay" else field_names_1
+                overlay_fields_2 = field_names_2 + ["mesh_id"] if layout == "overlay" else field_names_2
+                overlay_common = common_fields + ["mesh_id"] if layout == "overlay" else common_fields
                 ui_data.update({
-                    "field_names_1": [field_names_1],
-                    "field_names_2": [field_names_2],
-                    "common_fields": [common_fields],
+                    "field_names_1": [overlay_fields_1],
+                    "field_names_2": [overlay_fields_2],
+                    "common_fields": [overlay_common],
                 })
 
         print(f"[PreviewMeshDual] Preview ready")
@@ -292,13 +295,31 @@ class PreviewMeshDualNode:
                               mesh_1_has_fields, mesh_2_has_fields, use_glb):
         """Export combined mesh for overlay mode as VTP or GLB.
 
-        Note: opacity_1 and opacity_2 are passed but not used in export.
-        They are applied on the frontend in the viewer.
+        Automatically applies red color to mesh_1 and blue color to mesh_2
+        for easy visual distinction in overlay mode.
         """
 
-        # Combine meshes (with or without fields)
+        # Combine meshes with automatic color distinction
         try:
-            combined = trimesh_module.util.concatenate([mesh_1, mesh_2])
+            # Create copies to avoid modifying original meshes
+            mesh_1_copy = mesh_1.copy()
+            mesh_2_copy = mesh_2.copy()
+
+            # Add mesh_id field for distinction in fields mode (0 = mesh_1, 1 = mesh_2)
+            mesh_1_copy.vertex_attributes['mesh_id'] = np.zeros(len(mesh_1_copy.vertices), dtype=np.float32)
+            mesh_2_copy.vertex_attributes['mesh_id'] = np.ones(len(mesh_2_copy.vertices), dtype=np.float32)
+
+            # Apply red vertex colors to mesh_1 (RGBA: 255, 77, 77, 255) for texture mode
+            red_colors = np.full((len(mesh_1_copy.vertices), 4), [255, 77, 77, 255], dtype=np.uint8)
+            mesh_1_copy.visual.vertex_colors = red_colors
+
+            # Apply blue vertex colors to mesh_2 (RGBA: 77, 77, 255, 255) for texture mode
+            blue_colors = np.full((len(mesh_2_copy.vertices), 4), [77, 77, 255, 255], dtype=np.uint8)
+            mesh_2_copy.visual.vertex_colors = blue_colors
+
+            print(f"[PreviewMeshDual] Added mesh_id field and red/blue colors for overlay")
+
+            combined = trimesh_module.util.concatenate([mesh_1_copy, mesh_2_copy])
 
             if use_glb:
                 filename = f"preview_dual_overlay_{preview_id}.glb"
