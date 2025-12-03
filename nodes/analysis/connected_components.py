@@ -10,6 +10,7 @@ and assigns a unique part_id to each face based on which component it belongs to
 Supports batch processing: input a list of meshes, get a list of results.
 """
 
+import os
 import numpy as np
 
 
@@ -35,8 +36,8 @@ class ConnectedComponentsNode:
         }
 
     RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("trimesh", "num_components")
-    OUTPUT_IS_LIST = (True, True)
+    RETURN_NAMES = ("trimesh", "component_summary")
+    OUTPUT_IS_LIST = (True, False)  # TRIMESH is list, STRING is single summary
     FUNCTION = "label_components"
     CATEGORY = "geompack/analysis"
 
@@ -48,7 +49,7 @@ class ConnectedComponentsNode:
             trimesh: Input trimesh object(s)
 
         Returns:
-            tuple: (list of trimesh with part_id face attribute, list of component counts as strings)
+            tuple: (list of trimesh with part_id face attribute, summary string)
         """
         import trimesh as trimesh_module
 
@@ -56,7 +57,7 @@ class ConnectedComponentsNode:
         meshes = trimesh if isinstance(trimesh, list) else [trimesh]
 
         result_meshes = []
-        component_counts = []
+        summary_lines = []
 
         for mesh in meshes:
             # Get connected components using face adjacency
@@ -76,8 +77,15 @@ class ConnectedComponentsNode:
                 part_ids[face_indices] = component_id
                 component_sizes.append(len(face_indices))
 
-            # Print summary instead of per-component details
+            # Get mesh name for summary
             mesh_name = mesh.metadata.get('file_name', 'mesh') if hasattr(mesh, 'metadata') else 'mesh'
+            # Remove extension for cleaner display
+            mesh_name_short = os.path.splitext(mesh_name)[0]
+
+            # Add to summary
+            summary_lines.append(f"{mesh_name_short}: {num_components}")
+
+            # Print to console
             if num_components <= 5:
                 sizes_str = ", ".join(str(s) for s in component_sizes)
                 print(f"[ConnectedComponents] {mesh_name}: {num_components} component(s): [{sizes_str}] faces each")
@@ -98,10 +106,12 @@ class ConnectedComponentsNode:
             result_mesh.metadata['num_components'] = num_components
 
             result_meshes.append(result_mesh)
-            component_counts.append(str(num_components))
+
+        # Create summary string
+        summary = "\n".join(summary_lines)
 
         print(f"[ConnectedComponents] Processed {len(meshes)} mesh(es)")
-        return (result_meshes, component_counts)
+        return (result_meshes, summary)
 
 
 # Node mappings for ComfyUI
