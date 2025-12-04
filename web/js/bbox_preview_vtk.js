@@ -38,6 +38,7 @@ app.registerExtension({
                 iframe.style.backgroundColor = "#2a2a2a";
 
                 // Point to VTK.js HTML viewer (with cache buster)
+                // Use unified v2 viewer with modular architecture
                 iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_vtk.html?v=" + Date.now();
 
                 // Create bbox info panel
