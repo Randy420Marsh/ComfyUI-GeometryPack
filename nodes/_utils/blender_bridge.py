@@ -69,7 +69,7 @@ def find_blender():
             return path
 
     raise RuntimeError(
-        "Blender not found. Please run 'python install.py' to download Blender automatically,\n"
+        "Blender not found. Please run 'python blender_install.py' to download Blender,\n"
         "or install it manually from: https://www.blender.org/download/"
     )
 
