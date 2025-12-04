@@ -81,6 +81,8 @@
             z-index: 2000;
             display: none;
             min-width: 280px;
+            max-height: 80%;
+            overflow-y: auto;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         }
         #settingsPanel.visible {
@@ -168,6 +170,10 @@
         <div id="settingsOverlay"></div>
         <div id="settingsPanel">
             <h3>Appearance Settings</h3>
+            <div class="setting-row">
+                <label>Point Size:</label>
+                <input type="number" id="pointSize" min="1" max="20" step="1" value="5">
+            </div>
             <div class="setting-row">
                 <label>Mesh Color:</label>
                 <input type="color" id="meshColor" value="#ffffff">
@@ -663,6 +669,7 @@
         const settingsButton = document.getElementById('settingsButton');
         const settingsPanel = document.getElementById('settingsPanel');
         const settingsOverlay = document.getElementById('settingsOverlay');
+        const pointSizeInput = document.getElementById('pointSize');
         const meshColorInput = document.getElementById('meshColor');
         const edgeWidthInput = document.getElementById('edgeWidth');
         const representationSettings = document.getElementById('representationSettings');
@@ -672,6 +679,7 @@
         const cancelSettingsButton = document.getElementById('cancelSettings');
 
         // Store current settings
+        let currentPointSize = 5;
         let currentMeshColor = '#ffffff';
         let currentEdgeWidth = 1;
         let currentRepresentation = 2; // 2 = Surface
@@ -681,6 +689,7 @@
         // Open settings panel
         settingsButton.addEventListener('click', () => {
             // Update inputs with current values
+            pointSizeInput.value = currentPointSize;
             meshColorInput.value = currentMeshColor;
             edgeWidthInput.value = currentEdgeWidth;
             representationSettings.value = currentRepresentation.toString();
@@ -705,13 +714,14 @@
 
         // Apply settings
         applySettingsButton.addEventListener('click', () => {
+            const newPointSize = parseFloat(pointSizeInput.value);
             const newColor = meshColorInput.value;
             const newEdgeWidth = parseFloat(edgeWidthInput.value);
             const newRepresentation = parseInt(representationSettings.value);
             const newParallelProjection = parallelProjectionInput.checked;
             const newShowAxisIndicator = showAxisIndicatorInput.checked;
 
-            console.log('[GeomPack VTK Fields Viewer] Applying settings - Color:', newColor, 'Edge Width:', newEdgeWidth, 'Representation:', newRepresentation, 'Parallel:', newParallelProjection, 'Axis:', newShowAxisIndicator);
+            console.log('[GeomPack VTK Fields Viewer] Applying settings - Point Size:', newPointSize, 'Color:', newColor, 'Edge Width:', newEdgeWidth, 'Representation:', newRepresentation, 'Parallel:', newParallelProjection, 'Axis:', newShowAxisIndicator);
 
             // Convert hex color to RGB (0-1 range)
             const r = parseInt(newColor.substr(1, 2), 16) / 255;
@@ -727,6 +737,9 @@
             // Apply edge width (only visible when edges are enabled)
             property.setLineWidth(newEdgeWidth);
 
+            // Apply point size (for point cloud rendering)
+            property.setPointSize(newPointSize);
+
             // Apply representation mode (0=Points, 1=Wireframe, 2=Surface)
             property.setRepresentation(newRepresentation);
 
@@ -738,6 +751,7 @@
             orientationWidget.setEnabled(newShowAxisIndicator);
 
             // Update stored settings
+            currentPointSize = newPointSize;
             currentMeshColor = newColor;
             currentEdgeWidth = newEdgeWidth;
             currentRepresentation = newRepresentation;

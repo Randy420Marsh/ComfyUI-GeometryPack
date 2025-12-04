@@ -5,16 +5,18 @@
 
 from .combine_meshes import NODE_CLASS_MAPPINGS as COMBINE_MAPPINGS
 from .combine_meshes import NODE_DISPLAY_NAME_MAPPINGS as COMBINE_DISPLAY
-
-# Also import from parent combine.py for other nodes (SplitComponents, FilterComponents)
+from .split_by_field import NODE_CLASS_MAPPINGS as SPLIT_FIELD_MAPPINGS
+from .split_by_field import NODE_DISPLAY_NAME_MAPPINGS as SPLIT_FIELD_DISPLAY
 
 # Combine all mappings
 NODE_CLASS_MAPPINGS = {
     **COMBINE_MAPPINGS,
+    **SPLIT_FIELD_MAPPINGS,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     **COMBINE_DISPLAY,
+    **SPLIT_FIELD_DISPLAY,
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
