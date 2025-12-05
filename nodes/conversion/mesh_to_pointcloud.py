@@ -22,17 +22,23 @@ class MeshToPointCloudNode:
         return {
             "required": {
                 "trimesh": ("TRIMESH",),
+                "mode": (["strip_adjacency", "surface_sampling"], {
+                    "default": "strip_adjacency",
+                    "tooltip": "strip_adjacency: use mesh vertices directly. surface_sampling: sample points from surface."
+                }),
+            },
+            "optional": {
                 "sample_count": ("INT", {
                     "default": 10000,
                     "min": 100,
                     "max": 10000000,
-                    "step": 100
+                    "step": 100,
+                    "tooltip": "Number of points to sample (only for surface_sampling mode)"
                 }),
                 "sampling_method": (["uniform", "even", "face_weighted"], {
-                    "default": "uniform"
+                    "default": "uniform",
+                    "tooltip": "Sampling strategy (only for surface_sampling mode)"
                 }),
-            },
-            "optional": {
                 "include_normals": (["true", "false"], {
                     "default": "true"
                 }),
@@ -44,51 +50,64 @@ class MeshToPointCloudNode:
     FUNCTION = "mesh_to_pointcloud"
     CATEGORY = "geompack/conversion"
 
-    def mesh_to_pointcloud(self, trimesh, sample_count, sampling_method, include_normals="true"):
+    def mesh_to_pointcloud(self, trimesh, mode, sample_count=10000, sampling_method="uniform", include_normals="true"):
         """
-        Sample points from mesh surface.
+        Convert mesh to point cloud.
 
         Args:
             trimesh: Input trimesh.Trimesh object
-            sample_count: Number of points to sample
-            sampling_method: Sampling strategy
+            mode: "strip_adjacency" to use vertices directly, "surface_sampling" to sample surface
+            sample_count: Number of points to sample (only for surface_sampling)
+            sampling_method: Sampling strategy (only for surface_sampling)
             include_normals: Whether to compute surface normals
 
         Returns:
             tuple: (point_cloud_as_trimesh,) - TRIMESH with vertices only (no faces)
         """
-        print(f"[MeshToPointCloud] Sampling {sample_count:,} points using {sampling_method} method")
+        import trimesh as trimesh_module
 
-        if sampling_method == "uniform":
-            # Uniform random sampling
-            points, face_indices = trimesh.sample(sample_count, return_index=True)
-
-        elif sampling_method == "even":
-            # Approximately even spacing (rejection sampling)
-            # Calculate radius based on surface area and desired point count
-            radius = np.sqrt(trimesh.area / sample_count) * 2.0
-            points, face_indices = trimesh.sample.sample_surface_even(
-                trimesh, sample_count, radius=radius
-            )
-            print(f"[MeshToPointCloud] Even sampling produced {len(points):,} points (target: {sample_count:,})")
-
-        elif sampling_method == "face_weighted":
-            # Weight by face area (default behavior)
-            points, face_indices = trimesh.sample(
-                sample_count,
-                return_index=True,
-                face_weight=trimesh.area_faces
-            )
-
-        # Optional: compute normals at sample points
+        face_indices = None
         normals = None
-        if include_normals == "true":
-            # Get face normals for each sampled point
-            normals = trimesh.face_normals[face_indices]
+
+        if mode == "strip_adjacency":
+            # Simply use mesh vertices directly (strip face adjacency)
+            points = np.asarray(trimesh.vertices, dtype=np.float32)
+            print(f"[MeshToPointCloud] Strip adjacency: extracted {len(points):,} vertices")
+
+            # Use vertex normals if available and requested
+            if include_normals == "true" and hasattr(trimesh, 'vertex_normals'):
+                normals = trimesh.vertex_normals
+
+        else:  # surface_sampling
+            print(f"[MeshToPointCloud] Sampling {sample_count:,} points using {sampling_method} method")
+
+            if sampling_method == "uniform":
+                # Uniform random sampling
+                points, face_indices = trimesh.sample(sample_count, return_index=True)
+
+            elif sampling_method == "even":
+                # Approximately even spacing (rejection sampling)
+                # Calculate radius based on surface area and desired point count
+                radius = np.sqrt(trimesh.area / sample_count) * 2.0
+                points, face_indices = trimesh_module.sample.sample_surface_even(
+                    trimesh, sample_count, radius=radius
+                )
+                print(f"[MeshToPointCloud] Even sampling produced {len(points):,} points (target: {sample_count:,})")
+
+            elif sampling_method == "face_weighted":
+                # Weight by face area (default behavior)
+                points, face_indices = trimesh.sample(
+                    sample_count,
+                    return_index=True,
+                    face_weight=trimesh.area_faces
+                )
+
+            # Compute normals at sample points from face normals
+            if include_normals == "true" and face_indices is not None:
+                normals = trimesh.face_normals[face_indices]
 
         # Create point cloud as TRIMESH object (vertices only, no faces)
         # This ensures compatibility with all TRIMESH-expecting nodes
-        import trimesh as trimesh_module
         point_cloud = trimesh_module.PointCloud(vertices=points)
 
         # Add normals as vertex_normals if computed
@@ -98,15 +117,16 @@ class MeshToPointCloudNode:
         # Store point cloud metadata
         point_cloud.metadata = {
             'is_point_cloud': True,
+            'mode': mode,
             'face_indices': face_indices,
             'source_mesh_vertices': len(trimesh.vertices),
             'source_mesh_faces': len(trimesh.faces),
             'sample_count': len(points),
-            'sampling_method': sampling_method,
+            'sampling_method': sampling_method if mode == "surface_sampling" else None,
             'has_normals': normals is not None
         }
 
-        print(f"[MeshToPointCloud] Generated point cloud as TRIMESH with {len(points):,} points")
+        print(f"[MeshToPointCloud] Generated point cloud with {len(points):,} points")
 
         return (point_cloud,)
 
