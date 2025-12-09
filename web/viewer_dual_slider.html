@@ -177,9 +177,27 @@
 
         <button id="resetCamera">Reset Camera</button>
         <button id="resetSlider">Reset Slider</button>
+
+        <span class="divider"></span>
+
+        <label id="fieldLabel" style="display:none;">
+            Field:
+            <select id="fieldSelector"></select>
+        </label>
+        <label id="colormapLabel" style="display:none;">
+            Colormap:
+            <select id="colormapSelector">
+                <option value="erdc_rainbow_bright">Rainbow</option>
+                <option value="Cool to Warm">Cool to Warm</option>
+                <option value="Viridis (matplotlib)">Viridis</option>
+                <option value="Plasma (matplotlib)">Plasma</option>
+                <option value="Grayscale">Grayscale</option>
+            </select>
+        </label>
     </div>
 
     <script src="/extensions/ComfyUI-GeometryPack/js/vtk-gltf.js"></script>
+    <script src="/extensions/ComfyUI-GeometryPack/js/viewer-bundle.js"></script>
 
     <script>
         // Get VTK.js classes
@@ -194,6 +212,9 @@
         const vtkGLTFImporter = vtk.IO.Geometry.vtkGLTFImporter;
 
         console.log('[GeomPack VTK Slider Viewer] Initializing...');
+
+        // Get FieldVisualization from viewer bundle
+        const { FieldVisualization } = window.GeomPackViewer || {};
 
         const loading = document.getElementById('loading');
         const mesh1Container = document.getElementById('mesh1Container');
@@ -210,6 +231,12 @@
         let mesh1Bounds, mesh2Bounds, combinedBounds;
         let sliderPos = 0.5; // 0 = left edge, 1 = right edge
         let isDragging = false;
+
+        // Field visualization state
+        let fieldVisualization1 = null;
+        let fieldVisualization2 = null;
+        let mesh1Polydata = null;
+        let mesh2Polydata = null;
 
         // Camera sync state
         let isSyncing = false;
@@ -276,6 +303,13 @@
             fullScreenRenderer2.resize();
 
             setupCameraSync();
+
+            // Initialize field visualization if available
+            if (FieldVisualization) {
+                fieldVisualization1 = new FieldVisualization(vtk, renderWindow1);
+                fieldVisualization2 = new FieldVisualization(vtk, renderWindow2);
+                console.log('[GeomPack VTK Slider Viewer] Field visualization initialized');
+            }
 
             console.log('[GeomPack VTK Slider Viewer] Viewers initialized');
         }
@@ -406,8 +440,10 @@
 
                     if (isMesh1) {
                         mesh1Bounds = bounds;
+                        mesh1Polydata = polydata;
                     } else {
                         mesh2Bounds = bounds;
+                        mesh2Polydata = polydata;
                     }
                 } else {
                     if (isSTL) {
@@ -433,9 +469,16 @@
 
                     if (isMesh1) {
                         mesh1Bounds = mapperPolydata.getBounds();
+                        mesh1Polydata = mapperPolydata;
                     } else {
                         mesh2Bounds = mapperPolydata.getBounds();
+                        mesh2Polydata = mapperPolydata;
                     }
+                }
+
+                // Populate field selectors after both meshes are loaded
+                if (mesh1Polydata && mesh2Polydata && fieldVisualization1) {
+                    populateFieldSelectors();
                 }
 
                 console.log(`[GeomPack VTK Slider Viewer] Mesh ${isMesh1 ? '1' : '2'} loaded successfully`);
@@ -462,6 +505,89 @@
                 combinedBounds = [...mesh2Bounds];
             }
         }
+
+        // Populate field selectors from polydata
+        function populateFieldSelectors() {
+            if (!fieldVisualization1 || !mesh1Polydata || !mesh2Polydata) return;
+
+            const fieldSelector = document.getElementById('fieldSelector');
+            const fieldLabel = document.getElementById('fieldLabel');
+            const colormapLabel = document.getElementById('colormapLabel');
+
+            // Extract fields from both meshes
+            const fields1 = fieldVisualization1.extractFields(mesh1Polydata);
+            const fields2 = fieldVisualization1.extractFields(mesh2Polydata);
+
+            // Find common fields between both meshes
+            const commonFields = fields1.allFields.filter(f1 =>
+                fields2.allFields.some(f2 => f2.fullName === f1.fullName)
+            );
+
+            console.log(`[GeomPack VTK Slider Viewer] Found ${commonFields.length} common fields:`, commonFields.map(f => f.displayName));
+
+            if (commonFields.length > 0) {
+                fieldSelector.innerHTML = '<option value="">None</option>';
+                commonFields.forEach(field => {
+                    const option = document.createElement('option');
+                    option.value = field.fullName;
+                    option.textContent = field.displayName;
+                    fieldSelector.appendChild(option);
+                });
+
+                fieldLabel.style.display = 'flex';
+                colormapLabel.style.display = 'flex';
+            }
+        }
+
+        // Apply field visualization to both meshes
+        function applyFieldVisualization(fieldName, colormap) {
+            if (!fieldVisualization1 || !fieldVisualization2) return;
+
+            if (!fieldName) {
+                // Reset to solid colors
+                const prop1 = mesh1Actor.getProperty();
+                const prop2 = mesh2Actor.getProperty();
+                prop1.setColor(0.3, 0.5, 0.95); // Blue
+                prop2.setColor(0.3, 0.85, 0.4); // Green
+                mesh1Mapper.setScalarVisibility(false);
+                mesh2Mapper.setScalarVisibility(false);
+            } else {
+                // Calculate synchronized range for both meshes
+                const range = fieldVisualization1.calculateSynchronizedRange(
+                    [mesh1Polydata, mesh2Polydata], fieldName
+                );
+
+                // Apply to mesh 1
+                fieldVisualization1.applyField(mesh1Mapper, mesh1Polydata, fieldName, {
+                    colormap: colormap,
+                    range: range
+                });
+
+                // Apply to mesh 2
+                fieldVisualization2.applyField(mesh2Mapper, mesh2Polydata, fieldName, {
+                    colormap: colormap,
+                    range: range
+                });
+            }
+
+            renderWindow1.render();
+            renderWindow2.render();
+        }
+
+        // Field selector event handlers
+        document.getElementById('fieldSelector').addEventListener('change', (e) => {
+            const fieldName = e.target.value;
+            const colormap = document.getElementById('colormapSelector').value;
+            applyFieldVisualization(fieldName, colormap);
+        });
+
+        document.getElementById('colormapSelector').addEventListener('change', (e) => {
+            const fieldName = document.getElementById('fieldSelector').value;
+            const colormap = e.target.value;
+            if (fieldName) {
+                applyFieldVisualization(fieldName, colormap);
+            }
+        });
 
         // Update slider UI and CSS clip-path
         function updateSlider() {
