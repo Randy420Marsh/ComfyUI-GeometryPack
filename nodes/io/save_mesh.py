@@ -20,8 +20,9 @@ from .._utils import mesh_ops
 
 class SaveMesh:
     """
-    Save a mesh to file (OBJ, PLY, STL, OFF, etc.)
+    Save a mesh or point cloud to file (OBJ, PLY, STL, OFF, etc.)
     Supports all formats provided by trimesh.
+    Point clouds (vertices without faces) can be saved as PLY format.
     """
 
     @classmethod
@@ -77,16 +78,28 @@ class SaveMesh:
             raise ValueError("Cannot save mesh: received None instead of a mesh object. Check that the previous node is outputting a mesh.")
 
         # Check if mesh has data
+        is_point_cloud = False
         try:
             vertex_count = len(trimesh.vertices) if hasattr(trimesh, 'vertices') else 0
             face_count = len(trimesh.faces) if hasattr(trimesh, 'faces') else 0
             print(f"[SaveMesh] Mesh has {vertex_count} vertices, {face_count} faces")
 
-            if vertex_count == 0 or face_count == 0:
+            if vertex_count == 0:
                 raise ValueError(
-                    f"Cannot save empty mesh (vertices: {vertex_count}, faces: {face_count}). "
+                    f"Cannot save empty geometry (vertices: {vertex_count}). "
                     "Check that the previous node is producing valid geometry."
                 )
+
+            # Point cloud (no faces) - only PLY format supports this well
+            is_point_cloud = face_count == 0
+            if is_point_cloud and format not in ["ply"]:
+                print(f"[SaveMesh] Warning: Point cloud detected but format is '{format}'. "
+                      f"Switching to PLY format for point cloud export.")
+                format = "ply"
+                # Update file path extension
+                base_path = os.path.splitext(file_path)[0]
+                file_path = base_path + ".ply"
+
         except Exception as e:
             raise ValueError(f"Error checking mesh properties: {e}. Received object may not be a valid mesh.")
 
@@ -106,9 +119,11 @@ class SaveMesh:
         if not success:
             raise ValueError(f"Failed to save trimesh: {error}")
 
-        status = f"Successfully saved mesh to: {full_path}\n"
-        status += f"  Vertices: {len(trimesh.vertices)}\n"
-        status += f"  Faces: {len(trimesh.faces)}"
+        geom_type = "point cloud" if is_point_cloud else "mesh"
+        status = f"Successfully saved {geom_type} to: {full_path}\n"
+        status += f"  Vertices: {len(trimesh.vertices)}"
+        if not is_point_cloud:
+            status += f"\n  Faces: {len(trimesh.faces)}"
 
         print(f"[SaveMesh] {status}")
 

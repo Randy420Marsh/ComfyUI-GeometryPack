@@ -205,6 +205,7 @@
         let currentFilename = null;
         let meshBounds = null;
         let currentPolyData = null;
+        let isCurrentDataPointCloud = false;
 
         // Settings state
         let currentSettings = {
@@ -269,10 +270,24 @@
                 currentPolyData = polydata;
                 meshBounds = polydata.getBounds();
 
-                // Setup VTK pipeline with normals
-                const normalsFilter = vtkPolyDataNormals.newInstance();
-                normalsFilter.setInputConnection(currentReader.getOutputPort());
-                mapper.setInputConnection(normalsFilter.getOutputPort());
+                // Detect point cloud (no polygons)
+                const numPolys = polydata.getNumberOfPolys();
+                isCurrentDataPointCloud = numPolys === 0;
+
+                if (isCurrentDataPointCloud) {
+                    console.log('[GeomPack VTK Viewer] Detected point cloud, skipping normals filter');
+                    // Connect mapper directly to polydata (no normals filter for point clouds)
+                    mapper.setInputData(polydata);
+
+                    // Lock representation to Points mode
+                    property.setRepresentation(0);
+                    property.setPointSize(currentSettings.pointSize);
+                } else {
+                    // For meshes, use normals filter for proper shading
+                    const normalsFilter = vtkPolyDataNormals.newInstance();
+                    normalsFilter.setInputConnection(currentReader.getOutputPort());
+                    mapper.setInputConnection(normalsFilter.getOutputPort());
+                }
                 mapper.update();
 
                 property.setLineWidth(lineWidth);
@@ -498,6 +513,18 @@
             document.getElementById('representationSettings').value = currentSettings.representation;
             document.getElementById('parallelProjection').checked = currentSettings.parallelProjection;
             document.getElementById('showAxisIndicator').checked = currentSettings.showAxisIndicator;
+
+            // Lock representation for point clouds
+            const representationSelect = document.getElementById('representationSettings');
+            if (isCurrentDataPointCloud) {
+                representationSelect.value = '0';
+                representationSelect.disabled = true;
+                representationSelect.title = 'Point clouds can only be rendered in Points mode';
+            } else {
+                representationSelect.disabled = false;
+                representationSelect.title = '';
+            }
+
             settingsPanel.classList.add('visible');
             settingsOverlay.classList.add('visible');
         });
@@ -527,7 +554,11 @@
             property.setColor(rgb[0], rgb[1], rgb[2]);
             property.setLineWidth(newEdgeWidth);
             property.setPointSize(newPointSize);
-            property.setRepresentation(newRepresentation);
+
+            // Only apply representation change for non-point-cloud data
+            if (!isCurrentDataPointCloud) {
+                property.setRepresentation(newRepresentation);
+            }
 
             cameraController.setParallelProjection(newParallel);
             axisIndicator.setEnabled(newAxisIndicator);

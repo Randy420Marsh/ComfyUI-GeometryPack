@@ -314,22 +314,31 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
             return None, f"Error loading mesh: {str(e)}; Fallback error: {str(e2)}"
 
 
-def save_mesh_file(mesh: trimesh.Trimesh, file_path: str) -> Tuple[bool, str]:
+def save_mesh_file(mesh, file_path: str) -> Tuple[bool, str]:
     """
-    Save a mesh to file.
+    Save a mesh or point cloud to file.
 
     Args:
-        mesh: Trimesh object
+        mesh: Trimesh or PointCloud object
         file_path: Output file path
 
     Returns:
         Tuple of (success, error_message)
     """
-    if not isinstance(mesh, trimesh.Trimesh):
-        return False, "Input must be a trimesh.Trimesh object"
+    # Check for valid trimesh types (Trimesh or PointCloud)
+    is_point_cloud = isinstance(mesh, trimesh.PointCloud)
+    is_trimesh = isinstance(mesh, trimesh.Trimesh)
 
-    if len(mesh.vertices) == 0 or len(mesh.faces) == 0:
-        return False, "Mesh is empty"
+    if not is_trimesh and not is_point_cloud:
+        return False, "Input must be a trimesh.Trimesh or trimesh.PointCloud object"
+
+    if not hasattr(mesh, 'vertices') or len(mesh.vertices) == 0:
+        return False, "Geometry has no vertices"
+
+    # For meshes (not point clouds), check for faces
+    if is_trimesh and len(mesh.faces) == 0:
+        # Treat as point cloud - convert to PointCloud for proper export
+        is_point_cloud = True
 
     try:
         # Ensure output directory exists
@@ -343,7 +352,22 @@ def save_mesh_file(mesh: trimesh.Trimesh, file_path: str) -> Tuple[bool, str]:
             export_mesh_with_scalars_vtp(mesh, file_path)
             return True, ""
 
-        # Default: use trimesh export
+        # Point cloud export - use PLY format
+        if is_point_cloud:
+            # For Trimesh with 0 faces, convert to PointCloud
+            if is_trimesh and len(mesh.faces) == 0:
+                # Get colors if available
+                colors = None
+                if hasattr(mesh, 'visual') and hasattr(mesh.visual, 'vertex_colors'):
+                    colors = mesh.visual.vertex_colors
+                point_cloud = trimesh.PointCloud(mesh.vertices, colors=colors)
+                point_cloud.export(file_path)
+            else:
+                # Already a PointCloud
+                mesh.export(file_path)
+            return True, ""
+
+        # Default: use trimesh export for meshes
         mesh.export(file_path)
 
         return True, ""
