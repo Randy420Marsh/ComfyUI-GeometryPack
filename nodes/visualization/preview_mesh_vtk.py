@@ -153,6 +153,19 @@ class PreviewMeshVTKNode:
         # Calculate bounding box info for camera setup
         bounds = trimesh.bounds
         extents = trimesh.extents
+
+        # Handle case where extents/bounds are None (can happen with certain mesh configurations)
+        if extents is None or bounds is None:
+            import numpy as np
+            vertices_arr = np.asarray(trimesh.vertices)
+            if len(vertices_arr) > 0:
+                bounds = np.array([vertices_arr.min(axis=0), vertices_arr.max(axis=0)])
+                extents = bounds[1] - bounds[0]
+            else:
+                # Empty mesh - use default bounds
+                bounds = np.array([[0, 0, 0], [1, 1, 1]])
+                extents = np.array([1, 1, 1])
+
         max_extent = max(extents)
 
         # Check if mesh is watertight (only for actual meshes, not point clouds)
