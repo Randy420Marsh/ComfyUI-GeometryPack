@@ -195,7 +195,11 @@ class LoadMesh:
         if loaded_mesh is None:
             raise ValueError(f"Failed to load mesh: {error}")
 
-        print(f"[LoadMesh] Loaded: {len(loaded_mesh.vertices)} vertices, {len(loaded_mesh.faces)} faces")
+        # Handle both meshes and pointclouds
+        if hasattr(loaded_mesh, 'faces') and loaded_mesh.faces is not None:
+            print(f"[LoadMesh] Loaded: {len(loaded_mesh.vertices)} vertices, {len(loaded_mesh.faces)} faces")
+        else:
+            print(f"[LoadMesh] Loaded pointcloud: {len(loaded_mesh.vertices)} points")
 
         # Extract texture
         texture = self._extract_texture_image(loaded_mesh)

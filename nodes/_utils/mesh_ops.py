@@ -199,9 +199,21 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
         print(f"[load_mesh_file] Loading: {file_path}")
 
         # Try to load with trimesh first (supports many formats)
-        loaded = trimesh.load(file_path, force='mesh')
+        # Don't force='mesh' so we can also load pointclouds
+        loaded = trimesh.load(file_path)
 
         print(f"[load_mesh_file] Loaded type: {type(loaded).__name__}")
+
+        # Handle pointclouds (PLY files with only vertices, no faces)
+        if isinstance(loaded, trimesh.PointCloud):
+            print(f"[load_mesh_file] Loaded pointcloud: {len(loaded.vertices)} points")
+            # Store file metadata
+            loaded.metadata['file_path'] = file_path
+            loaded.metadata['file_name'] = os.path.basename(file_path)
+            loaded.metadata['file_format'] = os.path.splitext(file_path)[1].lower()
+            loaded.metadata['is_pointcloud'] = True
+            print(f"[load_mesh_file] ✓ Successfully loaded pointcloud: {len(loaded.vertices)} points")
+            return loaded, ""
 
         # Handle case where trimesh.load returns a Scene instead of a mesh
         if isinstance(loaded, trimesh.Scene):
@@ -211,8 +223,19 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
         else:
             mesh = loaded
 
-        if mesh is None or len(mesh.vertices) == 0 or len(mesh.faces) == 0:
+        if mesh is None or len(mesh.vertices) == 0:
             return None, f"Failed to read mesh or mesh is empty: {file_path}"
+
+        # Check if it's actually a pointcloud (mesh with no faces)
+        if not hasattr(mesh, 'faces') or mesh.faces is None or len(mesh.faces) == 0:
+            # Convert to PointCloud
+            pointcloud = trimesh.PointCloud(vertices=mesh.vertices)
+            pointcloud.metadata['file_path'] = file_path
+            pointcloud.metadata['file_name'] = os.path.basename(file_path)
+            pointcloud.metadata['file_format'] = os.path.splitext(file_path)[1].lower()
+            pointcloud.metadata['is_pointcloud'] = True
+            print(f"[load_mesh_file] ✓ Successfully loaded as pointcloud: {len(pointcloud.vertices)} points")
+            return pointcloud, ""
 
         print(f"[load_mesh_file] Initial mesh: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
 
