@@ -8,9 +8,17 @@ Handles mesh data structures, I/O, and processing using trimesh and CGAL
 
 import numpy as np
 import trimesh
-import igl
 import os
 from typing import Tuple, Optional
+
+# libigl for mesh processing operations
+try:
+    import igl
+    IGL_AVAILABLE = True
+except ImportError:
+    IGL_AVAILABLE = False
+    print("[GeomPack] Warning: libigl not available. Some mesh operations will be limited.")
+    print("[GeomPack]   Install with: pip install libigl")
 
 # PyMeshLab for remeshing (alternative to CGAL)
 try:
@@ -292,6 +300,8 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
     except Exception as e:
         print(f"[load_mesh_file] Trimesh failed: {str(e)}, trying libigl fallback...")
         # Fallback to libigl
+        if not IGL_AVAILABLE:
+            return None, f"Failed to load mesh with trimesh: {str(e)}. libigl fallback not available."
         try:
             v, f = igl.read_triangle_mesh(file_path)
             if v is None or f is None or len(v) == 0 or len(f) == 0:

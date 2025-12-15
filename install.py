@@ -199,7 +199,8 @@ def install_python_dependencies():
                  "point-cloud-utils>=0.30.0",
                  "fast-simplification>=0.1.5",
                  "xatlas>=0.0.11",
-                 "skeletor>=1.2.0"],
+                 "skeletor>=1.2.0",
+                 "libigl>=2.6.1"],
                 capture_output=True,
                 text=True,
                 timeout=600
