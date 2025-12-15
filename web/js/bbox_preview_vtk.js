@@ -5,6 +5,13 @@
 
 import { app } from "../../../scripts/app.js";
 
+// Auto-detect extension folder name (handles ComfyUI-GeometryPack or comfyui-geometrypack)
+const EXTENSION_FOLDER = (() => {
+    const url = import.meta.url;
+    const match = url.match(/\/extensions\/([^/]+)\//);
+    return match ? match[1] : "ComfyUI-GeometryPack";
+})();
+
 console.log("[GeomPack] Loading VTK.js bounding box preview extension...");
 
 app.registerExtension({
@@ -39,7 +46,7 @@ app.registerExtension({
 
                 // Point to VTK.js HTML viewer (with cache buster)
                 // Use unified v2 viewer with modular architecture
-                iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_vtk.html?v=" + Date.now();
+                iframe.src = `/extensions/${EXTENSION_FOLDER}/viewer_vtk.html?v=` + Date.now();
 
                 // Create bbox info panel
                 const infoPanel = document.createElement("div");

@@ -5,6 +5,13 @@
 
 import { app } from "../../../scripts/app.js";
 
+// Auto-detect extension folder name (handles ComfyUI-GeometryPack or comfyui-geometrypack)
+const EXTENSION_FOLDER = (() => {
+    const url = import.meta.url;
+    const match = url.match(/\/extensions\/([^/]+)\//);
+    return match ? match[1] : "ComfyUI-GeometryPack";
+})();
+
 console.log("[GeomPack] Loading UV mesh preview extension...");
 
 app.registerExtension({
@@ -29,7 +36,7 @@ app.registerExtension({
                 iframe.style.aspectRatio = "2";  // Wide aspect for split view
 
                 // Point to our UV viewer HTML
-                iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_uv.html?v=" + Date.now();
+                iframe.src = `/extensions/${EXTENSION_FOLDER}/viewer_uv.html?v=` + Date.now();
 
                 // Add widget
                 const widget = this.addDOMWidget("uv_preview", "MESH_UV_PREVIEW", iframe, {

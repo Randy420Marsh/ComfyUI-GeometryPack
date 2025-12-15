@@ -5,6 +5,13 @@
 
 import { app } from "../../../scripts/app.js";
 
+// Auto-detect extension folder name (handles ComfyUI-GeometryPack or comfyui-geometrypack)
+const EXTENSION_FOLDER = (() => {
+    const url = import.meta.url;
+    const match = url.match(/\/extensions\/([^/]+)\//);
+    return match ? match[1] : "ComfyUI-GeometryPack";
+})();
+
 console.log("[GeomPack] Loading mesh preview extension...");
 
 app.registerExtension({
@@ -31,7 +38,7 @@ app.registerExtension({
                 iframe.style.aspectRatio = "1";
 
                 // Point to our HTML viewer (with cache buster)
-                iframe.src = "/extensions/ComfyUI-GeometryPack/viewer.html?v=" + Date.now();
+                iframe.src = `/extensions/${EXTENSION_FOLDER}/viewer.html?v=` + Date.now();
 
                 // Add widget with required options
                 console.log("[GeomPack DEBUG] About to call addDOMWidget");

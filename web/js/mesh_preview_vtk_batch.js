@@ -5,6 +5,12 @@
 
 import { app } from "../../../scripts/app.js";
 
+// Auto-detect extension folder name (handles ComfyUI-GeometryPack or comfyui-geometrypack)
+const EXTENSION_FOLDER = (() => {
+    const url = import.meta.url;
+    const match = url.match(/\/extensions\/([^/]+)\//);
+    return match ? match[1] : "ComfyUI-GeometryPack";
+})();
 
 app.registerExtension({
     name: "geompack.meshpreview.vtk.batch",
@@ -37,7 +43,7 @@ app.registerExtension({
                 // Point to VTK.js HTML viewer (with cache buster)
                 // Note: viewer will be dynamically switched based on mode in onExecuted
                 // Use unified v2 viewer with modular architecture
-                iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_vtk.html?v=" + Date.now();
+                iframe.src = `/extensions/${EXTENSION_FOLDER}/viewer_vtk.html?v=` + Date.now();
 
                 // Track current viewer type to avoid unnecessary reloads
                 let currentViewerType = "fields";
@@ -280,8 +286,8 @@ app.registerExtension({
 
                         // Determine which viewer HTML to use (unified v2 viewers)
                         const viewerUrl = viewerType === "texture"
-                            ? "/extensions/ComfyUI-GeometryPack/viewer_vtk_textured.html"
-                            : "/extensions/ComfyUI-GeometryPack/viewer_vtk.html";
+                            ? `/extensions/${EXTENSION_FOLDER}/viewer_vtk_textured.html`
+                            : `/extensions/${EXTENSION_FOLDER}/viewer_vtk.html`;
 
                         // Update mesh info panel with metadata
                         const vertices = message.vertex_count?.[0] || 'N/A';

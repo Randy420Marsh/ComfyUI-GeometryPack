@@ -6,6 +6,13 @@
 
 import { app } from "../../../scripts/app.js";
 
+// Auto-detect extension folder name (handles ComfyUI-GeometryPack or comfyui-geometrypack)
+const EXTENSION_FOLDER = (() => {
+    const url = import.meta.url;
+    const match = url.match(/\/extensions\/([^/]+)\//);
+    return match ? match[1] : "ComfyUI-GeometryPack";
+})();
+
 console.log('[GeomPack Dual JS] Loading mesh_preview_dual.js extension - v2 WITH INCREASED NODE HEIGHT (680px)');
 
 app.registerExtension({
@@ -40,7 +47,7 @@ app.registerExtension({
 
                 // Point to unified dual VTK.js HTML viewer (with cache buster)
                 // Note: viewer will be dynamically switched based on mode in onExecuted
-                iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_dual.html?v=" + Date.now();
+                iframe.src = `/extensions/${EXTENSION_FOLDER}/viewer_dual.html?v=` + Date.now();
 
                 // Track current viewer type to avoid unnecessary reloads
                 let currentViewerType = "fields";
@@ -139,13 +146,13 @@ app.registerExtension({
 
                     if (layout === 'slider') {
                         viewerType = "slider";
-                        viewerUrl = "/extensions/ComfyUI-GeometryPack/viewer_dual_slider.html";
+                        viewerUrl = `/extensions/${EXTENSION_FOLDER}/viewer_dual_slider.html`;
                     } else if (mode === "texture") {
                         viewerType = "texture";
-                        viewerUrl = "/extensions/ComfyUI-GeometryPack/viewer_dual_textured.html";
+                        viewerUrl = `/extensions/${EXTENSION_FOLDER}/viewer_dual_textured.html`;
                     } else {
                         viewerType = "fields";
-                        viewerUrl = "/extensions/ComfyUI-GeometryPack/viewer_dual.html";
+                        viewerUrl = `/extensions/${EXTENSION_FOLDER}/viewer_dual.html`;
                     }
 
                     let infoHTML = '';
