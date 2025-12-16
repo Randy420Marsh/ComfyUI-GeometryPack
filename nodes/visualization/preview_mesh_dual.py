@@ -148,6 +148,12 @@ class PreviewMeshDualNode:
                 filename_1, filepath_1 = self._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", use_vtp=(mesh_1_has_fields or mesh_1_is_pc), use_glb=False)
                 filename_2, filepath_2 = self._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", use_vtp=(mesh_2_has_fields or mesh_2_is_pc), use_glb=False)
 
+            # Compute bounds from vertices (works for both meshes and point clouds)
+            bounds_1 = np.array([mesh_1.vertices.min(axis=0), mesh_1.vertices.max(axis=0)])
+            bounds_2 = np.array([mesh_2.vertices.min(axis=0), mesh_2.vertices.max(axis=0)])
+            extents_1 = bounds_1[1] - bounds_1[0]
+            extents_2 = bounds_2[1] - bounds_2[0]
+
             # Build UI data for side-by-side mode
             ui_data = {
                 "layout": [layout],
@@ -158,12 +164,12 @@ class PreviewMeshDualNode:
                 "vertex_count_2": [len(mesh_2.vertices)],
                 "face_count_1": [get_face_count(mesh_1)],
                 "face_count_2": [get_face_count(mesh_2)],
-                "bounds_min_1": [mesh_1.bounds[0].tolist()],
-                "bounds_max_1": [mesh_1.bounds[1].tolist()],
-                "bounds_min_2": [mesh_2.bounds[0].tolist()],
-                "bounds_max_2": [mesh_2.bounds[1].tolist()],
-                "extents_1": [mesh_1.extents.tolist()],
-                "extents_2": [mesh_2.extents.tolist()],
+                "bounds_min_1": [bounds_1[0].tolist()],
+                "bounds_max_1": [bounds_1[1].tolist()],
+                "bounds_min_2": [bounds_2[0].tolist()],
+                "bounds_max_2": [bounds_2[1].tolist()],
+                "extents_1": [extents_1.tolist()],
+                "extents_2": [extents_2.tolist()],
                 "is_watertight_1": [bool(mesh_1.is_watertight) if not is_point_cloud(mesh_1) else False],
                 "is_watertight_2": [bool(mesh_2.is_watertight) if not is_point_cloud(mesh_2) else False],
                 "opacity_1": [float(opacity_1)],
@@ -207,9 +213,11 @@ class PreviewMeshDualNode:
                     mesh_1_has_fields, mesh_2_has_fields, use_glb=False
                 )
 
-            # Calculate combined bounds
-            combined_bounds_min = np.minimum(mesh_1.bounds[0], mesh_2.bounds[0])
-            combined_bounds_max = np.maximum(mesh_1.bounds[1], mesh_2.bounds[1])
+            # Compute bounds from vertices (works for both meshes and point clouds)
+            bounds_1 = np.array([mesh_1.vertices.min(axis=0), mesh_1.vertices.max(axis=0)])
+            bounds_2 = np.array([mesh_2.vertices.min(axis=0), mesh_2.vertices.max(axis=0)])
+            combined_bounds_min = np.minimum(bounds_1[0], bounds_2[0])
+            combined_bounds_max = np.maximum(bounds_1[1], bounds_2[1])
             combined_extents = combined_bounds_max - combined_bounds_min
 
             # Build UI data for overlay mode
