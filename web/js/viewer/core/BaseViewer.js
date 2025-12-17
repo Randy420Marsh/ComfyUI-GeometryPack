@@ -384,6 +384,7 @@ export class BaseViewer {
                 format: result.format,
                 actors: result.actors.length,
                 hasTexture: result.hasTexture || false,
+                hasVertexColors: result.hasVertexColors || false,
                 fields: result.fields || []
             });
 
@@ -408,6 +409,20 @@ export class BaseViewer {
         if (this.config.enableTextures && this.textureManager && result.hasTexture) {
             this.textureManager.applyTextureFixesMultiple(this.actors);
             this.textureManager.configureRenderer(this.renderer);
+        } else if (result.hasVertexColors) {
+            // Mesh has vertex colors - don't override with default color
+            // Just configure edges if needed, colors are already set up by loader
+            this.actors.forEach(actor => {
+                const property = actor.getProperty();
+                if (property) {
+                    if (this.config.showEdges) {
+                        property.setEdgeVisibility(true);
+                        if (this.config.edgeColor) {
+                            property.setEdgeColor(...this.config.edgeColor);
+                        }
+                    }
+                }
+            });
         } else {
             // Apply standard actor configuration
             this.actorManager.configureActors(this.actors, {

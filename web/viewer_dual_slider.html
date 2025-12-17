@@ -238,6 +238,10 @@
         let mesh1Polydata = null;
         let mesh2Polydata = null;
 
+        // GLTF actors (stored separately since they replace the pre-made actors)
+        let mesh1GltfActors = null;
+        let mesh2GltfActors = null;
+
         // Camera sync state
         let isSyncing = false;
         let isAnimating1 = false;
@@ -429,21 +433,88 @@
                 const arrayBuffer = await response.arrayBuffer();
 
                 if (isGLB) {
-                    reader.parseAsArrayBuffer(arrayBuffer);
-                    await reader.update();
-                    const source = reader.getOutputData();
-                    targetMapper.setInputData(source);
-                    targetMapper.update();
+                    // GLTFImporter requires using its own actors - we can't extract polydata
+                    // So we need to replace the pre-made actors with the GLTF actors
+                    const targetRenderer = isMesh1 ? renderer1 : renderer2;
+                    const targetActor = isMesh1 ? mesh1Actor : mesh2Actor;
 
-                    const polydata = targetMapper.getInputData();
-                    const bounds = polydata.getBounds();
+                    // Clean up any previous GLTF actors
+                    const prevGltfActors = isMesh1 ? mesh1GltfActors : mesh2GltfActors;
+                    if (prevGltfActors) {
+                        prevGltfActors.forEach(actor => targetRenderer.removeActor(actor));
+                    }
+
+                    const importer = vtkGLTFImporter.newInstance();
+                    importer.setRenderer(targetRenderer);
+                    importer.setUrl(filepath);
+
+                    // Wait for GLTF parsing using onReady callback
+                    await new Promise((resolve, reject) => {
+                        importer.onReady(() => resolve());
+                        importer.loadData().catch(reject);
+                    });
+
+                    // Import actors - this adds them to the renderer
+                    importer.importActors();
+                    const actorsMap = importer.getActors();
+                    const actors = Array.from(actorsMap.values());
+
+                    console.log(`[GeomPack VTK Slider Viewer] GLTF actors found: ${actors.length}`);
+
+                    if (actors.length === 0) {
+                        throw new Error('No actors found in GLTF');
+                    }
+
+                    // Remove the pre-made actor (it has no data)
+                    targetRenderer.removeActor(targetActor);
+
+                    // Calculate bounds from all GLTF actors and apply vertex color settings
+                    let bounds = null;
+                    actors.forEach((actor, idx) => {
+                        const mapper = actor.getMapper();
+                        const property = actor.getProperty();
+                        const input = mapper?.getInputData();
+
+                        if (input) {
+                            const actorBounds = actor.getBounds();
+                            if (!bounds) {
+                                bounds = [...actorBounds];
+                            } else {
+                                bounds[0] = Math.min(bounds[0], actorBounds[0]);
+                                bounds[1] = Math.max(bounds[1], actorBounds[1]);
+                                bounds[2] = Math.min(bounds[2], actorBounds[2]);
+                                bounds[3] = Math.max(bounds[3], actorBounds[3]);
+                                bounds[4] = Math.min(bounds[4], actorBounds[4]);
+                                bounds[5] = Math.max(bounds[5], actorBounds[5]);
+                            }
+
+                            // Check for vertex colors
+                            const scalars = input.getPointData()?.getScalars();
+                            if (scalars && scalars.getNumberOfComponents() >= 3) {
+                                mapper.setScalarVisibility(true);
+                                mapper.setScalarModeToUsePointData();
+                                mapper.setColorModeToDirectScalars();
+                                console.log(`[GeomPack VTK Slider Viewer] Mesh ${isMesh1 ? '1' : '2'} actor ${idx} has vertex colors`);
+                            }
+
+                            // Apply material fixes for better rendering
+                            if (property) {
+                                if (typeof property.setMetallic === 'function') property.setMetallic(0.0);
+                                if (typeof property.setRoughness === 'function') property.setRoughness(1.0);
+                            }
+                        }
+                    });
+
+                    console.log(`[GeomPack VTK Slider Viewer] Mesh ${isMesh1 ? '1' : '2'} bounds:`, bounds);
 
                     if (isMesh1) {
                         mesh1Bounds = bounds;
-                        mesh1Polydata = polydata;
+                        mesh1Polydata = null;  // GLTF doesn't provide simple polydata access
+                        mesh1GltfActors = actors;  // Store for later reference
                     } else {
                         mesh2Bounds = bounds;
-                        mesh2Polydata = polydata;
+                        mesh2Polydata = null;
+                        mesh2GltfActors = actors;
                     }
                 } else {
                     if (isSTL) {
@@ -712,12 +783,20 @@
 
                     positionCamera(combinedBounds);
 
-                    // Apply opacity values
+                    // Apply opacity values (handle both regular actors and GLTF actors)
                     if (data.opacity1 !== undefined) {
-                        mesh1Actor.getProperty().setOpacity(data.opacity1);
+                        if (mesh1GltfActors) {
+                            mesh1GltfActors.forEach(actor => actor.getProperty().setOpacity(data.opacity1));
+                        } else {
+                            mesh1Actor.getProperty().setOpacity(data.opacity1);
+                        }
                     }
                     if (data.opacity2 !== undefined) {
-                        mesh2Actor.getProperty().setOpacity(data.opacity2);
+                        if (mesh2GltfActors) {
+                            mesh2GltfActors.forEach(actor => actor.getProperty().setOpacity(data.opacity2));
+                        } else {
+                            mesh2Actor.getProperty().setOpacity(data.opacity2);
+                        }
                     }
 
                     renderWindow1.render();
@@ -737,8 +816,17 @@
         // Control event handlers
         document.getElementById('showEdges').addEventListener('change', (e) => {
             const edgeViz = e.target.checked;
-            mesh1Actor.getProperty().setEdgeVisibility(edgeViz);
-            mesh2Actor.getProperty().setEdgeVisibility(edgeViz);
+            // Handle both regular actors and GLTF actors
+            if (mesh1GltfActors) {
+                mesh1GltfActors.forEach(actor => actor.getProperty().setEdgeVisibility(edgeViz));
+            } else {
+                mesh1Actor.getProperty().setEdgeVisibility(edgeViz);
+            }
+            if (mesh2GltfActors) {
+                mesh2GltfActors.forEach(actor => actor.getProperty().setEdgeVisibility(edgeViz));
+            } else {
+                mesh2Actor.getProperty().setEdgeVisibility(edgeViz);
+            }
             renderWindow1.render();
             renderWindow2.render();
         });

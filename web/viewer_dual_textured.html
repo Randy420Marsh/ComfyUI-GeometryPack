@@ -606,6 +606,11 @@
                             ];
                         }
 
+                        // Check for vertex colors early
+                        const scalars = input.getPointData()?.getScalars();
+                        const hasVertexColors = scalars && scalars.getNumberOfComponents() >= 3;
+                        let hasTexture = false;
+
                         // Apply texture fixes
                         if (property) {
                             // CRITICAL FIX: Remove metallicRoughnessTexture if present
@@ -630,6 +635,7 @@
 
                             if (texture) {
                                 actor.addTexture(texture);
+                                hasTexture = true;
                             }
 
                             // Set material to non-metallic for proper texture display
@@ -638,9 +644,17 @@
                             property.setInterpolation(2);
                         }
 
-                        // Configure mapper for texture rendering
+                        // Configure mapper for rendering
                         if (mapper) {
-                            mapper.setScalarVisibility(false);
+                            if (hasVertexColors && !hasTexture) {
+                                // Enable vertex colors
+                                mapper.setScalarVisibility(true);
+                                mapper.setScalarModeToUsePointData();
+                                mapper.setColorModeToDirectScalars();
+                            } else {
+                                // Disable scalars for texture rendering
+                                mapper.setScalarVisibility(false);
+                            }
                             mapper.modified();
                         }
                     }
