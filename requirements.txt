@@ -29,6 +29,8 @@ fast-simplification>=0.1.5
 
 # UV unwrapping
 xatlas>=0.0.11
+# GPU-accelerated UV unwrapping (optional, requires CUDA)
+# cumesh is installed separately via install.py (wheel or source)
 
 # Skeleton extraction (optional)
 skeletor>=1.2.0

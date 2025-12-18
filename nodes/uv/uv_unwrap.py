@@ -36,6 +36,7 @@ class UVUnwrapNode:
                 "trimesh": ("TRIMESH",),
                 "method": ([
                     "xatlas",
+                    "cumesh",
                     "libigl_lscm",
                     "libigl_harmonic",
                     "libigl_arap",
@@ -46,6 +47,32 @@ class UVUnwrapNode:
                 ], {"default": "xatlas"}),
             },
             "optional": {
+                # cumesh parameters (GPU-accelerated)
+                "chart_cone_angle": ("FLOAT", {
+                    "default": 90.0,
+                    "min": 0.0,
+                    "max": 359.9,
+                    "step": 1.0
+                }),
+                "chart_refine_iterations": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1
+                }),
+                "chart_global_iterations": ("INT", {
+                    "default": 1,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1
+                }),
+                "chart_smooth_strength": ("INT", {
+                    "default": 1,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1
+                }),
+
                 # libigl_arap parameters
                 "iterations": ("INT", {
                     "default": 10,
@@ -90,7 +117,10 @@ class UVUnwrapNode:
     FUNCTION = "unwrap"
     CATEGORY = "geompack/uv"
 
-    def unwrap(self, trimesh, method, iterations=10, angle_limit=66.0, island_margin=0.02,
+    def unwrap(self, trimesh, method,
+               chart_cone_angle=90.0, chart_refine_iterations=0,
+               chart_global_iterations=1, chart_smooth_strength=1,
+               iterations=10, angle_limit=66.0, island_margin=0.02,
                scale_to_bounds="true", cube_size=1.0, cylinder_radius=1.0):
         """
         Apply UV unwrapping based on selected method.
@@ -98,6 +128,10 @@ class UVUnwrapNode:
         Args:
             trimesh: Input trimesh.Trimesh object
             method: UV unwrapping method to use
+            chart_cone_angle: UV chart clustering threshold in degrees (cumesh, default: 90.0)
+            chart_refine_iterations: Refine UV charts iterations (cumesh, default: 0)
+            chart_global_iterations: Global UV optimization passes (cumesh, default: 1)
+            chart_smooth_strength: UV smoothing strength (cumesh, default: 1)
             iterations: Number of iterations for libigl_arap (default: 10)
             angle_limit: Angle limit for blender_smart in degrees (default: 66.0)
             island_margin: Island margin for blender_smart (default: 0.02)
@@ -116,6 +150,11 @@ class UVUnwrapNode:
 
         if method == "xatlas":
             unwrapped_mesh, info = self._xatlas(trimesh)
+        elif method == "cumesh":
+            unwrapped_mesh, info = self._cumesh(
+                trimesh, chart_cone_angle, chart_refine_iterations,
+                chart_global_iterations, chart_smooth_strength
+            )
         elif method == "libigl_lscm":
             unwrapped_mesh, info = self._libigl_lscm(trimesh)
         elif method == "libigl_harmonic":
@@ -184,6 +223,112 @@ After:
   Vertex Duplication: {len(new_vertices)/len(trimesh.vertices):.2f}x
 
 Fast automatic UV unwrapping with vertex splitting at seams.
+"""
+        return unwrapped, info
+
+    def _cumesh(self, trimesh, chart_cone_angle, chart_refine_iterations,
+                chart_global_iterations, chart_smooth_strength):
+        """CuMesh GPU-accelerated UV unwrapping with fast clustering + xatlas."""
+        try:
+            import torch
+            import cumesh as CuMesh
+        except ImportError as e:
+            raise ImportError(
+                f"cumesh not installed or CUDA not available: {e}\n"
+                "CuMesh requires CUDA and PyTorch. Install with:\n"
+                "  pip install cumesh (or run install.py)\n"
+                "Alternatively, use 'xatlas' method which works on CPU."
+            )
+
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA not available. CuMesh requires a CUDA-capable GPU.\n"
+                "Use 'xatlas' method for CPU-based UV unwrapping."
+            )
+
+        print(f"[UVUnwrap] CuMesh: chart_cone_angle={chart_cone_angle}, "
+              f"refine_iter={chart_refine_iterations}, global_iter={chart_global_iterations}, "
+              f"smooth={chart_smooth_strength}")
+
+        # Convert to torch tensors on GPU
+        vertices = torch.tensor(trimesh.vertices, dtype=torch.float32).cuda()
+        faces = torch.tensor(trimesh.faces, dtype=torch.int32).cuda()
+
+        # Convert cone angle to radians
+        chart_cone_angle_rad = np.radians(chart_cone_angle)
+
+        # Initialize CuMesh
+        cumesh = CuMesh.CuMesh()
+        cumesh.init(vertices, faces)
+
+        # UV Unwrap with two-stage process (fast clustering + xatlas)
+        print("[UVUnwrap] Running CuMesh UV unwrap...")
+        out_vertices, out_faces, out_uvs, out_vmaps = cumesh.uv_unwrap(
+            compute_charts_kwargs={
+                "threshold_cone_half_angle_rad": chart_cone_angle_rad,
+                "refine_iterations": chart_refine_iterations,
+                "global_iterations": chart_global_iterations,
+                "smooth_strength": chart_smooth_strength,
+            },
+            return_vmaps=True,
+            verbose=True,
+        )
+
+        # Convert back to numpy
+        out_vertices_np = out_vertices.cpu().numpy()
+        out_faces_np = out_faces.cpu().numpy()
+        out_uvs_np = out_uvs.cpu().numpy()
+
+        # Flip V coordinate (cumesh uses different UV convention)
+        out_uvs_np[:, 1] = 1 - out_uvs_np[:, 1]
+
+        # Build result trimesh
+        unwrapped = trimesh_module.Trimesh(
+            vertices=out_vertices_np,
+            faces=out_faces_np,
+            process=False
+        )
+
+        from trimesh.visual import TextureVisuals
+        unwrapped.visual = TextureVisuals(uv=out_uvs_np)
+
+        # Preserve metadata
+        unwrapped.metadata = trimesh.metadata.copy()
+        unwrapped.metadata['uv_unwrap'] = {
+            'algorithm': 'cumesh',
+            'chart_cone_angle': chart_cone_angle,
+            'chart_refine_iterations': chart_refine_iterations,
+            'chart_global_iterations': chart_global_iterations,
+            'chart_smooth_strength': chart_smooth_strength,
+            'original_vertices': len(trimesh.vertices),
+            'unwrapped_vertices': len(out_vertices_np),
+            'vertex_duplication_ratio': len(out_vertices_np) / len(trimesh.vertices)
+        }
+
+        # Clean up GPU memory
+        torch.cuda.empty_cache()
+
+        info = f"""UV Unwrap Results (CuMesh):
+
+Algorithm: CuMesh GPU-accelerated (fast clustering + xatlas)
+Optimized for: Large meshes, GPU acceleration
+
+Parameters:
+  Chart Cone Angle: {chart_cone_angle}°
+  Refine Iterations: {chart_refine_iterations}
+  Global Iterations: {chart_global_iterations}
+  Smooth Strength: {chart_smooth_strength}
+
+Before:
+  Vertices: {len(trimesh.vertices):,}
+  Faces: {len(trimesh.faces):,}
+
+After:
+  Vertices: {len(out_vertices_np):,}
+  Faces: {len(unwrapped.faces):,}
+  Vertex Duplication: {len(out_vertices_np)/len(trimesh.vertices):.2f}x
+
+Two-stage GPU-accelerated UV unwrapping with vertex splitting at seams.
 """
         return unwrapped, info
 
