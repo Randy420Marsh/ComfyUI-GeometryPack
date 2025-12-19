@@ -78,6 +78,7 @@
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.0;
+        renderer.sortObjects = true; // Enable proper transparency sorting
 
         // Controls
         const controls = new OrbitControls(camera, canvas);
@@ -106,18 +107,26 @@
                 const extPath = getExtensionPath();
                 const exrLoader = new EXRLoader();
 
+                const exrPath = `${extPath}/assets/studio.exr`;
+                console.log('[GeomPack PBR Viewer] Loading environment map from:', exrPath);
+
                 exrLoader.load(
-                    `${extPath}/assets/studio.exr`,
+                    exrPath,
                     (texture) => {
                         texture.mapping = THREE.EquirectangularReflectionMapping;
                         scene.environment = texture;
                         envMapLoaded = true;
-                        console.log('[GeomPack PBR Viewer] Environment map loaded');
+                        console.log('[GeomPack PBR Viewer] Environment map loaded successfully');
                         resolve(texture);
                     },
-                    undefined,
+                    (progress) => {
+                        if (progress.lengthComputable) {
+                            console.log('[GeomPack PBR Viewer] Env map loading:', Math.round(progress.loaded / progress.total * 100) + '%');
+                        }
+                    },
                     (error) => {
-                        console.warn('[GeomPack PBR Viewer] Could not load EXR environment, using fallback');
+                        console.error('[GeomPack PBR Viewer] Failed to load EXR environment:', error);
+                        console.warn('[GeomPack PBR Viewer] Using fallback gradient environment');
                         // Fallback: create a simple gradient environment
                         createFallbackEnvironment();
                         resolve(null);
@@ -252,6 +261,20 @@
                                 materials.forEach(mat => {
                                     if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
                                         mat.envMapIntensity = 1.0;
+
+                                        // Enable transparency support
+                                        // Check if baseColorTexture has alpha channel
+                                        const hasAlphaMap = mat.map && mat.map.format === THREE.RGBAFormat;
+                                        const hasAlphaTest = mat.alphaTest > 0;
+                                        const needsTransparency = mat.transparent || mat.opacity < 1.0 || hasAlphaMap;
+
+                                        if (needsTransparency || hasAlphaMap) {
+                                            mat.transparent = true;
+                                            mat.alphaTest = 0.01; // Discard nearly-transparent pixels
+                                            mat.side = THREE.DoubleSide; // Render both sides
+                                            mat.depthWrite = true; // Keep depth writing for proper sorting
+                                        }
+
                                         mat.needsUpdate = true;
 
                                         // Check if has textures
@@ -263,9 +286,14 @@
                                             name: mat.name,
                                             metalness: mat.metalness,
                                             roughness: mat.roughness,
+                                            opacity: mat.opacity,
+                                            transparent: mat.transparent,
+                                            alphaTest: mat.alphaTest,
                                             hasMap: !!mat.map,
+                                            mapFormat: mat.map ? mat.map.format : 'none',
                                             hasMetalnessMap: !!mat.metalnessMap,
-                                            hasRoughnessMap: !!mat.roughnessMap
+                                            hasRoughnessMap: !!mat.roughnessMap,
+                                            hasAlphaMap: hasAlphaMap
                                         });
                                     }
                                 });

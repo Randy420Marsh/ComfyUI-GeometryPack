@@ -285,8 +285,12 @@
                 } else {
                     // For meshes, use normals filter for proper shading
                     const normalsFilter = vtkPolyDataNormals.newInstance();
-                    normalsFilter.setInputConnection(currentReader.getOutputPort());
-                    mapper.setInputConnection(normalsFilter.getOutputPort());
+                    normalsFilter.setInputData(polydata);
+                    normalsFilter.update();
+                    // Use the filtered polydata so scalars are preserved
+                    const filteredPolyData = normalsFilter.getOutputData();
+                    mapper.setInputData(filteredPolyData);
+                    currentPolyData = filteredPolyData;  // Update reference for field visualization
                 }
                 mapper.update();
 

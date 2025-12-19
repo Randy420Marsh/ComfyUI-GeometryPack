@@ -41,8 +41,11 @@ class PreviewMeshVTKNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "trimesh": ("TRIMESH",),
                 "mode": (["fields", "texture", "texture (PBR)"], {"default": "fields"}),
+            },
+            "optional": {
+                "trimesh": ("TRIMESH",),
+                "voxelgrid": ("VOXELGRID",),
             },
         }
 
@@ -51,7 +54,7 @@ class PreviewMeshVTKNode:
     FUNCTION = "preview_mesh_vtk"
     CATEGORY = "geompack/visualization"
 
-    def preview_mesh_vtk(self, trimesh, mode="fields"):
+    def preview_mesh_vtk(self, mode="fields", trimesh=None, voxelgrid=None):
         """
         Export mesh and prepare for VTK.js preview.
 
@@ -60,17 +63,26 @@ class PreviewMeshVTKNode:
         - texture: Textured mesh visualization with materials (GLB export)
 
         Args:
-            trimesh: Input trimesh_module.Trimesh object or VOXEL_GRID tensor
             mode: Visualization mode - "fields" or "texture"
+            trimesh: Input trimesh_module.Trimesh object (optional)
+            voxelgrid: Input trimesh.VoxelGrid object (optional)
 
         Returns:
             dict: UI data for frontend widget
         """
+        # Use whichever input is provided
+        if trimesh is None and voxelgrid is None:
+            raise ValueError("Either trimesh or voxelgrid input is required")
+
+        mesh_input = trimesh if trimesh is not None else voxelgrid
+
         # Handle VOXEL_GRID input (trimesh.VoxelGrid from MeshToVoxel node)
-        if hasattr(trimesh, 'as_boxes'):  # It's a trimesh.VoxelGrid
-            voxel_shape = trimesh.matrix.shape
-            trimesh = trimesh.as_boxes()
+        if hasattr(mesh_input, 'as_boxes'):  # It's a trimesh.VoxelGrid
+            voxel_shape = mesh_input.matrix.shape
+            trimesh = mesh_input.as_boxes()
             print(f"[PreviewMeshVTK] Converted voxel grid {voxel_shape} to box mesh: {len(trimesh.vertices)} vertices")
+        else:
+            trimesh = mesh_input
 
         print(f"[PreviewMeshVTK] Preparing preview: {get_geometry_type(trimesh)} - {len(trimesh.vertices)} vertices, {get_face_count(trimesh)} faces")
 
@@ -132,6 +144,20 @@ class PreviewMeshVTKNode:
             filepath = os.path.join(COMFYUI_OUTPUT_FOLDER, filename)
         else:
             filepath = os.path.join(tempfile.gettempdir(), filename)
+
+        # Set alpha mode based on viewing mode
+        if mode == "texture":
+            # Texture mode: force opaque for solid color viewing (RGB only)
+            if hasattr(trimesh, 'visual') and hasattr(trimesh.visual, 'material'):
+                if hasattr(trimesh.visual.material, 'alphaMode'):
+                    trimesh.visual.material.alphaMode = 'OPAQUE'
+                    print(f"[PreviewMeshVTK] Set alphaMode to OPAQUE for texture mode")
+        elif mode == "texture (PBR)":
+            # PBR mode: use BLEND for transparency support
+            if hasattr(trimesh, 'visual') and hasattr(trimesh.visual, 'material'):
+                if hasattr(trimesh.visual.material, 'alphaMode'):
+                    trimesh.visual.material.alphaMode = 'BLEND'
+                    print(f"[PreviewMeshVTK] Set alphaMode to BLEND for PBR mode")
 
         # Export mesh
         try:

@@ -221,15 +221,16 @@
                 const canvasWidth = canvas.clientWidth || 512;
                 const canvasHeight = canvas.clientHeight || 512;
 
-                // Scale focal lengths proportionally to canvas size
-                const scaledFx = fx * (canvasWidth / imageWidth);
-                const scaledFy = fy * (canvasHeight / imageHeight);
+                // Use uniform scale factor (canvas should have same aspect ratio as image)
+                // This keeps fx = fy for undistorted view
+                const scale = canvasWidth / imageWidth;
+                const scaledF = fx * scale;  // fx and fy are equal in SHARP
 
-                camera.data.fx = scaledFx;
-                camera.data.fy = scaledFy;
+                camera.data.fx = scaledF;
+                camera.data.fy = scaledF;
 
                 console.log('[GaussianViewer] Canvas size:', canvasWidth, 'x', canvasHeight);
-                console.log('[GaussianViewer] Scaled focal lengths: fx=', scaledFx, 'fy=', scaledFy);
+                console.log('[GaussianViewer] Uniform scale:', scale, 'scaled focal length:', scaledF);
 
                 // Calculate vertical FOV in radians for logging
                 const fovY = 2 * Math.atan(imageHeight / (2 * fy));
@@ -245,15 +246,29 @@
             }
 
             // Determine the target position (what the camera looks at)
-            // Use scene bounds center if available, otherwise use calculated targetZ
+            // For the INITIAL view (matching original image), look STRAIGHT AHEAD along Z axis
+            // NOT at the scene center - that would tilt the camera
             let targetX = 0, targetY = 0;
+            let orbitZ = targetZ;  // For orbiting, use a closer point
             if (splat && splat.bounds) {
                 const center = splat.bounds.center();
-                targetX = center.x;
-                targetY = center.y;
+                const size = splat.bounds.size();
+
+                // Use scene center Z for the view direction
                 targetZ = center.z;
-                console.log('[GaussianViewer] Using scene center as target:', targetX, targetY, targetZ);
+
+                // For orbit center, use distance to closest object + 50%
+                // Camera is at origin, so minZ is the distance to closest point
+                const minZ = center.z - size.z / 2;
+                orbitZ = minZ * 1.5;  // 50% past the closest point
+
+                console.log('[GaussianViewer] Scene center:', center.x, -center.y, center.z);
+                console.log('[GaussianViewer] Closest point Z:', minZ.toFixed(1));
+                console.log('[GaussianViewer] Orbit center Z:', orbitZ.toFixed(1), '(closest + 50%)');
             }
+
+            // SHARP uses Y-down coordinate system, so flip camera Y as well
+            camPosY = -camPosY;
 
             // For SHARP: camera is at origin, scene is at positive Z
             // The orbit controls work by having the camera orbit around a target point.
@@ -261,7 +276,8 @@
             // and look at the scene center.
 
             const camPos = new SPLAT.Vector3(camPosX, camPosY, camPosZ);
-            const targetPos = new SPLAT.Vector3(targetX, targetY, targetZ);
+            // Use orbitZ for the target - closer to camera for better orbit feel
+            const targetPos = new SPLAT.Vector3(targetX, targetY, orbitZ);
 
             // Store for reset
             initialCameraData = {
@@ -271,10 +287,15 @@
                 fy: camera.data.fy
             };
 
-            // Set camera position
-            camera.data.position = camPos;
+            // Set camera position - IMPORTANT: must set camera.position, not camera.data.position
+            // camera.position is used by OrbitControls
+            // camera.data.position is used for rendering
+            camera.position.x = camPosX;
+            camera.position.y = camPosY;
+            camera.position.z = camPosZ;
 
             // Update orbit controls to orbit around the target point
+            // This recalculates the internal orbit state from current camera.position
             controls.setCameraTarget(targetPos);
 
             console.log('[GaussianViewer] Camera set to position:', camPosX, camPosY, camPosZ);
@@ -285,11 +306,15 @@
         // Load a PLY file from ArrayBuffer data
         async function loadPLYFromData(arrayBuffer, filename, extrinsics, intrinsics) {
             try {
-                // Clear existing splat
-                if (currentSplat) {
-                    scene.removeObject(currentSplat);
-                    currentSplat = null;
+                // Clear ALL existing objects from scene
+                if (scene.objects && scene.objects.length > 0) {
+                    console.log('[GaussianViewer] Clearing', scene.objects.length, 'existing objects from scene');
+                    // Remove all objects (iterate backwards to avoid index issues)
+                    while (scene.objects.length > 0) {
+                        scene.removeObject(scene.objects[0]);
+                    }
                 }
+                currentSplat = null;
 
                 console.log('[GaussianViewer] Loading from data, size:', arrayBuffer.byteLength);
 
@@ -351,20 +376,32 @@
         function resetCamera() {
             if (camera && controls) {
                 if (initialCameraData) {
-                    camera.data.position = initialCameraData.position;
-                    if (initialCameraData.target) {
-                        controls.setCameraTarget(initialCameraData.target);
-                    }
+                    // Set camera.position (used by OrbitControls), not camera.data.position
+                    const pos = initialCameraData.position;
+                    camera.position.x = pos.x;
+                    camera.position.y = pos.y;
+                    camera.position.z = pos.z;
+
+                    // Restore focal lengths
                     if (initialCameraData.fx) {
                         camera.data.fx = initialCameraData.fx;
                     }
                     if (initialCameraData.fy) {
                         camera.data.fy = initialCameraData.fy;
                     }
-                    console.log('[GaussianViewer] Reset camera to initial position');
+
+                    // Set the target - this recalculates orbit state from current camera.position
+                    if (initialCameraData.target) {
+                        controls.setCameraTarget(initialCameraData.target);
+                    }
+
+                    console.log('[GaussianViewer] Reset camera to position:', pos.x, pos.y, pos.z);
+                    console.log('[GaussianViewer] Reset camera target:', initialCameraData.target?.x, initialCameraData.target?.y, initialCameraData.target?.z);
                 } else {
                     // Default fallback
-                    camera.data.position = new SPLAT.Vector3(0, 0, 5);
+                    camera.position.x = 0;
+                    camera.position.y = 0;
+                    camera.position.z = 5;
                     console.log('[GaussianViewer] Reset camera to default position (0, 0, 5)');
                 }
                 controls.update();
