@@ -33,6 +33,14 @@ class PreviewGaussianNode:
                     "tooltip": "Path to a Gaussian Splatting PLY file"
                 }),
             },
+            "optional": {
+                "extrinsics": ("EXTRINSICS", {
+                    "tooltip": "4x4 camera extrinsics matrix for initial view"
+                }),
+                "intrinsics": ("INTRINSICS", {
+                    "tooltip": "3x3 camera intrinsics matrix for FOV"
+                }),
+            },
         }
 
     RETURN_TYPES = ()
@@ -40,12 +48,14 @@ class PreviewGaussianNode:
     FUNCTION = "preview_gaussian"
     CATEGORY = "geompack/visualization"
 
-    def preview_gaussian(self, ply_path: str):
+    def preview_gaussian(self, ply_path: str, extrinsics=None, intrinsics=None):
         """
         Prepare PLY file for gsplat.js preview.
 
         Args:
             ply_path: Path to the Gaussian Splatting PLY file
+            extrinsics: Optional 4x4 camera extrinsics matrix
+            intrinsics: Optional 3x3 camera intrinsics matrix
 
         Returns:
             dict: UI data for frontend widget
@@ -82,6 +92,12 @@ class PreviewGaussianNode:
             "filename": [filename],
             "file_size_mb": [round(file_size_mb, 2)],
         }
+
+        # Add camera parameters if provided
+        if extrinsics is not None:
+            ui_data["extrinsics"] = [extrinsics]
+        if intrinsics is not None:
+            ui_data["intrinsics"] = [intrinsics]
 
         return {"ui": ui_data}
 

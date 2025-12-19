@@ -154,6 +154,10 @@ app.registerExtension({
                         const displayName = message.filename?.[0] || filename;
                         const fileSizeMb = message.file_size_mb?.[0] || 'N/A';
 
+                        // Extract camera parameters if provided
+                        const extrinsics = message.extrinsics?.[0] || null;
+                        const intrinsics = message.intrinsics?.[0] || null;
+
                         // Update info panel
                         infoPanel.innerHTML = `
                             <div style="display: grid; grid-template-columns: auto 1fr; gap: 2px 8px;">
@@ -184,11 +188,13 @@ app.registerExtension({
                                 const arrayBuffer = await response.arrayBuffer();
                                 console.log("[GeomPack Gaussian] Fetched PLY file, size:", arrayBuffer.byteLength);
 
-                                // Send the data to iframe
+                                // Send the data to iframe with camera parameters
                                 iframe.contentWindow.postMessage({
                                     type: "LOAD_MESH_DATA",
                                     data: arrayBuffer,
                                     filename: filename,
+                                    extrinsics: extrinsics,
+                                    intrinsics: intrinsics,
                                     timestamp: Date.now()
                                 }, "*", [arrayBuffer]);
                             } catch (error) {

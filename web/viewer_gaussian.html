@@ -241,8 +241,28 @@
             progressFill.style.width = percent + '%';
         }
 
+        // Store initial camera params for reset
+        let initialCameraData = null;
+
+        // Set camera from extrinsics matrix (4x4)
+        // For SHARP, extrinsics is identity - camera at origin looking down +Z
+        function setCameraFromExtrinsics(extrinsics) {
+            if (!extrinsics || !camera) return;
+
+            // For SHARP output, the camera is at origin looking down +Z
+            // Just store the data for reset - the gsplat camera defaults work
+            initialCameraData = {
+                position: new SPLAT.Vector3(extrinsics[0][3], extrinsics[1][3], extrinsics[2][3])
+            };
+
+            // Set camera position using SPLAT.Vector3
+            camera.data.position = initialCameraData.position;
+
+            console.log('[GaussianViewer] Camera set from extrinsics:', extrinsics[0][3], extrinsics[1][3], extrinsics[2][3]);
+        }
+
         // Load a PLY file from ArrayBuffer data
-        async function loadPLYFromData(arrayBuffer, filename) {
+        async function loadPLYFromData(arrayBuffer, filename, extrinsics, intrinsics) {
             showLoading('Loading Gaussian Splat...');
 
             try {
@@ -277,6 +297,12 @@
                     currentSplat = scene.objects[scene.objects.length - 1];
                 }
 
+                // Set camera from extrinsics if provided
+                if (extrinsics) {
+                    setCameraFromExtrinsics(extrinsics);
+                    if (controls) controls.update();
+                }
+
                 hideLoading();
 
                 // Show info panel
@@ -304,11 +330,15 @@
             }
         }
 
-        // Reset camera
+        // Reset camera to initial position
         function resetCamera() {
             if (camera && controls) {
-                camera.position = [0, 0, 5];
-                camera.rotation = [0, 0, 0, 1];
+                if (initialCameraData) {
+                    camera.data.position = initialCameraData.position;
+                } else {
+                    // Default fallback
+                    camera.data.position = new SPLAT.Vector3(0, 0, 5);
+                }
                 controls.update();
             }
         }
@@ -336,11 +366,13 @@
 
         // Listen for messages from parent
         window.addEventListener('message', (event) => {
-            const { type, data, filename } = event.data;
+            const { type, data, filename, extrinsics, intrinsics } = event.data;
 
             if (type === 'LOAD_MESH_DATA' && data) {
                 console.log('[GaussianViewer] Received LOAD_MESH_DATA, size:', data.byteLength);
-                loadPLYFromData(data, filename || 'gaussian.ply');
+                console.log('[GaussianViewer] Extrinsics:', extrinsics);
+                console.log('[GaussianViewer] Intrinsics:', intrinsics);
+                loadPLYFromData(data, filename || 'gaussian.ply', extrinsics, intrinsics);
             }
         });
 
