@@ -14,14 +14,15 @@
             background: #1a1a1a;
             overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
 
         #viewerContainer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: relative;
+            flex: 1;
+            min-height: 0;
         }
 
         canvas {
@@ -45,31 +46,55 @@
             display: none;
         }
 
-        #controls {
-            position: absolute;
-            bottom: 8px;
-            left: 50%;
-            transform: translateX(-50%);
+        #controlsBar {
             display: flex;
-            gap: 8px;
-            background: rgba(0,0,0,0.7);
-            padding: 6px 12px;
-            border-radius: 4px;
-            z-index: 50;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            background: #252525;
+            padding: 8px 12px;
+            border-top: 1px solid #333;
+            flex-shrink: 0;
         }
 
-        #controls button {
+        #controlsBar button {
             background: #444;
             border: none;
             color: #fff;
-            padding: 4px 8px;
+            padding: 4px 10px;
             border-radius: 3px;
             cursor: pointer;
             font-size: 11px;
         }
 
-        #controls button:hover {
+        #controlsBar button:hover {
             background: #555;
+        }
+
+        .scale-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .scale-control span {
+            color: #888;
+            font-size: 11px;
+        }
+
+        .scale-control input[type="range"] {
+            width: 100px;
+            vertical-align: middle;
+        }
+
+        .scale-control input[type="number"] {
+            width: 50px;
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            font-size: 11px;
+            padding: 2px 4px;
+            border-radius: 3px;
         }
 
         .info-panel {
@@ -94,7 +119,6 @@
     <div id="viewerContainer">
         <canvas id="canvas"></canvas>
 
-
         <div id="error" class="error hidden"></div>
 
         <div id="infoPanel" class="info-panel hidden">
@@ -102,7 +126,12 @@
         </div>
     </div>
 
-    <div id="controls">
+    <div id="controlsBar">
+        <div class="scale-control">
+            <span>Scale:</span>
+            <input type="range" id="gaussianScale" min="0.1" max="3.0" step="0.05" value="1.0" title="Gaussian scale multiplier">
+            <input type="number" id="gaussianScaleValue" min="0.1" max="3.0" step="0.05" value="1.0">
+        </div>
         <button id="resetCamera" title="Reset camera view">Reset View</button>
         <button id="screenshot" title="Take screenshot">Screenshot</button>
     </div>
@@ -127,6 +156,7 @@
         let controls = null;
         let animationId = null;
         let currentSplat = null;
+
 
         // Initialize the viewer
         function initViewer() {
@@ -339,6 +369,44 @@
                         console.log('[GaussianViewer] Scene bounds center:', center.x, center.y, center.z);
                         console.log('[GaussianViewer] Scene bounds size:', size.x, size.y, size.z);
                     }
+
+                    // Store original scales and log statistics
+                    if (currentSplat.data && currentSplat.data.scales) {
+                        const scales = currentSplat.data.scales;
+                        const numGaussians = scales.length / 3;
+                        let minScale = Infinity, maxScale = -Infinity, sumScale = 0;
+
+                        // Store a copy of original scales for dynamic adjustment
+                        originalScales = new Float32Array(scales);
+                        console.log('[GaussianViewer] Stored original scales for dynamic adjustment');
+
+                        for (let i = 0; i < scales.length; i++) {
+                            const s = scales[i];
+                            minScale = Math.min(minScale, s);
+                            maxScale = Math.max(maxScale, s);
+                            sumScale += s;
+                        }
+
+                        const avgScale = sumScale / scales.length;
+                        console.log('[GaussianViewer] === GAUSSIAN SCALE DEBUG ===');
+                        console.log('[GaussianViewer] Number of Gaussians:', numGaussians);
+                        console.log('[GaussianViewer] Scale min:', minScale.toFixed(6));
+                        console.log('[GaussianViewer] Scale max:', maxScale.toFixed(6));
+                        console.log('[GaussianViewer] Scale avg:', avgScale.toFixed(6));
+                        console.log('[GaussianViewer] ===========================');
+                    } else {
+                        console.log('[GaussianViewer] No scales data found on splat object');
+                        console.log('[GaussianViewer] Splat properties:', Object.keys(currentSplat));
+                        if (currentSplat.data) {
+                            console.log('[GaussianViewer] Splat.data properties:', Object.keys(currentSplat.data));
+                        }
+                        originalScales = null;
+                    }
+
+                    // Reset scale slider when loading new splat
+                    scaleSlider.value = 1.0;
+                    scaleInput.value = 1.0;
+                    currentScale = 1.0;
                 }
 
                 // Set camera from extrinsics and intrinsics if provided
@@ -424,6 +492,109 @@
                 console.error('[GaussianViewer] Screenshot error:', err);
             }
         }
+
+        // Gaussian scale control
+        const scaleSlider = document.getElementById('gaussianScale');
+        const scaleInput = document.getElementById('gaussianScaleValue');
+        let currentScale = 1.0;
+        let scaleUpdatePending = false;
+        let lastScaleValue = 1.0;
+
+        function updateGaussianScale(newScale) {
+            newScale = Math.max(0.1, Math.min(3.0, parseFloat(newScale) || 1.0));
+            currentScale = newScale;
+
+            // Update both controls
+            scaleSlider.value = newScale;
+            scaleInput.value = newScale;
+
+            // Apply scale to current splat by modifying the underlying scale data
+            // gsplat.js applies Math.exp() during PLY loading, so data.scales contains LINEAR values
+            // To multiply visual size by factor f, we multiply the scale values directly
+            if (currentSplat && currentSplat.data && currentSplat.data.scales && originalScales) {
+                console.log('[GaussianViewer] Updating gaussian scales with factor:', newScale);
+
+                const scales = currentSplat.data.scales;
+
+                // Apply scale factor by multiplying (scales are in linear space)
+                for (let i = 0; i < scales.length; i++) {
+                    scales[i] = originalScales[i] * newScale;
+                }
+
+                // Mark data as changed to trigger GPU re-upload
+                // gsplat.js checks data.changed and data.detached
+                currentSplat.data.changed = true;
+                currentSplat.data.detached = false;
+                console.log('[GaussianViewer] Set data.changed=true, data.detached=false');
+
+                // Get the render data (could be _renderData or renderData)
+                const renderData = renderer._renderData || renderer.renderData;
+                if (renderData) {
+                    console.log('[GaussianViewer] Found renderData, keys:', Object.keys(renderData).join(', '));
+
+                    // Mark the splat as dirty
+                    if (renderData.markDirty) {
+                        renderData.markDirty(currentSplat);
+                        console.log('[GaussianViewer] Called markDirty()');
+                    }
+
+                    // Try forcing the flags directly
+                    renderData.dataChanged = true;
+                    console.log('[GaussianViewer] Set renderData.dataChanged = true');
+
+                    // Check needsRebuild status
+                    console.log('[GaussianViewer] renderData.needsRebuild:', renderData.needsRebuild);
+                    console.log('[GaussianViewer] renderData._updating size:', renderData._updating?.size);
+                    console.log('[GaussianViewer] renderData._dirty size:', renderData._dirty?.size);
+                } else {
+                    console.log('[GaussianViewer] No renderData found on renderer');
+                    console.log('[GaussianViewer] renderer keys:', Object.keys(renderer).join(', '));
+                }
+
+                // Also dispatch change event (triggers scene to pick up changes)
+                if (currentSplat.dispatchEvent && currentSplat._changeEvent) {
+                    currentSplat.dispatchEvent(currentSplat._changeEvent);
+                    console.log('[GaussianViewer] Dispatched change event');
+                }
+
+                // Throttled force refresh by removing and re-adding the splat to scene
+                // This is a workaround for gsplat.js not supporting dynamic scale updates
+                if (scene && scene.removeObject && scene.addObject) {
+                    lastScaleValue = newScale;  // Always update to latest value
+
+                    if (!scaleUpdatePending) {
+                        scaleUpdatePending = true;
+                        const splatToRefresh = currentSplat;  // Capture reference
+
+                        // Delay the refresh to avoid flickering during slider drag
+                        setTimeout(() => {
+                            scaleUpdatePending = false;
+
+                            // Only refresh if splat is still current
+                            if (splatToRefresh === currentSplat) {
+                                console.log('[GaussianViewer] Forcing refresh by re-adding splat to scene');
+                                scene.removeObject(splatToRefresh);
+                                scene.addObject(splatToRefresh);
+                                console.log('[GaussianViewer] Splat re-added to scene');
+                            } else {
+                                console.log('[GaussianViewer] Skipping refresh, splat changed during delay');
+                            }
+                        }, 150); // 150ms debounce for smoother dragging
+                    }
+                }
+
+                console.log('[GaussianViewer] Scale update complete. New scale[0]:', scales[0].toFixed(6),
+                            'original[0]:', originalScales[0].toFixed(6), 'multiplier:', newScale);
+            } else if (currentSplat) {
+                console.log('[GaussianViewer] Cannot update scales - missing data or originalScales');
+                console.log('[GaussianViewer] currentSplat.data:', !!currentSplat.data);
+                console.log('[GaussianViewer] currentSplat.data.scales:', !!(currentSplat.data && currentSplat.data.scales));
+                console.log('[GaussianViewer] originalScales:', !!originalScales);
+            }
+        }
+
+        scaleSlider.addEventListener('input', (e) => updateGaussianScale(e.target.value));
+        scaleInput.addEventListener('change', (e) => updateGaussianScale(e.target.value));
 
         // Event listeners
         document.getElementById('resetCamera').addEventListener('click', resetCamera);
