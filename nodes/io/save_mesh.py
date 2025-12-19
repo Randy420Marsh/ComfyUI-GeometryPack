@@ -43,7 +43,7 @@ class SaveMesh:
         }
 
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("status",)
+    RETURN_NAMES = ("file_path",)
     FUNCTION = "save_mesh"
     CATEGORY = "geompack/io"
     OUTPUT_NODE = True
@@ -120,14 +120,12 @@ class SaveMesh:
             raise ValueError(f"Failed to save trimesh: {error}")
 
         geom_type = "point cloud" if is_point_cloud else "mesh"
-        status = f"Successfully saved {geom_type} to: {full_path}\n"
-        status += f"  Vertices: {len(trimesh.vertices)}"
+        print(f"[SaveMesh] Successfully saved {geom_type} to: {full_path}")
+        print(f"[SaveMesh]   Vertices: {len(trimesh.vertices)}")
         if not is_point_cloud:
-            status += f"\n  Faces: {len(trimesh.faces)}"
+            print(f"[SaveMesh]   Faces: {len(trimesh.faces)}")
 
-        print(f"[SaveMesh] {status}")
-
-        return (status,)
+        return (full_path,)
 
 
 # Node mappings
