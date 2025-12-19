@@ -152,10 +152,15 @@ app.registerExtension({
                         const viewerType = message.viewer_type?.[0] || "fields";
                         const mode = message.mode?.[0] || "fields";
 
-                        // Determine which viewer HTML to use (unified v2 viewers)
-                        const viewerUrl = viewerType === "texture"
-                            ? `/extensions/${EXTENSION_FOLDER}/viewer_vtk_textured.html`
-                            : `/extensions/${EXTENSION_FOLDER}/viewer_vtk.html`;
+                        // Determine which viewer HTML to use
+                        let viewerUrl;
+                        if (viewerType === "pbr") {
+                            viewerUrl = `/extensions/${EXTENSION_FOLDER}/viewer_pbr.html`;
+                        } else if (viewerType === "texture") {
+                            viewerUrl = `/extensions/${EXTENSION_FOLDER}/viewer_vtk_textured.html`;
+                        } else {
+                            viewerUrl = `/extensions/${EXTENSION_FOLDER}/viewer_vtk.html`;
+                        }
 
                         // Update mesh info panel with metadata
                         const vertices = message.vertex_count?.[0] || 'N/A';
@@ -178,7 +183,7 @@ app.registerExtension({
 
                         // Build info HTML
                         const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
-                        const modeColor = mode === "texture" ? '#c8c' : '#6cc';
+                        const modeColor = mode === "texture (PBR)" ? '#fc6' : (mode === "texture" ? '#c8c' : '#6cc');
 
                         let infoHTML = `
                             <div style="display: grid; grid-template-columns: auto 1fr; gap: 2px 8px;">
@@ -209,8 +214,8 @@ app.registerExtension({
                         }
 
                         // Add mode-specific info
-                        if (viewerType === "texture") {
-                            // Texture mode info
+                        if (viewerType === "texture" || viewerType === "pbr") {
+                            // Texture/PBR mode info
                             if (message.visual_kind !== undefined) {
                                 const visualKind = message.visual_kind[0] || 'none';
                                 infoHTML += `

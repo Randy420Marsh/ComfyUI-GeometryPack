@@ -103,5 +103,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackPreviewMesh": "Preview Mesh",
+    "GeomPackPreviewMesh": "Preview Mesh (Three.js)",
 }
