@@ -52,6 +52,9 @@ export class FieldVisualization {
             return { pointFields: [], cellFields: [], allFields: [] };
         }
 
+        // Fields to hide from dropdown (VTK internal arrays that aren't useful to visualize)
+        const HIDDEN_FIELDS = ['Attribute', 'vtkOriginalPointIds', 'vtkOriginalCellIds'];
+
         const pointData = polyData.getPointData();
         const cellData = polyData.getCellData();
 
@@ -62,6 +65,8 @@ export class FieldVisualization {
         for (let i = 0; i < pointData.getNumberOfArrays(); i++) {
             const array = pointData.getArray(i);
             const name = array.getName();
+            // Skip hidden/internal fields
+            if (HIDDEN_FIELDS.includes(name)) continue;
             const range = array.getRange();
             pointFields.push({
                 name,
@@ -77,6 +82,8 @@ export class FieldVisualization {
         for (let i = 0; i < cellData.getNumberOfArrays(); i++) {
             const array = cellData.getArray(i);
             const name = array.getName();
+            // Skip hidden/internal fields
+            if (HIDDEN_FIELDS.includes(name)) continue;
             const range = array.getRange();
             cellFields.push({
                 name,

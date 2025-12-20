@@ -363,10 +363,8 @@
 
                 colormapLabel.style.display = 'flex';
 
-                // Auto-select first field
-                if (fieldInfo.allFields.length > 0) {
-                    fieldSelector.value = fieldInfo.allFields[0].fullName;
-                }
+                // Default to "None" - don't auto-select any field
+                // fieldSelector.value stays as "" (None option)
             } else {
                 fieldLabel.style.display = 'none';
                 colormapLabel.style.display = 'none';
