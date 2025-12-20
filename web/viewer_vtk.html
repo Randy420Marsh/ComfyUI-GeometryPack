@@ -23,7 +23,7 @@
             </div>
             <div class="setting-row">
                 <label>Mesh Color:</label>
-                <input type="color" id="meshColor" value="#ffffff">
+                <input type="color" id="meshColor" value="#99ccff">
             </div>
             <div class="setting-row">
                 <label>Edge Width:</label>
@@ -191,7 +191,7 @@
         // Configure default appearance
         const property = actor.getProperty();
         property.setEdgeVisibility(false);
-        property.setColor(1.0, 1.0, 1.0);
+        property.setColor(0.6, 0.8, 1.0);  // Light blue
         property.setAmbient(0.4);
         property.setDiffuse(0.8);
         property.setSpecular(0.3);
@@ -210,7 +210,7 @@
         // Settings state
         let currentSettings = {
             pointSize: 5,
-            meshColor: '#ffffff',
+            meshColor: '#99ccff',
             edgeWidth: 1,
             representation: 2,
             parallelProjection: false,
@@ -378,7 +378,7 @@
             const fieldName = document.getElementById('fieldSelector').value;
             if (!fieldName || !currentPolyData) {
                 mapper.setScalarVisibility(false);
-                property.setColor(1.0, 1.0, 1.0);
+                property.setColor(0.6, 0.8, 1.0);  // Light blue
                 renderWindow.render();
                 return;
             }

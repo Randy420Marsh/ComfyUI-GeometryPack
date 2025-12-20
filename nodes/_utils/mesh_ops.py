@@ -1311,3 +1311,141 @@ def cgal_isotropic_remesh(
         error_msg = f"Error during CGAL remesh: {str(e)}"
         print(f"[cgal_isotropic_remesh] ERROR: {error_msg}")
         return None, error_msg
+
+
+# CuMesh availability check
+try:
+    import cumesh as CuMesh
+    import torch
+    CUMESH_AVAILABLE = True
+except ImportError:
+    CUMESH_AVAILABLE = False
+
+
+def cumesh_dc_remesh(
+    mesh: trimesh.Trimesh,
+    grid_resolution: int = 128,
+    fill_holes_first: bool = True,
+    band: float = 1.0,
+) -> Tuple[Optional[trimesh.Trimesh], str]:
+    """
+    GPU-accelerated dual-contouring remeshing using CuMesh.
+
+    This method voxelizes the mesh and reconstructs it using dual contouring,
+    producing a clean, manifold mesh with uniform triangle sizes.
+
+    Uses the same algorithm as TRELLIS2: CuMesh.remeshing.remesh_narrow_band_dc()
+
+    Args:
+        mesh: Input trimesh.Trimesh
+        grid_resolution: Voxel grid resolution (higher = more detail, default 128)
+        fill_holes_first: Fill holes before remeshing (default True)
+        band: Narrow band width for dual contouring (default 1.0)
+
+    Returns:
+        Tuple of (remeshed_mesh, error_message)
+        - remeshed_mesh: The remeshed trimesh.Trimesh, or None on error
+        - error_message: Empty string on success, error description on failure
+    """
+    if not CUMESH_AVAILABLE:
+        return None, "CuMesh not available. Install with CUDA support."
+
+    try:
+        print(f"[cumesh_dc_remesh] ===== CuMesh Dual-Contouring Remesh =====")
+        print(f"[cumesh_dc_remesh] Input: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        print(f"[cumesh_dc_remesh] Grid resolution: {grid_resolution}")
+        print(f"[cumesh_dc_remesh] Fill holes first: {fill_holes_first}")
+        print(f"[cumesh_dc_remesh] Band width: {band}")
+
+        # Convert to GPU tensors
+        vertices = torch.tensor(mesh.vertices, dtype=torch.float32).cuda()
+        faces = torch.tensor(mesh.faces, dtype=torch.int32).cuda()
+
+        # Calculate bounding box and scale (same approach as TRELLIS2)
+        bbox_min = vertices.min(dim=0).values
+        bbox_max = vertices.max(dim=0).values
+        bbox_size = bbox_max - bbox_min
+        scale = bbox_size.max().item()
+
+        # Center the mesh
+        center = (bbox_min + bbox_max) / 2
+        vertices_centered = vertices - center
+
+        # Initialize CuMesh for pre-processing
+        cumesh = CuMesh.CuMesh()
+        cumesh.init(vertices_centered, faces)
+        print(f"[cumesh_dc_remesh] Initialized CuMesh on GPU")
+
+        # Pre-unify face orientations (fixes inconsistent winding)
+        cumesh.unify_face_orientations()
+        print(f"[cumesh_dc_remesh] Unified face orientations (pre-remesh)")
+
+        # Optionally fill holes before remeshing
+        if fill_holes_first:
+            cumesh.fill_holes()
+            print(f"[cumesh_dc_remesh] Filled holes")
+
+        # Read current state after preprocessing
+        curr_verts, curr_faces = cumesh.read()
+
+        # Build BVH for the remeshing operation
+        bvh = CuMesh.cuBVH(curr_verts, curr_faces)
+
+        # Run dual-contouring remesh (same parameters as TRELLIS2 nodes_unwrap.py)
+        print(f"[cumesh_dc_remesh] Running dual-contouring remesh...")
+        new_verts, new_faces = CuMesh.remeshing.remesh_narrow_band_dc(
+            curr_verts, curr_faces,
+            center=torch.zeros(3, device='cuda'),  # Already centered above
+            scale=(grid_resolution + 3 * band) / grid_resolution * scale,
+            resolution=grid_resolution,
+            band=band,
+            project_back=0.0,
+            verbose=True,
+            bvh=bvh,
+        )
+
+        # Clean up BVH after remesh
+        del bvh, curr_verts, curr_faces
+
+        # After remesh we have ~5M faces - DON'T call unify_face_orientations here!
+        # It crashes on large meshes. TRELLIS2 does unify AFTER simplify (on smaller mesh).
+        # Caller (remesh.py _cumesh) should call unify after simplify.
+        print(f"[cumesh_dc_remesh] After remesh: {len(new_verts)} vertices, {len(new_faces)} faces")
+        print(f"[cumesh_dc_remesh] NOTE: Skipping unify_face_orientations (do it after simplify)")
+
+        final_verts, final_faces = new_verts, new_faces
+
+        # Restore center offset
+        final_verts = final_verts + center
+
+        # Create result mesh
+        remeshed_mesh = trimesh.Trimesh(
+            vertices=final_verts.cpu().numpy().astype(np.float32),
+            faces=final_faces.cpu().numpy(),
+            process=False
+        )
+
+        # Calculate statistics
+        vertex_change = len(remeshed_mesh.vertices) - len(mesh.vertices)
+        face_change = len(remeshed_mesh.faces) - len(mesh.faces)
+        vertex_pct = (vertex_change / len(mesh.vertices)) * 100 if len(mesh.vertices) > 0 else 0
+        face_pct = (face_change / len(mesh.faces)) * 100 if len(mesh.faces) > 0 else 0
+
+        print(f"[cumesh_dc_remesh] ===== Remeshing Complete =====")
+        print(f"[cumesh_dc_remesh] Results:")
+        print(f"[cumesh_dc_remesh]   Vertices: {len(mesh.vertices)} -> {len(remeshed_mesh.vertices)} ({vertex_change:+d}, {vertex_pct:+.1f}%)")
+        print(f"[cumesh_dc_remesh]   Faces:    {len(mesh.faces)} -> {len(remeshed_mesh.faces)} ({face_change:+d}, {face_pct:+.1f}%)")
+
+        # Cleanup GPU memory (curr_verts, curr_faces already deleted after BVH)
+        del cumesh, vertices, faces, vertices_centered
+        del new_verts, new_faces, final_verts, final_faces
+        torch.cuda.empty_cache()
+
+        return remeshed_mesh, ""
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        error_msg = f"Error during CuMesh remesh: {str(e)}"
+        print(f"[cumesh_dc_remesh] ERROR: {error_msg}")
+        return None, error_msg

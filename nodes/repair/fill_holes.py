@@ -9,6 +9,13 @@ import trimesh
 import numpy as np
 
 try:
+    import cumesh as CuMesh
+    import torch
+    HAS_CUMESH = True
+except ImportError:
+    HAS_CUMESH = False
+
+try:
     import pymeshlab
     HAS_PYMESHLAB = True
 except ImportError:
@@ -35,8 +42,25 @@ class FillHolesNode:
         return {
             "required": {
                 "mesh": ("TRIMESH",),
-                "method": (["trimesh", "pymeshlab", "igl_fan"], {"default": "trimesh"}),
-                "maxholesize": ("FLOAT", {"default": 100.0, "min": 0.0, "max": 10000.0, "step": 1.0}),
+                "method": (["cumesh", "trimesh", "pymeshlab", "igl_fan"], {"default": "cumesh"}),
+            },
+            "optional": {
+                # CuMesh parameter (same as TRELLIS2 fill_holes_perimeter)
+                "perimeter": ("FLOAT", {
+                    "default": 0.03,
+                    "min": 0.001,
+                    "max": 1.0,
+                    "step": 0.001,
+                    "backends": ["cumesh"],
+                }),
+                # PyMeshLab parameter
+                "maxholesize": ("INT", {
+                    "default": 1000,
+                    "min": 1,
+                    "max": 100000,
+                    "step": 100,
+                    "backends": ["pymeshlab"],
+                }),
             },
         }
 
@@ -45,19 +69,29 @@ class FillHolesNode:
     FUNCTION = "fill_holes"
     CATEGORY = "geompack/repair"
 
-    def fill_holes(self, mesh, method="trimesh", maxholesize=100.0):
+    def fill_holes(self, mesh, method="cumesh", perimeter=0.03, maxholesize=1000):
         """
         Fill holes in the mesh.
 
         Args:
             mesh: Input trimesh.Trimesh object
-            method: Hole filling method ("trimesh", "pymeshlab", or "igl_fan")
-            maxholesize: Maximum hole size to fill (used by trimesh method)
+            method: Hole filling method ("cumesh", "trimesh", "pymeshlab", or "igl_fan")
+            perimeter: Maximum hole perimeter to fill (used by cumesh, default matches TRELLIS2)
 
         Returns:
             tuple: (filled_trimesh, info_string)
         """
-        print(f"[FillHoles] Input: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        # Log method and parameters
+        print(f"\n{'='*60}")
+        print(f"[FillHoles] Method: {method}")
+        print(f"[FillHoles] Input: {len(mesh.vertices):,} vertices, {len(mesh.faces):,} faces")
+        if method == "cumesh":
+            print(f"[FillHoles] Parameters: perimeter={perimeter}")
+        elif method == "pymeshlab":
+            print(f"[FillHoles] Parameters: maxholesize={maxholesize}")
+        elif method in ["trimesh", "igl_fan"]:
+            print(f"[FillHoles] Parameters: (none)")
+        print(f"{'='*60}\n")
 
         # Check initial state
         was_watertight = mesh.is_watertight
@@ -72,7 +106,35 @@ class FillHolesNode:
         num_holes_filled = None
 
         # Fill holes using selected method
-        if method == "pymeshlab" and HAS_PYMESHLAB:
+        if method == "cumesh" and HAS_CUMESH:
+            # GPU-accelerated hole filling (same as TRELLIS2)
+            vertices = torch.tensor(filled_mesh.vertices, dtype=torch.float32).cuda()
+            faces = torch.tensor(filled_mesh.faces, dtype=torch.int32).cuda()
+
+            # Initialize CuMesh
+            cumesh_obj = CuMesh.CuMesh()
+            cumesh_obj.init(vertices, faces)
+
+            # Fill holes with perimeter limit
+            cumesh_obj.fill_holes(max_hole_perimeter=perimeter)
+
+            # Read back result
+            final_verts, final_faces = cumesh_obj.read()
+            filled_mesh = trimesh.Trimesh(
+                vertices=final_verts.cpu().numpy(),
+                faces=final_faces.cpu().numpy(),
+                process=False
+            )
+
+            print(f"[FillHoles] CuMesh method completed (perimeter={perimeter})")
+
+        elif method == "cumesh" and not HAS_CUMESH:
+            # Fallback to trimesh if cumesh not available
+            print(f"[FillHoles] CuMesh not available, falling back to trimesh method")
+            filled_mesh.fill_holes()
+            method_used = "trimesh (fallback)"
+
+        elif method == "pymeshlab" and HAS_PYMESHLAB:
             # Use PyMeshLab's hole closing
             ms = pymeshlab.MeshSet()
             ms.add_mesh(pymeshlab.Mesh(
@@ -80,8 +142,8 @@ class FillHolesNode:
                 face_matrix=filled_mesh.faces
             ))
 
-            # Close holes
-            ms.meshing_close_holes(maxholesize=int(maxholesize))
+            # Close holes (pymeshlab uses edge count, use large default)
+            ms.meshing_close_holes(maxholesize=maxholesize)
 
             # Extract result
             m = ms.current_mesh()
@@ -160,10 +222,18 @@ class FillHolesNode:
         if num_holes_filled is not None:
             holes_info = f"\n  Holes Filled: {num_holes_filled}"
 
+        # Build param info based on method
+        if "cumesh" in method_used.lower():
+            param_info = f"Max Hole Perimeter: {perimeter}"
+        elif "pymeshlab" in method_used.lower():
+            param_info = f"Max Hole Size: {maxholesize}"
+        else:
+            param_info = "(no params)"
+
         info = f"""Hole Filling Results:
 
 Method: {method_used}
-Max Hole Size: {maxholesize}
+{param_info}
 
 Initial State:
   Vertices: {initial_vertices:,}

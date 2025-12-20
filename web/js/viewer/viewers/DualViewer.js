@@ -42,7 +42,7 @@ const DUAL_CONFIG = {
 
     // Appearance
     backgroundColor: [0.15, 0.15, 0.15],
-    defaultMeshColorA: [0.85, 0.85, 0.85],
+    defaultMeshColorA: [0.6, 0.8, 1.0],
     defaultMeshColorB: [0.6, 0.8, 1.0],
     showEdges: false,
 
