@@ -15,8 +15,8 @@ from pathlib import Path
 from datetime import datetime
 
 # Only run initialization when loaded by ComfyUI, not during pytest
-# This prevents import errors when pytest collects test modules
-if 'pytest' not in sys.modules:
+# Use PYTEST_CURRENT_TEST env var which is only set when pytest is actually running tests
+if 'PYTEST_CURRENT_TEST' not in os.environ:
     # Check if CGAL is available
     try:
         from CGAL import CGAL_Polygon_mesh_processing
