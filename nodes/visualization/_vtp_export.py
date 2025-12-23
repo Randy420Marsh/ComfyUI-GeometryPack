@@ -10,6 +10,7 @@ which can be visualized in VTK.js with color mapping.
 Supports both meshes (with faces) and point clouds (without faces).
 """
 
+import numpy as np
 import trimesh as trimesh_module
 import xml.etree.ElementTree as ET
 import sys
@@ -87,12 +88,19 @@ def export_mesh_with_scalars_vtp(trimesh: trimesh_module.Trimesh, filepath: str)
         # Add face attributes as scalar arrays
         if hasattr(trimesh, 'face_attributes') and trimesh.face_attributes:
             for attr_name, attr_values in trimesh.face_attributes.items():
+                attr_arr = np.asarray(attr_values)
+                # Skip high-dimensional arrays (e.g., 448-dim feature vectors)
+                if attr_arr.ndim > 1 and attr_arr.shape[1] > 4:
+                    print(f"[_export_mesh_with_scalars_vtp]   Skipping high-dim field: {attr_name} (shape {attr_arr.shape})")
+                    continue
                 print(f"[_export_mesh_with_scalars_vtp]   Adding face field: {attr_name}")
+                num_components = attr_arr.shape[1] if attr_arr.ndim > 1 else 1
                 scalar_array = ET.SubElement(cell_data, 'DataArray',
                                               type='Float32',
                                               Name=attr_name,
+                                              NumberOfComponents=str(num_components),
                                               format='ascii')
-                scalar_array.text = ' '.join(map(str, attr_values.flatten()))
+                scalar_array.text = ' '.join(map(str, attr_arr.flatten()))
 
     # Geometry section: Verts for point clouds, Polys for meshes
     if is_pc:
