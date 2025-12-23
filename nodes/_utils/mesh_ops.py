@@ -943,7 +943,9 @@ def transfer_texture_via_closest_point(original_mesh: trimesh.Trimesh,
 def pymeshlab_isotropic_remesh(
     mesh: trimesh.Trimesh,
     target_edge_length: float,
-    iterations: int = 3
+    iterations: int = 3,
+    adaptive: bool = False,
+    feature_angle: float = 30.0
 ) -> Tuple[Optional[trimesh.Trimesh], str]:
     """
     Apply isotropic remeshing to create uniform triangle sizes using PyMeshLab.
@@ -952,6 +954,8 @@ def pymeshlab_isotropic_remesh(
         mesh: Input trimesh object
         target_edge_length: Target edge length for remeshed triangles
         iterations: Number of remeshing iterations (default: 3)
+        adaptive: Use curvature-adaptive edge lengths (default: False)
+        feature_angle: Angle threshold in degrees for feature edge detection (default: 30.0)
 
     Returns:
         Tuple of (remeshed_mesh, error_message)
@@ -961,6 +965,8 @@ def pymeshlab_isotropic_remesh(
     print(f"[pymeshlab_isotropic_remesh] Parameters:")
     print(f"[pymeshlab_isotropic_remesh]   target_edge_length: {target_edge_length}")
     print(f"[pymeshlab_isotropic_remesh]   iterations: {iterations}")
+    print(f"[pymeshlab_isotropic_remesh]   adaptive: {adaptive}")
+    print(f"[pymeshlab_isotropic_remesh]   feature_angle: {feature_angle}")
 
     if not PYMESHLAB_AVAILABLE:
         return None, "pymeshlab is not installed. Install with: pip install pymeshlab"
@@ -1001,7 +1007,8 @@ def pymeshlab_isotropic_remesh(
             ms.meshing_isotropic_explicit_remeshing(
                 targetlen=pymeshlab.PercentageValue(target_pct),
                 iterations=iterations,
-                adaptive=False
+                adaptive=adaptive,
+                featuredeg=feature_angle
             )
         except AttributeError:
             # Older PyMeshLab versions use 'remeshing_' prefix
@@ -1009,7 +1016,8 @@ def pymeshlab_isotropic_remesh(
                 ms.remeshing_isotropic_explicit_remeshing(
                     targetlen=pymeshlab.PercentageValue(target_pct),
                     iterations=iterations,
-                    adaptive=False
+                    adaptive=adaptive,
+                    featuredeg=feature_angle
                 )
             except AttributeError as e:
                 return None, (
@@ -1033,6 +1041,8 @@ def pymeshlab_isotropic_remesh(
             'target_edge_length': target_edge_length,
             'target_percentage': target_pct,
             'iterations': iterations,
+            'adaptive': adaptive,
+            'feature_angle': feature_angle,
             'original_vertices': len(mesh.vertices),
             'original_faces': len(mesh.faces),
             'remeshed_vertices': len(remeshed_mesh.vertices),

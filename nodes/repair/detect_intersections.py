@@ -5,6 +5,7 @@
 Detect self-intersecting faces in a mesh.
 """
 
+import os
 import numpy as np
 import trimesh
 
@@ -29,6 +30,7 @@ class DetectSelfIntersectionsNode:
 
     RETURN_TYPES = ("TRIMESH", "STRING")
     RETURN_NAMES = ("mesh_with_field", "report")
+    OUTPUT_NODE = True  # Enable UI output for dynamic display
     FUNCTION = "detect_intersections"
     CATEGORY = "geompack/repair"
 
@@ -75,10 +77,14 @@ class DetectSelfIntersectionsNode:
                     )
 
                     # IF contains pairs of intersecting faces [n x 2]
+                    intersecting_faces_list = []  # For UI display
+                    num_pairs = 0
+
                     if IF.shape[0] > 0:
                         # Get unique face indices that are involved in intersections
                         intersecting_faces = np.unique(IF.flatten())
                         num_intersecting = len(intersecting_faces)
+                        num_pairs = IF.shape[0]
 
                         # Create scalar field for faces
                         face_field = np.zeros(len(F), dtype=np.float32)
@@ -99,7 +105,14 @@ class DetectSelfIntersectionsNode:
                             vertex_count[vertex_indices] += 1.0
                         result_mesh.vertex_attributes['intersection_count'] = vertex_count
 
-                        print(f"[DetectSelfIntersections] Found {num_intersecting} intersecting faces ({IF.shape[0]} intersection pairs)")
+                        # Build face details for UI
+                        for face_idx in intersecting_faces:
+                            intersecting_faces_list.append({
+                                "id": int(face_idx),
+                                "vertices": F[face_idx].tolist()
+                            })
+
+                        print(f"[DetectSelfIntersections] Found {num_intersecting} intersecting faces ({num_pairs} intersection pairs)")
 
                     else:
                         # No intersections found
@@ -114,6 +127,8 @@ class DetectSelfIntersectionsNode:
                     print(f"[DetectSelfIntersections] CGAL detection failed: {e}")
                     # Fallback to basic method
                     num_intersecting = 0
+                    num_pairs = 0
+                    intersecting_faces_list = []
                     result_mesh.face_attributes['self_intersecting'] = np.zeros(len(trimesh.faces), dtype=np.float32)
                     result_mesh.vertex_attributes['intersection_flag'] = np.zeros(len(trimesh.vertices), dtype=np.float32)
                     result_mesh.vertex_attributes['intersection_count'] = np.zeros(len(trimesh.vertices), dtype=np.float32)
@@ -123,6 +138,8 @@ class DetectSelfIntersectionsNode:
                 # CGAL not available - use basic fallback
                 print("[DetectSelfIntersections] CGAL not available, using basic detection")
                 num_intersecting = 0
+                num_pairs = 0
+                intersecting_faces_list = []
 
                 # Add zero fields
                 result_mesh.face_attributes['self_intersecting'] = np.zeros(len(trimesh.faces), dtype=np.float32)
@@ -160,8 +177,27 @@ Scalar Fields Added:
 
 Use 'Preview Mesh (VTK with Fields)' node to visualize the intersection fields!
 """
+            # Get mesh name
+            mesh_name = trimesh.metadata.get('file_name', 'mesh') if hasattr(trimesh, 'metadata') else 'mesh'
+            mesh_name_short = os.path.splitext(mesh_name)[0]
 
-            return (result_mesh, report)
+            # Prepare UI data
+            ui_data = {
+                "mesh_name": mesh_name_short,
+                "num_intersecting_faces": num_intersecting,
+                "num_intersection_pairs": num_pairs,
+                "total_faces": len(trimesh.faces),
+                "total_vertices": len(trimesh.vertices),
+                "has_cgal": has_cgal,
+                "faces": intersecting_faces_list
+            }
+
+            return {
+                "result": (result_mesh, report),
+                "ui": {
+                    "intersection_data": [ui_data]
+                }
+            }
 
         except ImportError as e:
             # libigl not available at all
@@ -195,5 +231,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackDetectSelfIntersections": "Detect Self Intersections",
+    "GeomPackDetectSelfIntersections": "Self Intersections",
 }

@@ -39,7 +39,10 @@ class RemeshNode:
                     "blender_quadriflow",
                     "instant_meshes",
                     "cumesh",
-                ], {"default": "pymeshlab_isotropic"}),
+                ], {
+                    "default": "pymeshlab_isotropic",
+                    "tooltip": "Remeshing algorithm. pymeshlab=fast isotropic, cgal=high-quality isotropic, blender_voxel=watertight output, blender_quadriflow=quad remesh, cumesh=GPU dual-contouring, instant_meshes=field-aligned quads"
+                }),
             },
             "optional": {
                 # Isotropic params (pymeshlab, cgal)
@@ -49,6 +52,7 @@ class RemeshNode:
                     "max": 10.0,
                     "step": 0.01,
                     "display": "number",
+                    "tooltip": "Target edge length for output triangles. Value is relative to mesh scale.",
                     "backends": ["pymeshlab_isotropic", "cgal_isotropic"],
                 }),
                 "iterations": ("INT", {
@@ -56,11 +60,27 @@ class RemeshNode:
                     "min": 1,
                     "max": 20,
                     "step": 1,
+                    "tooltip": "Number of remeshing passes. More iterations = smoother result, slower processing.",
                     "backends": ["pymeshlab_isotropic", "cgal_isotropic"],
+                }),
+                # PyMeshLab-specific
+                "feature_angle": ("FLOAT", {
+                    "default": 30.0,
+                    "min": 0.0,
+                    "max": 180.0,
+                    "step": 1.0,
+                    "tooltip": "Angle threshold (degrees) for feature edge detection. Edges with dihedral angle greater than this are preserved as sharp creases.",
+                    "backends": ["pymeshlab_isotropic"],
+                }),
+                "adaptive": (["true", "false"], {
+                    "default": "false",
+                    "tooltip": "Use curvature-adaptive edge lengths. Creates smaller triangles in high-curvature areas, larger triangles in flat areas.",
+                    "backends": ["pymeshlab_isotropic"],
                 }),
                 # CGAL-specific
                 "protect_boundaries": (["true", "false"], {
                     "default": "true",
+                    "tooltip": "Lock boundary/open edges in place during remeshing. Prevents modification of mesh borders and holes.",
                     "backends": ["cgal_isotropic"],
                 }),
                 # Blender voxel
@@ -70,6 +90,7 @@ class RemeshNode:
                     "max": 1.0,
                     "step": 0.01,
                     "display": "number",
+                    "tooltip": "Voxel size for Blender voxel remesh. Smaller = more detail, more faces. Output is always watertight.",
                     "backends": ["blender_voxel"],
                 }),
                 # CuMesh / Quadriflow
@@ -78,6 +99,7 @@ class RemeshNode:
                     "min": 1000,
                     "max": 5000000,
                     "step": 1000,
+                    "tooltip": "Target number of output faces for cumesh/quadriflow backends.",
                     "backends": ["cumesh", "blender_quadriflow"],
                 }),
                 # CuMesh specific (matches TRELLIS2)
@@ -86,6 +108,7 @@ class RemeshNode:
                     "min": 0.1,
                     "max": 5.0,
                     "step": 0.1,
+                    "tooltip": "Band width for CuMesh dual-contouring. Affects surface detail capture. Higher = smoother but may lose fine details.",
                     "backends": ["cumesh"],
                 }),
                 # Instant Meshes specific
@@ -94,10 +117,12 @@ class RemeshNode:
                     "min": 100,
                     "max": 1000000,
                     "step": 100,
+                    "tooltip": "Target vertex count for Instant Meshes output. Creates field-aligned quad-dominant mesh.",
                     "backends": ["instant_meshes"],
                 }),
                 "deterministic": (["true", "false"], {
                     "default": "true",
+                    "tooltip": "Use deterministic algorithm for reproducible results. Disable for potentially better quality but non-reproducible output.",
                     "backends": ["instant_meshes"],
                 }),
                 "crease_angle": ("FLOAT", {
@@ -105,6 +130,7 @@ class RemeshNode:
                     "min": 0.0,
                     "max": 180.0,
                     "step": 1.0,
+                    "tooltip": "Angle threshold (degrees) for preserving sharp/crease edges in Instant Meshes. 0 = no crease preservation.",
                     "backends": ["instant_meshes"],
                 }),
             }
@@ -114,8 +140,10 @@ class RemeshNode:
     RETURN_NAMES = ("remeshed_mesh", "info")
     FUNCTION = "remesh"
     CATEGORY = "geompack/remeshing"
+    OUTPUT_NODE = True
 
     def remesh(self, trimesh, backend, target_edge_length=0.05, iterations=3,
+               feature_angle=30.0, adaptive="false",
                protect_boundaries="true", voxel_size=0.02, target_face_count=500000,
                target_vertex_count=5000, deterministic="true", crease_angle=0.0,
                remesh_band=1.0):
@@ -138,7 +166,7 @@ class RemeshNode:
         print(f"[Remesh] Backend: {backend}")
         print(f"[Remesh] Input: {initial_vertices:,} vertices, {initial_faces:,} faces")
         if backend == "pymeshlab_isotropic":
-            print(f"[Remesh] Parameters: target_edge_length={target_edge_length}, iterations={iterations}")
+            print(f"[Remesh] Parameters: target_edge_length={target_edge_length}, iterations={iterations}, feature_angle={feature_angle}, adaptive={adaptive}")
         elif backend == "cgal_isotropic":
             print(f"[Remesh] Parameters: target_edge_length={target_edge_length}, iterations={iterations}, protect_boundaries={protect_boundaries}")
         elif backend == "blender_voxel":
@@ -153,7 +181,7 @@ class RemeshNode:
 
         if backend == "pymeshlab_isotropic":
             remeshed_mesh, info = self._pymeshlab_isotropic(
-                trimesh, target_edge_length, iterations
+                trimesh, target_edge_length, iterations, feature_angle, adaptive
             )
         elif backend == "cgal_isotropic":
             remeshed_mesh, info = self._cgal_isotropic(
@@ -180,12 +208,14 @@ class RemeshNode:
         print(f"[Remesh] Output: {len(remeshed_mesh.vertices)} vertices ({vertex_change:+d}), "
               f"{len(remeshed_mesh.faces)} faces ({face_change:+d})")
 
-        return (remeshed_mesh, info)
+        return {"ui": {"text": [info]}, "result": (remeshed_mesh, info)}
 
-    def _pymeshlab_isotropic(self, trimesh, target_edge_length, iterations):
+    def _pymeshlab_isotropic(self, trimesh, target_edge_length, iterations, feature_angle, adaptive):
         """PyMeshLab isotropic remeshing."""
+        adaptive_bool = (adaptive == "true")
         remeshed_mesh, error = mesh_ops.pymeshlab_isotropic_remesh(
-            trimesh, target_edge_length, iterations
+            trimesh, target_edge_length, iterations,
+            adaptive=adaptive_bool, feature_angle=feature_angle
         )
         if remeshed_mesh is None:
             raise ValueError(f"PyMeshLab remeshing failed: {error}")
@@ -194,6 +224,8 @@ class RemeshNode:
 
 Target Edge Length: {target_edge_length}
 Iterations: {iterations}
+Feature Angle: {feature_angle}°
+Adaptive: {adaptive}
 
 Before:
   Vertices: {len(trimesh.vertices):,}

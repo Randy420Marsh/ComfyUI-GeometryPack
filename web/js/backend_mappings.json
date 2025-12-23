@@ -3,7 +3,9 @@
     "GeomPackRemesh": {
       "pymeshlab_isotropic": [
         "target_edge_length",
-        "iterations"
+        "iterations",
+        "feature_angle",
+        "adaptive"
       ],
       "cgal_isotropic": [
         "target_edge_length",

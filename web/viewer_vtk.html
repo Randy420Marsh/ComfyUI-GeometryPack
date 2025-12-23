@@ -589,11 +589,73 @@
         });
         resizeObserver.observe(container);
 
+        // Focus camera on a specific 3D point
+        function focusOnPoint(point, viewRadius = null) {
+            const camera = renderer.getActiveCamera();
+
+            // Get current camera direction (from focal point to camera position)
+            const currentFocalPoint = camera.getFocalPoint();
+            const currentPosition = camera.getPosition();
+            const direction = [
+                currentPosition[0] - currentFocalPoint[0],
+                currentPosition[1] - currentFocalPoint[1],
+                currentPosition[2] - currentFocalPoint[2]
+            ];
+
+            // Normalize direction
+            const length = Math.sqrt(direction[0]**2 + direction[1]**2 + direction[2]**2);
+            if (length > 0) {
+                direction[0] /= length;
+                direction[1] /= length;
+                direction[2] /= length;
+            } else {
+                // Default to looking from +Z if no current direction
+                direction[0] = 0;
+                direction[1] = 0;
+                direction[2] = 1;
+            }
+
+            // Calculate view distance based on mesh bounds
+            let distance;
+            if (viewRadius !== null) {
+                distance = viewRadius * 2.5;
+            } else if (meshBounds) {
+                const maxDim = Math.max(
+                    meshBounds[1] - meshBounds[0],
+                    meshBounds[3] - meshBounds[2],
+                    meshBounds[5] - meshBounds[4]
+                );
+                distance = maxDim * 0.3;  // Closer view for focused point
+            } else {
+                distance = 10;  // Fallback
+            }
+
+            // Position camera along the direction from the point
+            const newPosition = [
+                point[0] + direction[0] * distance,
+                point[1] + direction[1] * distance,
+                point[2] + direction[2] * distance
+            ];
+
+            camera.setFocalPoint(...point);
+            camera.setPosition(...newPosition);
+
+            renderer.resetCameraClippingRange();
+            renderWindow.render();
+        }
+
         // Listen for postMessage from parent
         window.addEventListener('message', (event) => {
             if (event.data.type === 'LOAD_MESH') {
                 const lineWidth = event.data.lineWidth || 1.0;
                 loadMeshFile(event.data.filepath, lineWidth);
+            } else if (event.data.type === 'FOCUS_ON_POINT') {
+                const point = event.data.point;
+                const radius = event.data.radius || null;
+                if (point && Array.isArray(point) && point.length === 3) {
+                    console.log('[GeomPack VTK Viewer] Focusing on point:', point);
+                    focusOnPoint(point, radius);
+                }
             }
         });
 

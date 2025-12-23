@@ -27,6 +27,9 @@ mesh-to-sdf>=0.0.14
 # Mesh simplification
 fast-simplification>=0.1.5
 
+# Mesh repair
+pymeshfix>=0.17.0
+
 # UV unwrapping
 xatlas>=0.0.11
 # GPU-accelerated UV unwrapping (optional, requires CUDA)

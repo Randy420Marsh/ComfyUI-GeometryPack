@@ -210,6 +210,62 @@ export class CameraController {
         if (state.viewAngle !== undefined) camera.setViewAngle(state.viewAngle);
         this.renderWindow.render();
     }
+
+    /**
+     * Focus camera on a specific 3D point
+     * Moves the camera to look at the point while maintaining relative view direction
+     * @param {number[]} point - [x, y, z] coordinates to focus on
+     * @param {number} viewRadius - Optional radius around point to view (defaults to 1/10 of mesh size)
+     */
+    focusOnPoint(point, viewRadius = null) {
+        const camera = this.getCamera();
+
+        // Get current camera direction (from focal point to camera position)
+        const currentFocalPoint = camera.getFocalPoint();
+        const currentPosition = camera.getPosition();
+        const direction = [
+            currentPosition[0] - currentFocalPoint[0],
+            currentPosition[1] - currentFocalPoint[1],
+            currentPosition[2] - currentFocalPoint[2]
+        ];
+
+        // Normalize direction
+        const length = Math.sqrt(direction[0]**2 + direction[1]**2 + direction[2]**2);
+        if (length > 0) {
+            direction[0] /= length;
+            direction[1] /= length;
+            direction[2] /= length;
+        } else {
+            // Default to looking from +Z if no current direction
+            direction[0] = 0;
+            direction[1] = 0;
+            direction[2] = 1;
+        }
+
+        // Calculate view distance
+        let distance;
+        if (viewRadius !== null) {
+            distance = viewRadius * this.config.distanceMultiplier;
+        } else if (this.currentBounds) {
+            const maxDim = getMaxDimension(this.currentBounds);
+            distance = maxDim * 0.3;  // Closer view for focused point
+        } else {
+            distance = 10;  // Fallback
+        }
+
+        // Position camera along the direction from the point
+        const newPosition = [
+            point[0] + direction[0] * distance,
+            point[1] + direction[1] * distance,
+            point[2] + direction[2] * distance
+        ];
+
+        camera.setFocalPoint(...point);
+        camera.setPosition(...newPosition);
+
+        this.renderer.resetCameraClippingRange();
+        this.renderWindow.render();
+    }
 }
 
 export default CameraController;
