@@ -12,7 +12,7 @@ module.exports = [
                 type: 'umd',
                 export: 'default',
             },
-            globalObject: 'this',
+            globalObject: 'globalThis',
         },
         mode: 'production',
         resolve: {
@@ -47,7 +47,7 @@ module.exports = [
                 name: 'GeomPackViewer',
                 type: 'umd',
             },
-            globalObject: 'this',
+            globalObject: 'globalThis',
         },
         mode: 'production',
         resolve: {

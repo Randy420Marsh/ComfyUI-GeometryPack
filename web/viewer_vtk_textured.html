@@ -234,9 +234,12 @@
                     }
                 });
 
-                // Apply texture fixes
-                if (result.hasTexture || result.format === 'GLTF' || result.format === 'GLB') {
+                // Apply texture fixes only for textured meshes (not vertex-colored ones)
+                if (result.hasTexture) {
                     textureManager.applyTextureFixesMultiple(result.actors);
+                    textureManager.configureRenderer(renderer);
+                } else if (result.hasVertexColors) {
+                    // For vertex-colored meshes, just configure renderer
                     textureManager.configureRenderer(renderer);
                 }
 

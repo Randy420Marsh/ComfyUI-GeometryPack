@@ -88,10 +88,28 @@ export async function loadGLTF(filepath, vtk, renderer, options = {}) {
             const input = mapper?.getInputData();
 
             if (input && input.getNumberOfPoints() > 0) {
-                // Check for vertex colors (stored as scalars in VTK)
-                const scalars = input.getPointData()?.getScalars();
+                // Check for vertex colors (may be stored as scalars or as named array COLOR_0)
+                const pointData = input.getPointData();
+                let scalars = pointData?.getScalars();
+
+                // If no default scalars, check for COLOR_0 array (GLTF standard)
+                if (!scalars && pointData) {
+                    const numArrays = pointData.getNumberOfArrays();
+                    for (let i = 0; i < numArrays; i++) {
+                        const arr = pointData.getArray(i);
+                        const name = arr?.getName() || '';
+                        if (name.toUpperCase().includes('COLOR') && arr.getNumberOfComponents() >= 3) {
+                            scalars = arr;
+                            // Set as active scalars so VTK renders them
+                            pointData.setScalars(arr);
+                            break;
+                        }
+                    }
+                }
+
                 if (scalars && scalars.getNumberOfComponents() >= 3) {
                     hasVertexColors = true;
+                    console.log('[GLTFLoader] Found vertex colors:', scalars.getName(), 'components:', scalars.getNumberOfComponents());
                 }
 
                 if (property) {
@@ -140,11 +158,37 @@ export async function loadGLTF(filepath, vtk, renderer, options = {}) {
 
                 // Configure mapper for rendering
                 if (mapper) {
+                    console.log('[GLTFLoader] Configuring mapper - hasVertexColors:', hasVertexColors, 'hasTexture:', hasTexture);
                     if (hasVertexColors && !hasTexture) {
                         // Enable scalar visibility to show vertex colors
+                        console.log('[GLTFLoader] Enabling vertex color rendering');
                         mapper.setScalarVisibility(true);
                         mapper.setScalarModeToUsePointData();
                         mapper.setColorModeToDirectScalars();
+
+                        // Set actor color to white so vertex colors show through
+                        if (property) {
+                            console.log('[GLTFLoader] Setting actor color to white');
+                            property.setColor(1.0, 1.0, 1.0);
+                            // Also set PBR base color factor for GLTF materials
+                            if (typeof property.setBaseColorFactor === 'function') {
+                                console.log('[GLTFLoader] Setting PBR baseColorFactor to white');
+                                property.setBaseColorFactor([1.0, 1.0, 1.0, 1.0]);
+                            }
+                            // Set diffuse and ambient explicitly
+                            if (typeof property.setDiffuseColor === 'function') {
+                                property.setDiffuseColor(1.0, 1.0, 1.0);
+                            }
+                            if (typeof property.setAmbientColor === 'function') {
+                                property.setAmbientColor(1.0, 1.0, 1.0);
+                            }
+                            if (typeof property.setAmbient === 'function') {
+                                property.setAmbient(0.2);
+                            }
+                            if (typeof property.setDiffuse === 'function') {
+                                property.setDiffuse(0.8);
+                            }
+                        }
                     } else {
                         // Disable scalars for texture rendering
                         mapper.setScalarVisibility(false);
