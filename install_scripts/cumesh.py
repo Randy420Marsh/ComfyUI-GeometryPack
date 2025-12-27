@@ -184,25 +184,16 @@ def install_cumesh():
     python_version = _get_python_version()
     print(f"[CuMesh] Python version: {sys.version_info.major}.{sys.version_info.minor}")
 
-    # Try wheel first
-    print("\n[CuMesh] Step 1: Trying pre-built wheel...")
+    # Try wheel installation
+    print("\n[CuMesh] Trying pre-built wheel...")
     if _install_wheel(cuda_version, torch_version, python_version):
         if _verify_cumesh_import():
             print("[CuMesh] Installation verified!")
             return True
         else:
-            print("[CuMesh] Wheel installed but import failed, trying source...")
+            print("[CuMesh] Wheel installed but import failed")
 
-    # Fallback to source
-    print("\n[CuMesh] Step 2: Trying source compilation...")
-    if _install_from_source():
-        if _verify_cumesh_import():
-            print("[CuMesh] Installation verified!")
-            return True
-        else:
-            print("[CuMesh] Source build completed but import failed")
-
-    # Both failed
+    # Wheel not available or failed
     print("\n" + "-"*60)
     print("[CuMesh] WARNING: CuMesh installation failed")
     print("[CuMesh] The 'cumesh' UV unwrap method will not be available.")
