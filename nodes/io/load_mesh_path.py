@@ -36,6 +36,9 @@ class LoadMeshPath:
     """
     Load a mesh from a string path (OBJ, PLY, STL, OFF, etc.)
     Takes a string input for the path, allowing dynamic path construction.
+
+    Supports batch paths: pass multiple paths separated by newlines or commas.
+    When multiple paths are provided, returns lists of meshes and textures.
     """
 
     @classmethod
@@ -44,24 +47,49 @@ class LoadMeshPath:
             "required": {
                 "file_path": ("STRING", {
                     "default": "",
-                    "multiline": False,
-                    "tooltip": "Path to mesh file (absolute or relative to input/output folder)"
+                    "multiline": True,
+                    "tooltip": "Path to mesh file(s). Supports multiple paths separated by newlines or commas."
                 }),
             },
         }
 
     RETURN_TYPES = ("TRIMESH", "IMAGE")
     RETURN_NAMES = ("mesh", "texture")
+    OUTPUT_IS_LIST = (True, True)
     FUNCTION = "load_mesh"
     CATEGORY = "geompack/io"
+    DESCRIPTION = "Load mesh(es) from path(s). Supports batch paths (newline or comma separated)."
+
+    @classmethod
+    def _parse_paths(cls, file_path_input):
+        """Parse input into list of paths, handling newlines and commas."""
+        if not file_path_input or file_path_input.strip() == "":
+            return []
+
+        # Split by newlines first, then by commas if no newlines
+        if '\n' in file_path_input:
+            paths = file_path_input.strip().split('\n')
+        elif ',' in file_path_input:
+            paths = file_path_input.strip().split(',')
+        else:
+            paths = [file_path_input]
+
+        # Clean up paths and filter empty ones
+        paths = [p.strip() for p in paths if p.strip()]
+        return paths
 
     @classmethod
     def IS_CHANGED(cls, file_path):
-        """Force re-execution when file changes."""
-        resolved_path = cls._resolve_path(file_path)
-        if resolved_path and os.path.exists(resolved_path):
-            return os.path.getmtime(resolved_path)
-        return file_path
+        """Force re-execution when any file changes."""
+        paths = cls._parse_paths(file_path)
+        mtimes = []
+        for path in paths:
+            resolved_path = cls._resolve_path(path)
+            if resolved_path and os.path.exists(resolved_path):
+                mtimes.append(str(os.path.getmtime(resolved_path)))
+            else:
+                mtimes.append(path)
+        return "_".join(mtimes)
 
     @classmethod
     def _resolve_path(cls, file_path):
@@ -138,19 +166,8 @@ class LoadMeshPath:
         img_array = np.array(texture_image.convert("RGB")).astype(np.float32) / 255.0
         return torch.from_numpy(img_array)[None,]
 
-    def load_mesh(self, file_path):
-        """
-        Load mesh from file path string.
-
-        Args:
-            file_path: Path to mesh file (absolute or relative to output/input folders)
-
-        Returns:
-            tuple: (trimesh.Trimesh, IMAGE)
-        """
-        if not file_path or file_path.strip() == "":
-            raise ValueError("File path cannot be empty")
-
+    def _load_single_mesh(self, file_path):
+        """Load a single mesh from file path string."""
         file_path = file_path.strip()
 
         # Resolve the path
@@ -188,6 +205,44 @@ class LoadMeshPath:
         texture = self._extract_texture_image(loaded_mesh)
 
         return (loaded_mesh, texture)
+
+    def load_mesh(self, file_path):
+        """
+        Load mesh(es) from file path string(s).
+
+        Args:
+            file_path: Path to mesh file(s). Can be single path or multiple paths
+                       separated by newlines or commas.
+
+        Returns:
+            tuple: (list of trimesh.Trimesh, list of IMAGE)
+        """
+        if not file_path or file_path.strip() == "":
+            raise ValueError("File path cannot be empty")
+
+        # Parse paths
+        paths = self._parse_paths(file_path)
+
+        if not paths:
+            raise ValueError("No valid paths provided")
+
+        print(f"[LoadMeshPath] Loading {len(paths)} mesh(es)")
+
+        meshes = []
+        textures = []
+
+        for i, path in enumerate(paths):
+            try:
+                mesh, texture = self._load_single_mesh(path)
+                meshes.append(mesh)
+                textures.append(texture)
+            except Exception as e:
+                print(f"[LoadMeshPath] Error loading mesh {i+1} ({path}): {e}")
+                # Continue with other paths instead of failing completely
+                raise
+
+        print(f"[LoadMeshPath] Successfully loaded {len(meshes)} mesh(es)")
+        return (meshes, textures)
 
 
 # Node mappings
