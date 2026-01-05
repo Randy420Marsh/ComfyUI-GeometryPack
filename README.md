@@ -140,6 +140,9 @@ Load Mesh → PyMeshLab Remesh → Save Mesh
 **Depth Map to Mesh**
 ![Depth Map to Mesh](docs/workflows/depth_map_to_mesh.png)
 
+**Alpha Wrapping**
+![uv_unwrapping](docs/uv_unwrapping.png)
+
 ## Demo Videos
 
 *Coming soon - video demonstrations will be added here*

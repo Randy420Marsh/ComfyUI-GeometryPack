@@ -204,14 +204,23 @@
 
         // Store initial camera params for reset
         let initialCameraData = null;
-        
+
         // Resolution lock state
         let isResolutionLocked = false;
 
         // Scale compensation: when focal length is scaled down for canvas size,
         // gaussian scales need to be multiplied by this factor to maintain correct screen-space size
         let gaussianScaleCompensation = 1.0;
-        let splatScaleMultiplier = 1.0; // Base multiplier for point size
+
+        // Resume the animation loop (used after pausing for screenshot/clipboard)
+        function resumeAnimationLoop() {
+            const frame = () => {
+                controls.update();
+                renderer.render(scene, camera);
+                animationId = requestAnimationFrame(frame);
+            };
+            frame();
+        }
 
         // Set camera from extrinsics and intrinsics
         // extrinsics: 4x4 matrix (identity for SHARP = camera at origin looking down +Z)
@@ -645,25 +654,12 @@
                     image: dataUrl,
                     timestamp: Date.now()
                 }, '*');
-                
-                // Resume animation loop
-                const frame = () => {
-                    controls.update();
-                    renderer.render(scene, camera);
-                    animationId = requestAnimationFrame(frame);
-                };
-                frame();
 
+                resumeAnimationLoop();
                 console.log('[GaussianViewer] Screenshot captured successfully');
             } catch (err) {
                 console.error('[GaussianViewer] Screenshot error:', err);
-                // Try to resume loop even if error
-                const frame = () => {
-                    controls.update();
-                    renderer.render(scene, camera);
-                    animationId = requestAnimationFrame(frame);
-                };
-                frame();
+                resumeAnimationLoop();
             }
         }
 
@@ -714,24 +710,10 @@
                     }, '*');
                 }
 
-                // Resume animation loop
-                const frame = () => {
-                    controls.update();
-                    renderer.render(scene, camera);
-                    animationId = requestAnimationFrame(frame);
-                };
-                frame();
-
+                resumeAnimationLoop();
             } catch (err) {
                 console.error('[GaussianViewer] Copy to clipboard error:', err);
-                // Try to resume loop
-                const frame = () => {
-                    controls.update();
-                    renderer.render(scene, camera);
-                    animationId = requestAnimationFrame(frame);
-                };
-                frame();
-                
+                resumeAnimationLoop();
                 window.parent.postMessage({
                     type: 'COPY_IMAGE',
                     success: false,
