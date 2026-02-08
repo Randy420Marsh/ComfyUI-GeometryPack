@@ -9,22 +9,13 @@ import os
 import glob as glob_module
 import numpy as np
 
-from ..._utils import mesh_ops
+from . import mesh_io
 
 try:
     from PIL import Image
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
-
-
-def _get_torch():
-    """Lazy torch import to avoid importing before ComfyUI startup."""
-    try:
-        import torch
-        return torch
-    except ImportError:
-        return None
 
 
 class LoadMeshGlob:
@@ -69,8 +60,7 @@ class LoadMeshGlob:
 
     def _extract_texture_image(self, mesh):
         """Extract texture from mesh and convert to ComfyUI IMAGE format."""
-        torch = _get_torch()
-        if not PIL_AVAILABLE or torch is None:
+        if not PIL_AVAILABLE:
             return self._placeholder_texture()
 
         texture_image = None
@@ -100,14 +90,11 @@ class LoadMeshGlob:
 
         # Convert to ComfyUI IMAGE format (BHWC with values 0-1)
         img_array = np.array(texture_image.convert("RGB")).astype(np.float32) / 255.0
-        return torch.from_numpy(img_array)[None,]
+        return img_array[np.newaxis, ...]
 
     def _placeholder_texture(self):
         """Return a black 64x64 placeholder texture."""
-        torch = _get_torch()
-        if torch is None:
-            return None
-        return torch.zeros(1, 64, 64, 3)
+        return np.zeros((1, 64, 64, 3), dtype=np.float32)
 
     def load_meshes(self, glob_pattern, sort_by="name"):
         """
@@ -147,7 +134,7 @@ class LoadMeshGlob:
         for path in matched_files:
             try:
                 print(f"[LoadMeshGlob] Loading: {path}")
-                mesh, error = mesh_ops.load_mesh_file(path)
+                mesh, error = mesh_io.load_mesh_file(path)
 
                 if mesh is None:
                     print(f"[LoadMeshGlob] Failed to load {path}: {error}")

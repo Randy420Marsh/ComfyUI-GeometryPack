@@ -1,12 +1,8 @@
-# Import submodules
-from . import remesh
+from . import remeshing_gpu
 
-# Collect all node class mappings
 NODE_CLASS_MAPPINGS = {}
-NODE_CLASS_MAPPINGS.update(remesh.NODE_CLASS_MAPPINGS)
-
-# Collect all display name mappings
 NODE_DISPLAY_NAME_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS.update(remesh.NODE_DISPLAY_NAME_MAPPINGS)
+NODE_CLASS_MAPPINGS.update(remeshing_gpu.NODE_CLASS_MAPPINGS)
+NODE_DISPLAY_NAME_MAPPINGS.update(remeshing_gpu.NODE_DISPLAY_NAME_MAPPINGS)
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']

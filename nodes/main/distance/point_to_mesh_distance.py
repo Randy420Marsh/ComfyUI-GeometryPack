@@ -6,7 +6,6 @@ Point to Mesh Distance Node - Compute distances from points to mesh surface
 """
 
 import numpy as np
-import igl
 
 
 class PointToMeshDistanceNode:
@@ -73,6 +72,11 @@ class PointToMeshDistanceNode:
 
         # Compute distances based on selected type
         if distance_type == "signed":
+            try:
+                import igl
+            except (ImportError, OSError):
+                raise ImportError("libigl is required for signed distance. Install with: pip install libigl")
+
             # Map sign method to igl enum
             sign_type_map = {
                 "default": igl.SIGNED_DISTANCE_TYPE_DEFAULT,
@@ -95,8 +99,9 @@ class PointToMeshDistanceNode:
             )
         else:
             # Use trimesh's proximity query to find closest points and distances (unsigned)
-            print(f"[PointToMeshDistance] Using trimesh.nearest.on_surface (unsigned)")
-            closest_points, distances, triangle_ids = target_mesh.nearest.on_surface(points)
+            import trimesh
+            print(f"[PointToMeshDistance] Using trimesh.proximity.closest_point (unsigned)")
+            closest_points, distances, triangle_ids = trimesh.proximity.closest_point(target_mesh, points)
 
         # Create a copy of the input to add distance field
         result = pointcloud.copy()
