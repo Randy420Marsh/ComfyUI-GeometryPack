@@ -169,6 +169,9 @@ export class FieldVisualization {
         this.currentField = fieldName;
         this.currentColormap = colormap;
 
+        // Update mapper to apply changes
+        mapper.update();
+
         if (render) {
             this.renderWindow.render();
         }
