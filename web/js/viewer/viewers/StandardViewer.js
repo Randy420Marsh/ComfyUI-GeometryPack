@@ -29,7 +29,7 @@ const STANDARD_CONFIG = {
 
     // Appearance
     backgroundColor: [0.15, 0.15, 0.15],
-    defaultMeshColor: [0.85, 0.85, 0.85],
+    defaultMeshColor: [0.6, 0.8, 1.0],
     showEdges: false
 };
 

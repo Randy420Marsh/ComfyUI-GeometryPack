@@ -23,7 +23,7 @@ import { getCenter, getMaxDimension, isValidBounds } from '../utils/BoundsUtils.
 const DEFAULT_CONFIG = {
     // Appearance
     backgroundColor: [0.15, 0.15, 0.15],
-    defaultMeshColor: [0.85, 0.85, 0.85],
+    defaultMeshColor: [0.6, 0.8, 1.0],
     edgeColor: [0.2, 0.2, 0.2],
     edgeWidth: 1.0,
     showEdges: false,

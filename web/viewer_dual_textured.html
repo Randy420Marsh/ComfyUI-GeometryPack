@@ -246,7 +246,7 @@
             </div>
             <div class="setting-row">
                 <label>Mesh Color:</label>
-                <input type="color" id="meshColor" value="#ffffff">
+                <input type="color" id="meshColor" value="#99ccff">
             </div>
             <div class="setting-row">
                 <label>Edge Width:</label>
@@ -415,7 +415,7 @@
             // Configure appearance
             [leftActor.getProperty(), rightActor.getProperty()].forEach(property => {
                 property.setEdgeVisibility(false);
-                property.setColor(1.0, 1.0, 1.0);
+                property.setColor(0.6, 0.8, 1.0);  // Light blue
                 property.setAmbient(0.4);
                 property.setDiffuse(0.8);
                 property.setSpecular(0.3);
@@ -458,7 +458,7 @@
 
             const property = singleActor.getProperty();
             property.setEdgeVisibility(false);
-            property.setColor(1.0, 1.0, 1.0);
+            property.setColor(0.6, 0.8, 1.0);  // Light blue
             property.setAmbient(0.4);
             property.setDiffuse(0.8);
             property.setSpecular(0.3);
@@ -1024,7 +1024,7 @@
 
         // Store current settings
         let currentPointSize = 3;
-        let currentMeshColor = '#ffffff';
+        let currentMeshColor = '#99ccff';
         let currentEdgeWidth = 1;
         let currentRepresentation = 2; // 2 = Surface
         let currentParallelProjection = false;

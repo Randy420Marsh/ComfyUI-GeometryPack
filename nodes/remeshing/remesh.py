@@ -17,6 +17,7 @@ class RemeshNode:
     Universal Remesh - Unified topology-changing remeshing operations.
 
     Consolidates multiple remeshing backends into a single node:
+    - cumesh: GPU-accelerated dual-contouring remeshing (same as TRELLIS2)
     - pymeshlab_isotropic: PyMeshLab isotropic remeshing
     - cgal_isotropic: CGAL high-quality isotropic remeshing
     - blender_voxel: Blender voxel-based remeshing (watertight output)
@@ -36,7 +37,8 @@ class RemeshNode:
                     "cgal_isotropic",
                     "blender_voxel",
                     "blender_quadriflow",
-                    "instant_meshes"
+                    "instant_meshes",
+                    "cumesh",
                 ], {"default": "pymeshlab_isotropic"}),
             },
             "optional": {
@@ -46,44 +48,64 @@ class RemeshNode:
                     "min": 0.001,
                     "max": 10.0,
                     "step": 0.01,
-                    "display": "number"
+                    "display": "number",
+                    "backends": ["pymeshlab_isotropic", "cgal_isotropic"],
                 }),
                 "iterations": ("INT", {
                     "default": 3,
                     "min": 1,
                     "max": 20,
-                    "step": 1
+                    "step": 1,
+                    "backends": ["pymeshlab_isotropic", "cgal_isotropic"],
                 }),
                 # CGAL-specific
-                "protect_boundaries": (["true", "false"], {"default": "true"}),
+                "protect_boundaries": (["true", "false"], {
+                    "default": "true",
+                    "backends": ["cgal_isotropic"],
+                }),
                 # Blender voxel
                 "voxel_size": ("FLOAT", {
                     "default": 1,
                     "min": 0.001,
                     "max": 1.0,
                     "step": 0.01,
-                    "display": "number"
+                    "display": "number",
+                    "backends": ["blender_voxel"],
                 }),
-                # Quadriflow/Instant Meshes
+                # CuMesh / Quadriflow
                 "target_face_count": ("INT", {
-                    "default": 10000,
-                    "min": 100,
-                    "max": 1000000,
-                    "step": 100
+                    "default": 500000,
+                    "min": 1000,
+                    "max": 5000000,
+                    "step": 1000,
+                    "backends": ["cumesh", "blender_quadriflow"],
                 }),
+                # CuMesh specific (matches TRELLIS2)
+                "remesh_band": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.1,
+                    "backends": ["cumesh"],
+                }),
+                # Instant Meshes specific
                 "target_vertex_count": ("INT", {
                     "default": 5000,
                     "min": 100,
                     "max": 1000000,
-                    "step": 100
+                    "step": 100,
+                    "backends": ["instant_meshes"],
                 }),
-                # Instant Meshes specific
-                "deterministic": (["true", "false"], {"default": "true"}),
+                "deterministic": (["true", "false"], {
+                    "default": "true",
+                    "backends": ["instant_meshes"],
+                }),
                 "crease_angle": ("FLOAT", {
                     "default": 0.0,
                     "min": 0.0,
                     "max": 180.0,
-                    "step": 1.0
+                    "step": 1.0,
+                    "backends": ["instant_meshes"],
                 }),
             }
         }
@@ -94,8 +116,9 @@ class RemeshNode:
     CATEGORY = "geompack/remeshing"
 
     def remesh(self, trimesh, backend, target_edge_length=0.05, iterations=3,
-               protect_boundaries="true", voxel_size=0.02, target_face_count=10000,
-               target_vertex_count=5000, deterministic="true", crease_angle=0.0):
+               protect_boundaries="true", voxel_size=0.02, target_face_count=500000,
+               target_vertex_count=5000, deterministic="true", crease_angle=0.0,
+               remesh_band=1.0):
         """
         Apply remeshing based on selected backend.
 
@@ -110,8 +133,23 @@ class RemeshNode:
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        print(f"[Remesh] Input: {initial_vertices} vertices, {initial_faces} faces")
+        # Log backend and parameters
+        print(f"\n{'='*60}")
         print(f"[Remesh] Backend: {backend}")
+        print(f"[Remesh] Input: {initial_vertices:,} vertices, {initial_faces:,} faces")
+        if backend == "pymeshlab_isotropic":
+            print(f"[Remesh] Parameters: target_edge_length={target_edge_length}, iterations={iterations}")
+        elif backend == "cgal_isotropic":
+            print(f"[Remesh] Parameters: target_edge_length={target_edge_length}, iterations={iterations}, protect_boundaries={protect_boundaries}")
+        elif backend == "blender_voxel":
+            print(f"[Remesh] Parameters: voxel_size={voxel_size}")
+        elif backend == "blender_quadriflow":
+            print(f"[Remesh] Parameters: target_face_count={target_face_count:,}")
+        elif backend == "instant_meshes":
+            print(f"[Remesh] Parameters: target_vertex_count={target_vertex_count:,}, deterministic={deterministic}, crease_angle={crease_angle}")
+        elif backend == "cumesh":
+            print(f"[Remesh] Parameters: target_face_count={target_face_count:,}, remesh_band={remesh_band}")
+        print(f"{'='*60}\n")
 
         if backend == "pymeshlab_isotropic":
             remeshed_mesh, info = self._pymeshlab_isotropic(
@@ -128,6 +166,10 @@ class RemeshNode:
         elif backend == "instant_meshes":
             remeshed_mesh, info = self._instant_meshes(
                 trimesh, target_vertex_count, deterministic, crease_angle
+            )
+        elif backend == "cumesh":
+            remeshed_mesh, info = self._cumesh(
+                trimesh, remesh_band, target_face_count
             )
         else:
             raise ValueError(f"Unknown backend: {backend}")
@@ -358,5 +400,76 @@ After:
   Faces: {len(remeshed_mesh.faces):,}
 
 Instant Meshes creates flow-aligned quad meshes.
+"""
+        return remeshed_mesh, info
+
+    def _cumesh(self, trimesh, remesh_band, target_face_count):
+        """CuMesh GPU dual-contouring remeshing (same algorithm as TRELLIS2)."""
+        import torch
+        import cumesh as CuMesh
+
+        # Hardcoded resolution = 512 (same as TRELLIS2)
+        grid_resolution = 512
+
+        remeshed_mesh, error = mesh_ops.cumesh_dc_remesh(
+            trimesh, grid_resolution, fill_holes_first=False, band=remesh_band
+        )
+        if remeshed_mesh is None:
+            raise ValueError(f"CuMesh remeshing failed: {error}")
+
+        # Simplify to target face count
+        pre_simplify_faces = len(remeshed_mesh.faces)
+        vertices = torch.tensor(remeshed_mesh.vertices, dtype=torch.float32).cuda()
+        faces = torch.tensor(remeshed_mesh.faces, dtype=torch.int32).cuda()
+
+        cumesh_obj = CuMesh.CuMesh()
+        cumesh_obj.init(vertices, faces)
+
+        # Skip pre-simplify unify on large meshes - CuMesh crashes on >2M faces
+        # TRELLIS2 does unify here, but their mesh comes from a different path
+        if len(faces) < 2_000_000:
+            cumesh_obj.unify_face_orientations()
+            print(f"[Remesh] Unified face orientations (pre-simplify)")
+        else:
+            print(f"[Remesh] Skipping pre-simplify unify (mesh too large: {len(faces):,} faces)")
+
+        # Simplify to target
+        cumesh_obj.simplify(target_face_count, verbose=True)
+        print(f"[Remesh] After simplify: {cumesh_obj.num_faces:,} faces")
+
+        # Unify after simplify (on smaller mesh, should work)
+        cumesh_obj.unify_face_orientations()
+        print(f"[Remesh] Unified face orientations (post-simplify)")
+
+        final_verts, final_faces = cumesh_obj.read()
+        remeshed_mesh = trimesh_module.Trimesh(
+            vertices=final_verts.cpu().numpy(),
+            faces=final_faces.cpu().numpy(),
+            process=False
+        )
+
+        # Preserve metadata
+        remeshed_mesh.metadata = trimesh.metadata.copy()
+        remeshed_mesh.metadata['remeshing'] = {
+            'algorithm': 'cumesh',
+            'remesh_band': remesh_band,
+            'target_face_count': target_face_count,
+            'original_vertices': len(trimesh.vertices),
+            'original_faces': len(trimesh.faces)
+        }
+
+        info = f"""Remesh Results (CuMesh):
+
+Band Width: {remesh_band}
+Target Face Count: {target_face_count:,}
+
+Before:
+  Vertices: {len(trimesh.vertices):,}
+  Faces: {len(trimesh.faces):,}
+
+After Remesh: {pre_simplify_faces:,} faces
+After Simplify: {len(remeshed_mesh.faces):,} faces
+
+GPU-accelerated dual contouring (same algorithm as TRELLIS2).
 """
         return remeshed_mesh, info
