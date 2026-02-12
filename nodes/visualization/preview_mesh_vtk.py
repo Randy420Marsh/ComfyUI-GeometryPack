@@ -60,12 +60,18 @@ class PreviewMeshVTKNode:
         - texture: Textured mesh visualization with materials (GLB export)
 
         Args:
-            trimesh: Input trimesh_module.Trimesh object
+            trimesh: Input trimesh_module.Trimesh object or VOXEL_GRID tensor
             mode: Visualization mode - "fields" or "texture"
 
         Returns:
             dict: UI data for frontend widget
         """
+        # Handle VOXEL_GRID input (trimesh.VoxelGrid from MeshToVoxel node)
+        if hasattr(trimesh, 'as_boxes'):  # It's a trimesh.VoxelGrid
+            voxel_shape = trimesh.matrix.shape
+            trimesh = trimesh.as_boxes()
+            print(f"[PreviewMeshVTK] Converted voxel grid {voxel_shape} to box mesh: {len(trimesh.vertices)} vertices")
+
         print(f"[PreviewMeshVTK] Preparing preview: {get_geometry_type(trimesh)} - {len(trimesh.vertices)} vertices, {get_face_count(trimesh)} faces")
 
         # Check for scalar fields (vertex/face attributes)
