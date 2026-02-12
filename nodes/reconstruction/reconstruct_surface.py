@@ -8,6 +8,13 @@ Surface Reconstruction Node - Point cloud to mesh conversion
 import numpy as np
 import trimesh as trimesh_module
 
+# ComfyUI progress reporting
+try:
+    from comfy.utils import ProgressBar
+    PROGRESS_AVAILABLE = True
+except ImportError:
+    PROGRESS_AVAILABLE = False
+
 
 class ReconstructSurfaceNode:
     """
@@ -110,13 +117,15 @@ class ReconstructSurfaceNode:
             normals = points.vertex_normals
             print(f"[Reconstruct] Using normals from input")
 
-        # Check if this is a point cloud (from MeshToPointCloud node)
+        # Check if this is a point cloud
         is_point_cloud = False
-        if hasattr(points, 'metadata') and points.metadata.get('is_point_cloud', False):
+        face_count = len(points.faces) if hasattr(points, 'faces') and points.faces is not None else 0
+
+        if face_count == 0 or (hasattr(points, 'metadata') and points.metadata.get('is_point_cloud', False)):
             is_point_cloud = True
-            print(f"[Reconstruct] Input type: Point cloud (TRIMESH with {len(vertices)} points, 0 faces)")
+            print(f"[Reconstruct] Input type: Point cloud ({len(vertices)} points)")
         else:
-            print(f"[Reconstruct] Input type: TRIMESH ({len(vertices)} vertices, {len(points.faces)} faces)")
+            print(f"[Reconstruct] Input type: TRIMESH ({len(vertices)} vertices, {face_count} faces)")
 
         print(f"[Reconstruct] Method: {method}")
 
@@ -155,37 +164,49 @@ class ReconstructSurfaceNode:
 
     def _poisson(self, vertices, normals, depth, scale, estimate_normals, normal_radius):
         """Poisson surface reconstruction using Open3D or PyMeshLab."""
+        # Set up progress bar (5 steps for Open3D path)
+        pbar = ProgressBar(5) if PROGRESS_AVAILABLE else None
+
         # Try Open3D first
         try:
             import open3d as o3d
 
             print(f"[Reconstruct] Using Open3D Poisson reconstruction...")
+            print(f"[Reconstruct] Step 1/5: Creating point cloud...")
 
             # Create point cloud
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(vertices)
+            if pbar: pbar.update(1)
 
             # Estimate normals if needed
+            print(f"[Reconstruct] Step 2/5: Estimating normals...")
             if normals is None or estimate_normals:
                 pcd.estimate_normals(
                     search_param=o3d.geometry.KDTreeSearchParamHybrid(
                         radius=normal_radius, max_nn=30
                     )
                 )
+                print(f"[Reconstruct] Step 3/5: Orienting normals...")
                 pcd.orient_normals_consistent_tangent_plane(k=10)
             else:
                 pcd.normals = o3d.utility.Vector3dVector(normals)
+            if pbar: pbar.update(1)
 
             # Poisson reconstruction
+            print(f"[Reconstruct] Step 4/5: Running Poisson reconstruction (depth={depth})... This may take a while.")
             mesh_o3d, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
                 pcd, depth=depth, scale=scale, linear_fit=False
             )
+            if pbar: pbar.update(1)
 
             # Remove low density vertices (noise)
+            print(f"[Reconstruct] Step 5/5: Cleaning up mesh...")
             densities = np.asarray(densities)
             density_threshold = np.quantile(densities, 0.01)
             vertices_to_remove = densities < density_threshold
             mesh_o3d.remove_vertices_by_mask(vertices_to_remove)
+            if pbar: pbar.update(1)
 
             # Convert to trimesh
             result = trimesh_module.Trimesh(
@@ -193,6 +214,9 @@ class ReconstructSurfaceNode:
                 faces=np.asarray(mesh_o3d.triangles),
                 process=False
             )
+
+            if pbar: pbar.update(1)
+            print(f"[Reconstruct] Done! Output: {len(result.vertices):,} vertices, {len(result.faces):,} faces")
 
             info = f"""Reconstruct Surface Results (Poisson):
 
@@ -211,7 +235,7 @@ Poisson reconstruction creates smooth, watertight surfaces.
             return result, info
 
         except ImportError:
-            pass
+            if pbar: pbar.update(5)  # Skip to end if Open3D not available
 
         # Fallback to PyMeshLab
         try:
