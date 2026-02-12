@@ -583,13 +583,6 @@
                     const input = mapper?.getInputData();
 
                     const numPoints = input?.getNumberOfPoints() || 0;
-                        points: numPoints,
-                        hasDiffuseTexture: property ? !!property.getDiffuseTexture() : false,
-                        hasMapper: !!mapper,
-                        hasProperty: !!property,
-                        visibility: actor.getVisibility(),
-                        opacity: property?.getOpacity()
-                    });
 
                     // Skip actors with no geometry - they serve no purpose and may cause rendering issues
                     if (numPoints === 0) {
@@ -1344,46 +1337,7 @@
         });
 
 
-        // Debug: Check if edges button is visible
-        setTimeout(() => {
-            const showEdgesCheckbox = document.getElementById('showEdges');
-            const controlsDiv = document.getElementById('controls');
-            const bodyEl = document.body;
-
-
-            if (showEdgesCheckbox) {
-                const rect = showEdgesCheckbox.getBoundingClientRect();
-                const computedStyle = window.getComputedStyle(showEdgesCheckbox);
-                const parentStyle = window.getComputedStyle(controlsDiv);
-
-                    top: rect.top,
-                    left: rect.left,
-                    width: rect.width,
-                    height: rect.height,
-                    bottom: rect.bottom,
-                    right: rect.right
-                });
-                    display: computedStyle.display,
-                    visibility: computedStyle.visibility,
-                    opacity: computedStyle.opacity,
-                    position: computedStyle.position
-                });
-                    display: parentStyle.display,
-                    visibility: parentStyle.visibility,
-                    position: parentStyle.position,
-                    bottom: parentStyle.bottom,
-                    height: parentStyle.height
-                });
-                    bodyHeight: bodyEl.offsetHeight,
-                    bodyScrollHeight: bodyEl.scrollHeight,
-                    windowHeight: window.innerHeight,
-                    viewportHeight: document.documentElement.clientHeight
-                });
-                    rect.top >= 0 && rect.bottom <= window.innerHeight);
-            } else {
-                console.error('[GeomPack VTK Dual Viewer] DEBUG - Edges checkbox NOT FOUND!');
-            }
-        }, 1000);
+        console.log('[GeomPack VTK Dual Textured Viewer] Ready');
     </script>
 </body>
 </html>

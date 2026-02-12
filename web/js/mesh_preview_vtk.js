@@ -36,6 +36,7 @@ app.registerExtension({
 
                 // Point to VTK.js HTML viewer (with cache buster)
                 // Note: viewer will be dynamically switched based on mode in onExecuted
+                // Use unified v2 viewer with modular architecture
                 iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_vtk.html?v=" + Date.now();
 
                 // Track current viewer type to avoid unnecessary reloads
@@ -145,7 +146,7 @@ app.registerExtension({
                         const viewerType = message.viewer_type?.[0] || "fields";
                         const mode = message.mode?.[0] || "fields";
 
-                        // Determine which viewer HTML to use
+                        // Determine which viewer HTML to use (unified v2 viewers)
                         const viewerUrl = viewerType === "texture"
                             ? "/extensions/ComfyUI-GeometryPack/viewer_vtk_textured.html"
                             : "/extensions/ComfyUI-GeometryPack/viewer_vtk.html";

@@ -36,6 +36,7 @@ app.registerExtension({
                 iframe.style.backgroundColor = "#2a2a2a";
 
                 // Point to VTK.js textured HTML viewer (with cache buster)
+                // Use unified v2 viewer with modular architecture
                 iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_vtk_textured.html?v=" + Date.now();
 
                 // Create mesh info panel

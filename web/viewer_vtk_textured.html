@@ -2,73 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>GeomPack VTK.js Textured Viewer</title>
+    <title>GeomPack VTK.js Textured Viewer (Unified)</title>
+    <link rel="stylesheet" href="/extensions/ComfyUI-GeometryPack/js/viewer/ui/styles.css">
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: #2a2a2a;
-            font-family: monospace;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-        #viewerContainer {
-            flex: 1;
-            position: relative;
-            min-height: 0;
-        }
-        #container {
-            width: 100%;
-            height: 100%;
-            position: relative;
-        }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 14px;
-            text-align: center;
-            z-index: 1000;
-            pointer-events: none;
-        }
-        #controls {
-            background: #1a1a1a;
-            border-top: 1px solid #444;
-            padding: 8px 12px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-            font-size: 12px;
-            color: #ccc;
-        }
-        #controls label {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        #controls select, #controls button {
-            background: #333;
-            color: #ccc;
-            border: 1px solid #555;
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            font-family: monospace;
-        }
-        #controls button {
-            cursor: pointer;
-        }
-        #controls button:hover {
-            background: #444;
-        }
-        #controls input[type="checkbox"] {
-            cursor: pointer;
-        }
-        /* Info panel */
+        /* Minimal overrides for textured viewer */
         #infoPanel {
             position: absolute;
             top: 10px;
@@ -83,112 +20,18 @@
         #infoPanel div {
             margin: 2px 0;
         }
-        .info-label {
-            color: #888;
-        }
-        .info-value {
-            color: #4fc3f7;
-        }
-        .info-warning {
-            color: #ffb74d;
-        }
-        /* Settings panel */
-        #settingsPanel {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #1a1a1a;
-            border: 1px solid #555;
-            border-radius: 6px;
-            padding: 16px;
-            z-index: 2000;
-            display: none;
-            min-width: 280px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        }
-        #settingsPanel.visible {
-            display: block;
-        }
-        #settingsPanel h3 {
-            margin: 0 0 12px 0;
-            color: #ccc;
-            font-size: 14px;
-            font-weight: normal;
-            border-bottom: 1px solid #333;
-            padding-bottom: 8px;
-        }
-        #settingsPanel .setting-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-        #settingsPanel .setting-row label {
-            flex: 0 0 100px;
-            color: #ccc;
-            font-size: 12px;
-        }
-        #settingsPanel .setting-row input[type="number"] {
-            flex: 1;
-            background: #333;
-            color: #ccc;
-            border: 1px solid #555;
-            padding: 6px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            font-family: monospace;
-        }
-        #settingsPanel .setting-row select {
-            flex: 1;
-            background: #333;
-            color: #ccc;
-            border: 1px solid #555;
-            padding: 6px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-        }
-        #settingsPanel .button-row {
-            display: flex;
-            gap: 8px;
-            margin-top: 16px;
-            padding-top: 12px;
-            border-top: 1px solid #333;
-        }
-        #settingsPanel .button-row button {
-            flex: 1;
-            padding: 6px 12px;
-            font-size: 12px;
-        }
-        #settingsOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1999;
-            display: none;
-        }
-        #settingsOverlay.visible {
-            display: block;
-        }
-        #settingsButton {
-            background: #333;
-            width: 32px;
-            height: 32px;
-            padding: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-        }
+        .info-label { color: #888; }
+        .info-value { color: #4fc3f7; }
+        .info-warning { color: #ffb74d; }
     </style>
 </head>
 <body>
     <div id="viewerContainer">
         <div id="container"></div>
-        <div id="loading">Ready to load textured mesh</div>
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <div class="loading-text">Ready to load textured mesh</div>
+        </div>
 
         <!-- Info panel for texture/material status -->
         <div id="infoPanel" style="display: none;">
@@ -197,352 +40,161 @@
             <div><span class="info-label">Materials:</span> <span id="infoMaterial" class="info-value">-</span></div>
             <div id="warningRow" style="display: none;"><span class="info-warning">PBR requires WebGPU</span></div>
         </div>
-
-        <!-- Settings overlay and panel -->
-        <div id="settingsOverlay"></div>
-        <div id="settingsPanel">
-            <h3>Appearance Settings</h3>
-            <div class="setting-row">
-                <label>Opacity:</label>
-                <input type="number" id="opacity" min="0" max="1" step="0.1" value="1.0">
-            </div>
-            <div class="setting-row">
-                <label>Render Mode:</label>
-                <select id="representationSettings">
-                    <option value="2">Surface</option>
-                    <option value="1">Wireframe</option>
-                    <option value="0">Points</option>
-                </select>
-            </div>
-            <div class="setting-row">
-                <label>
-                    <input type="checkbox" id="parallelProjection"> Parallel Projection
-                </label>
-            </div>
-            <div class="button-row">
-                <button id="applySettings">Apply</button>
-                <button id="cancelSettings">Cancel</button>
-            </div>
-        </div>
     </div>
+
     <div id="controls">
         <!-- Settings button -->
-        <button id="settingsButton" title="Appearance Settings">⚙</button>
+        <button id="settingsButton" class="settings-button" title="Appearance Settings">⚙</button>
 
-        <label style="width: 1px; height: 20px; background: #444; margin: 0 8px;"></label>
+        <span class="control-separator"></span>
 
-        <label>
+        <label class="control-label">
             <input type="checkbox" id="showEdges"> Edges
         </label>
 
-        <label style="width: 1px; height: 20px; background: #444; margin: 0 8px;"></label>
+        <span class="control-separator"></span>
 
         <!-- Camera view buttons -->
-        <button id="viewPosX">+X</button>
-        <button id="viewNegX">-X</button>
-        <button id="viewPosY">+Y</button>
-        <button id="viewNegY">-Y</button>
-        <button id="viewPosZ">+Z</button>
-        <button id="viewNegZ">-Z</button>
+        <button class="view-button" data-view="+X">+X</button>
+        <button class="view-button" data-view="-X">-X</button>
+        <button class="view-button" data-view="+Y">+Y</button>
+        <button class="view-button" data-view="-Y">-Y</button>
+        <button class="view-button" data-view="+Z">+Z</button>
+        <button class="view-button" data-view="-Z">-Z</button>
 
-        <label style="width: 1px; height: 20px; background: #444; margin: 0 8px;"></label>
+        <span class="control-separator"></span>
 
         <button id="screenshot">Screenshot</button>
-        <button id="saveMesh" style="background: #2a5a2a;">Save GLB</button>
+        <button id="saveMesh" class="save-button">Save GLB</button>
     </div>
 
-    <!-- Load local VTK.js bundle with GLTFImporter support -->
+    <!-- Settings overlay and panel -->
+    <div id="settingsOverlay" class="settings-overlay"></div>
+    <div id="settingsPanel" class="settings-panel">
+        <h3>Appearance Settings</h3>
+        <div class="setting-row">
+            <label>Opacity:</label>
+            <input type="number" id="opacity" min="0" max="1" step="0.1" value="1.0">
+        </div>
+        <div class="setting-row">
+            <label>Render Mode:</label>
+            <select id="representationSettings">
+                <option value="2">Surface</option>
+                <option value="1">Wireframe</option>
+                <option value="0">Points</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <label>
+                <input type="checkbox" id="parallelProjection"> Parallel Projection
+            </label>
+        </div>
+        <div class="button-row">
+            <button id="applySettings">Apply</button>
+            <button id="cancelSettings">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Load VTK.js bundle with GLTFImporter support -->
     <script src="/extensions/ComfyUI-GeometryPack/js/vtk-gltf.js"></script>
+    <!-- Load unified viewer bundle -->
+    <script src="/extensions/ComfyUI-GeometryPack/js/viewer-bundle.js"></script>
 
     <script>
-        // Get VTK.js classes from global vtk object (UMD bundle)
-        const vtkFullScreenRenderWindow = vtk.Rendering.Misc.vtkFullScreenRenderWindow;
-        const vtkActor = vtk.Rendering.Core.vtkActor;
-        const vtkMapper = vtk.Rendering.Core.vtkMapper;
-        const vtkAnnotatedCubeActor = vtk.Rendering.Core.vtkAnnotatedCubeActor;
-        const vtkInteractorStyleTrackballCamera = vtk.Interaction.Style.vtkInteractorStyleTrackballCamera;
-        const vtkOrientationMarkerWidget = vtk.Interaction.Widgets.vtkOrientationMarkerWidget;
+        // Use the unified viewer module
+        const {
+            CameraController,
+            ActorManager,
+            TextureManager,
+            ScreenshotCapture,
+            AxisIndicator,
+            loadMesh,
+            detectFormat,
+            sendMeshLoaded,
+            sendError,
+            extractFilename,
+            getCenter,
+            getMaxDimension,
+            isValidBounds,
+            rgbToString
+        } = window.GeomPackViewer;
 
-        // GLTF Importer for textured meshes
-        const vtkGLTFImporter = vtk.IO.Geometry.vtkGLTFImporter;
-        const gltfSupported = vtk._gltfAvailable && vtkGLTFImporter !== null;
-
-        // Fallback loaders
-        const vtkSTLReader = vtk.IO.Geometry.vtkSTLReader;
-        const vtkOBJReader = vtk.IO.Misc.vtkOBJReader;
-        const vtkPolyDataNormals = vtk.Filters.Core.vtkPolyDataNormals;
-
-
-        // Helper function to convert RGB values (0-1 range) to RGB string
-        function createRGBStringFromRGBValues(r, g, b) {
-            const r255 = Math.round(r * 255);
-            const g255 = Math.round(g * 255);
-            const b255 = Math.round(b * 255);
-            return `rgb(${r255}, ${g255}, ${b255})`;
-        }
-
+        // DOM elements
         const loading = document.getElementById('loading');
+        const loadingText = loading.querySelector('.loading-text');
         const container = document.getElementById('container');
         const infoPanel = document.getElementById('infoPanel');
 
-        // Create full screen renderer
-        const fullScreenRenderer = vtkFullScreenRenderWindow.newInstance({
-            background: [0.16, 0.16, 0.16],  // #2a2a2a
-            container: container,
-        });
+        // VTK setup
+        const vtkRenderWindow = vtk.Rendering.Core.vtkRenderWindow;
+        const vtkRenderer = vtk.Rendering.Core.vtkRenderer;
+        const vtkOpenGLRenderWindow = vtk.Rendering.OpenGL.vtkRenderWindow;
+        const vtkRenderWindowInteractor = vtk.Rendering.Core.vtkRenderWindowInteractor;
+        const vtkInteractorStyleTrackballCamera = vtk.Interaction.Style.vtkInteractorStyleTrackballCamera;
 
-        // Immediately resize to ensure canvas has correct dimensions
-        fullScreenRenderer.resize();
-
-        const renderer = fullScreenRenderer.getRenderer();
-        const renderWindow = fullScreenRenderer.getRenderWindow();
-        const interactor = renderWindow.getInteractor();
-
-        // Ensure proper lighting for texture visibility
+        // Create render window
+        const renderWindow = vtkRenderWindow.newInstance();
+        const renderer = vtkRenderer.newInstance();
+        renderer.setBackground(0.16, 0.16, 0.16);
         renderer.setTwoSidedLighting(true);
         renderer.setUseShadows(false);
+        renderWindow.addRenderer(renderer);
 
-        // Set up trackball camera controls
+        // Create OpenGL view
+        const openGLRenderWindow = vtkOpenGLRenderWindow.newInstance();
+        openGLRenderWindow.setContainer(container);
+        renderWindow.addView(openGLRenderWindow);
+
+        // Resize to container
+        const { width, height } = container.getBoundingClientRect();
+        openGLRenderWindow.setSize(width, height);
+
+        // Create interactor
+        const interactor = vtkRenderWindowInteractor.newInstance();
+        interactor.setView(openGLRenderWindow);
+        interactor.initialize();
+        interactor.bindEvents(container);
+
         const interactorStyle = vtkInteractorStyleTrackballCamera.newInstance();
         interactor.setInteractorStyle(interactorStyle);
 
-        // Store actors for GLTF scenes (may have multiple)
+        // Initialize modules
+        const cameraController = new CameraController(renderer, renderWindow, {
+            distanceMultiplier: 2.0  // Closer for texture detail
+        });
+
+        const actorManager = new ActorManager(renderWindow);
+
+        const textureManager = new TextureManager(vtk, renderWindow);
+        const screenshotCapture = new ScreenshotCapture(renderWindow);
+
+        // Create axis indicator
+        const axisIndicator = new AxisIndicator(vtk, interactor, {
+            enabled: true,
+            corner: 'BOTTOM_LEFT'
+        });
+
+        // State
         let currentActors = [];
-        let currentFilename = null;
         let meshBounds = null;
+        let currentFilename = null;
 
-        // Create axis orientation widget
-        const axes = vtkAnnotatedCubeActor.newInstance();
-        axes.setDefaultStyle({
-            text: '+X',
-            fontStyle: 'bold',
-            fontFamily: 'Arial',
-            fontColor: 'white',
-            fontSizeScale: (res) => res / 2,
-            faceColor: createRGBStringFromRGBValues(0.5, 0.5, 0.5),
-            faceRotation: 0,
-            edgeThickness: 0.1,
-            edgeColor: 'white',
-            resolution: 400,
-        });
+        // Check GLTF support
+        const gltfSupported = vtk._gltfAvailable && vtk.IO.Geometry.vtkGLTFImporter !== null;
 
-        // Customize each face
-        axes.setXPlusFaceProperty({ text: '+X', faceColor: '#ff5555' });
-        axes.setXMinusFaceProperty({ text: '-X', faceColor: '#ff5555' });
-        axes.setYPlusFaceProperty({ text: '+Y', faceColor: '#55ff55' });
-        axes.setYMinusFaceProperty({ text: '-Y', faceColor: '#55ff55' });
-        axes.setZPlusFaceProperty({ text: '+Z', faceColor: '#5555ff' });
-        axes.setZMinusFaceProperty({ text: '-Z', faceColor: '#5555ff' });
+        // Show loading
+        function showLoading(show, text = 'Loading textured mesh...') {
+            loading.style.display = show ? 'flex' : 'none';
+            loadingText.textContent = text;
+        }
 
-        const orientationWidget = vtkOrientationMarkerWidget.newInstance({
-            actor: axes,
-            interactor: renderWindow.getInteractor(),
-        });
-        orientationWidget.setEnabled(true);
-        orientationWidget.setViewportCorner(vtkOrientationMarkerWidget.Corners.BOTTOM_LEFT);
-        orientationWidget.setViewportSize(0.15);
-        orientationWidget.setMinPixelSize(100);
-        orientationWidget.setMaxPixelSize(300);
-
-        // Load GLTF/GLB mesh
-        async function loadGLTFMesh(filepath) {
-            loading.textContent = 'Loading textured mesh...';
-            loading.style.display = 'block';
+        // Load mesh function
+        async function loadTexturedMesh(filepath, metadata = {}) {
+            showLoading(true, 'Loading textured mesh...');
 
             // Extract filename
             const urlParams = new URLSearchParams(filepath.split('?')[1] || '');
             currentFilename = urlParams.get('filename') || filepath.split('/').pop().split('?')[0];
-
-            try {
-                if (!gltfSupported || !vtkGLTFImporter) {
-                    throw new Error('GLTFImporter not available in this VTK.js version');
-                }
-
-                // Clear previous actors FIRST
-                currentActors.forEach(actor => renderer.removeActor(actor));
-                currentActors = [];
-
-                const importer = vtkGLTFImporter.newInstance();
-
-                // Set the renderer FIRST - importActors() needs this to add actors
-                importer.setRenderer(renderer);
-
-                // Set the URL
-                importer.setUrl(filepath);
-
-                // Wait for GLTF parsing to complete using onReady callback
-                await new Promise((resolve, reject) => {
-                    importer.onReady(() => {
-                        resolve();
-                    });
-
-                    // Start loading (this triggers parsing)
-                    importer.loadData().catch(reject);
-                });
-
-
-                // Debug: Check internal GLTF model state
-                const state = importer.getState();
-                if (state.glTFTree?.json) {
-                    const json = state.glTFTree.json;
-                }
-
-                // Now import actors (creates VTK actors and adds them to renderer)
-                importer.importActors();
-
-                // Get actors from the importer (returns Map<string, vtkActor>)
-                const actorsMap = importer.getActors();
-                const actors = Array.from(actorsMap.values());
-
-                // Process actors and apply texture fixes
-                actors.forEach((actor, index) => {
-                    currentActors.push(actor);
-
-                    const mapper = actor.getMapper();
-                    const property = actor.getProperty();
-                    const input = mapper?.getInputData();
-
-                    if (input && input.getNumberOfPoints() > 0) {
-                        if (property) {
-                            // CRITICAL FIX: Remove metallicRoughnessTexture if present
-                            // VTK.js GLTFImporter may use this instead of baseColorTexture
-                            if (typeof property.setRMTexture === 'function') {
-                                property.setRMTexture(null);
-                            }
-                            if (typeof property.setMetallicRoughnessTexture === 'function') {
-                                property.setMetallicRoughnessTexture(null);
-                            }
-
-                            // Try multiple methods to get the base color texture
-                            let texture = null;
-                            if (typeof property.getBaseColorTexture === 'function') {
-                                texture = property.getBaseColorTexture();
-                            }
-                            if (!texture && typeof property.getDiffuseTexture === 'function') {
-                                texture = property.getDiffuseTexture();
-                            }
-                            if (!texture && typeof property.getTexture === 'function') {
-                                texture = property.getTexture();
-                            }
-
-                            if (texture) {
-                                actor.addTexture(texture);
-                            }
-
-                            // Set material to non-metallic for proper texture display
-                            property.setMetallic(0.0);
-                            property.setRoughness(1.0);
-                            property.setInterpolation(2);
-                        }
-
-                        // Configure mapper for texture rendering
-                        if (mapper) {
-                            mapper.setScalarVisibility(false);
-                            mapper.modified();
-                        }
-                    }
-                });
-
-                // Render with updated materials and textures
-                renderWindow.render();
-
-                // Get scene bounds
-                if (actors.length > 0) {
-                    // Calculate combined bounds from all actors
-                    let minBounds = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
-                    actors.forEach(actor => {
-                        const bounds = actor.getBounds();
-                        minBounds[0] = Math.min(minBounds[0], bounds[0]);
-                        minBounds[1] = Math.max(minBounds[1], bounds[1]);
-                        minBounds[2] = Math.min(minBounds[2], bounds[2]);
-                        minBounds[3] = Math.max(minBounds[3], bounds[3]);
-                        minBounds[4] = Math.min(minBounds[4], bounds[4]);
-                        minBounds[5] = Math.max(minBounds[5], bounds[5]);
-                    });
-                    meshBounds = minBounds;
-                }
-
-                // Reset camera to fit scene
-                renderer.resetCamera();
-                renderWindow.render();
-
-                // Force a second render after a brief delay
-                setTimeout(() => {
-                    renderer.resetCamera();
-                    renderWindow.render();
-                }, 100);
-
-                loading.style.display = 'none';
-
-                return true;
-            } catch (error) {
-                console.error('[GeomPack VTK Textured] GLTF loading failed:', error);
-                loading.textContent = 'GLTF loading failed: ' + error.message;
-
-                // Try fallback to fetch as binary and parse
-                if (error.message.includes('not available')) {
-                    loading.textContent = 'GLTFImporter not available. PBR/Texture support requires newer VTK.js with WebGPU.';
-                }
-
-                return false;
-            }
-        }
-
-        // Fallback loader for OBJ files
-        async function loadOBJMesh(filepath) {
-            loading.textContent = 'Loading mesh (fallback OBJ)...';
-
-            try {
-                if (!vtkOBJReader) {
-                    throw new Error('OBJ reader not available');
-                }
-
-                const response = await fetch(filepath);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const text = await response.text();
-
-                // Clear previous actors
-                currentActors.forEach(actor => renderer.removeActor(actor));
-                currentActors = [];
-
-                const reader = vtkOBJReader.newInstance();
-                reader.parseAsText(text);
-
-                const actor = vtkActor.newInstance();
-                const mapper = vtkMapper.newInstance();
-
-                mapper.setInputConnection(reader.getOutputPort());
-                actor.setMapper(mapper);
-
-                // Set default appearance
-                const property = actor.getProperty();
-                property.setColor(0.8, 0.8, 0.8);
-                property.setAmbient(0.3);
-                property.setDiffuse(0.7);
-                property.setSpecular(0.2);
-
-                renderer.addActor(actor);
-                currentActors.push(actor);
-
-                meshBounds = reader.getOutputData().getBounds();
-
-                renderer.resetCamera();
-                renderWindow.render();
-
-                loading.style.display = 'none';
-                return true;
-            } catch (error) {
-                console.error('[GeomPack VTK Textured] OBJ fallback failed:', error);
-                loading.textContent = 'Failed to load mesh: ' + error.message;
-                return false;
-            }
-        }
-
-        // Main load function
-        async function loadMesh(filepath, metadata = {}) {
 
             // Update info panel
             if (metadata.visual_kind) {
@@ -556,91 +208,97 @@
             }
             infoPanel.style.display = 'block';
 
-            // Show WebGPU warning if we have textures but no GLTF support
+            // Show warning if textures but no GLTF support
             if (!gltfSupported && metadata.has_texture) {
                 document.getElementById('warningRow').style.display = 'block';
             }
 
-            // Determine file type
-            const isGLB = filepath.includes('.glb') || filepath.includes('.gltf');
-            const isOBJ = filepath.includes('.obj');
+            try {
+                // Clear previous actors
+                currentActors.forEach(actor => renderer.removeActor(actor));
+                currentActors = [];
 
-            let success = false;
+                // Load mesh using unified loader
+                const result = await loadMesh(filepath, vtk, {
+                    renderer: renderer,
+                    withTextures: true,
+                    twoSidedLighting: true
+                });
 
-            if (isGLB) {
-                success = await loadGLTFMesh(filepath);
-                if (!success && isOBJ) {
-                    // If GLB failed and we have OBJ fallback
-                    success = await loadOBJMesh(filepath);
+                currentActors = result.actors;
+
+                // Add actors to renderer (if not already added by GLTF loader)
+                result.actors.forEach(actor => {
+                    if (!renderer.getActors().includes(actor)) {
+                        renderer.addActor(actor);
+                    }
+                });
+
+                // Apply texture fixes
+                if (result.hasTexture || result.format === 'GLTF' || result.format === 'GLB') {
+                    textureManager.applyTextureFixesMultiple(result.actors);
+                    textureManager.configureRenderer(renderer);
                 }
-            } else if (isOBJ) {
-                success = await loadOBJMesh(filepath);
-            } else {
-                loading.textContent = 'Unsupported file format. Use GLB or OBJ.';
-            }
 
-            return success;
+                // Calculate bounds
+                if (result.actors.length > 0) {
+                    meshBounds = result.actors[0].getBounds();
+                    for (let i = 1; i < result.actors.length; i++) {
+                        const b = result.actors[i].getBounds();
+                        meshBounds = [
+                            Math.min(meshBounds[0], b[0]),
+                            Math.max(meshBounds[1], b[1]),
+                            Math.min(meshBounds[2], b[2]),
+                            Math.max(meshBounds[3], b[3]),
+                            Math.min(meshBounds[4], b[4]),
+                            Math.max(meshBounds[5], b[5])
+                        ];
+                    }
+                }
+
+                // Position camera
+                renderer.resetCamera();
+                renderWindow.render();
+
+                // Second render for proper texture display
+                setTimeout(() => {
+                    renderer.resetCamera();
+                    renderWindow.render();
+                }, 100);
+
+                showLoading(false);
+
+                // Notify parent
+                sendMeshLoaded({
+                    filename: currentFilename,
+                    format: result.format,
+                    hasTexture: result.hasTexture || false,
+                    actors: result.actors.length
+                });
+
+                return true;
+
+            } catch (error) {
+                console.error('[GeomPack VTK Textured] Load failed:', error);
+                showLoading(true, 'Failed to load mesh: ' + error.message);
+                sendError(error.message);
+                return false;
+            }
         }
 
-        // Set up camera view functions
+        // Camera view function
         function setCameraView(direction) {
             if (!meshBounds) return;
-
-            const camera = renderer.getActiveCamera();
-            const center = [
-                (meshBounds[0] + meshBounds[1]) / 2,
-                (meshBounds[2] + meshBounds[3]) / 2,
-                (meshBounds[4] + meshBounds[5]) / 2
-            ];
-            const size = Math.max(
-                meshBounds[1] - meshBounds[0],
-                meshBounds[3] - meshBounds[2],
-                meshBounds[5] - meshBounds[4]
-            );
-            const distance = size * 2;
-
-            let position, viewUp;
-            switch (direction) {
-                case '+X':
-                    position = [center[0] + distance, center[1], center[2]];
-                    viewUp = [0, 1, 0];
-                    break;
-                case '-X':
-                    position = [center[0] - distance, center[1], center[2]];
-                    viewUp = [0, 1, 0];
-                    break;
-                case '+Y':
-                    position = [center[0], center[1] + distance, center[2]];
-                    viewUp = [0, 0, -1];
-                    break;
-                case '-Y':
-                    position = [center[0], center[1] - distance, center[2]];
-                    viewUp = [0, 0, 1];
-                    break;
-                case '+Z':
-                    position = [center[0], center[1], center[2] + distance];
-                    viewUp = [0, 1, 0];
-                    break;
-                case '-Z':
-                    position = [center[0], center[1], center[2] - distance];
-                    viewUp = [0, 1, 0];
-                    break;
-            }
-
-            camera.setPosition(...position);
-            camera.setFocalPoint(...center);
-            camera.setViewUp(...viewUp);
-            renderer.resetCameraClippingRange();
+            cameraController.setCameraView(direction, meshBounds);
             renderWindow.render();
         }
 
-        // Set up event listeners
-        document.getElementById('viewPosX').addEventListener('click', () => setCameraView('+X'));
-        document.getElementById('viewNegX').addEventListener('click', () => setCameraView('-X'));
-        document.getElementById('viewPosY').addEventListener('click', () => setCameraView('+Y'));
-        document.getElementById('viewNegY').addEventListener('click', () => setCameraView('-Y'));
-        document.getElementById('viewPosZ').addEventListener('click', () => setCameraView('+Z'));
-        document.getElementById('viewNegZ').addEventListener('click', () => setCameraView('-Z'));
+        // Event listeners - Camera views
+        document.querySelectorAll('.view-button').forEach(button => {
+            button.addEventListener('click', () => {
+                setCameraView(button.dataset.view);
+            });
+        });
 
         // Edges toggle
         document.getElementById('showEdges').addEventListener('change', (e) => {
@@ -651,13 +309,9 @@
         });
 
         // Screenshot
-        document.getElementById('screenshot').addEventListener('click', () => {
+        document.getElementById('screenshot').addEventListener('click', async () => {
             renderWindow.render();
-            const image = renderWindow.captureImages()[0];
-            const link = document.createElement('a');
-            link.href = image;
-            link.download = `screenshot_${Date.now()}.png`;
-            link.click();
+            await screenshotCapture.captureAndDownload(`screenshot_${Date.now()}.png`);
         });
 
         // Save mesh
@@ -703,28 +357,35 @@
                 property.setRepresentation(representation);
             });
 
-            const camera = renderer.getActiveCamera();
-            camera.setParallelProjection(parallel);
-
+            cameraController.setParallelProjection(parallel);
             renderWindow.render();
+
             settingsPanel.classList.remove('visible');
             settingsOverlay.classList.remove('visible');
         });
 
-        // Expose loadMesh to global scope for the widget to call
-        window.loadMesh = loadMesh;
+        // Resize handling
+        const resizeObserver = new ResizeObserver(() => {
+            const { width, height } = container.getBoundingClientRect();
+            if (width > 0 && height > 0) {
+                openGLRenderWindow.setSize(width, height);
+                renderWindow.render();
+            }
+        });
+        resizeObserver.observe(container);
+
+        // Expose for parent widget
+        window.loadMesh = loadTexturedMesh;
         window.gltfSupported = gltfSupported;
 
-
-        // Listen for postMessage from parent widget
+        // Listen for postMessage
         window.addEventListener('message', async (event) => {
             if (event.data.type === 'LOAD_MESH' && event.data.filepath) {
                 const filepath = event.data.filepath;
                 const metadata = event.data.metadata || {};
 
-                const success = await loadMesh(filepath, metadata);
+                const success = await loadTexturedMesh(filepath, metadata);
 
-                // Send result back to parent
                 if (window.parent && window.parent !== window) {
                     window.parent.postMessage({
                         type: success ? 'MESH_LOADED' : 'MESH_ERROR',
@@ -734,7 +395,8 @@
             }
         });
 
-        loading.textContent = gltfSupported ?
+        // Initial status
+        loadingText.textContent = gltfSupported ?
             'Ready to load textured mesh (GLB/GLTF)' :
             'Ready - GLTFImporter loading...';
     </script>
