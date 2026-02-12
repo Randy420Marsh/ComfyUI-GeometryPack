@@ -37,6 +37,13 @@ class TextureToGeometryNode:
             "optional": {
                 "mask": ("MASK",),
                 "depth_image": ("IMAGE",),
+                "field": ("MASK", {
+                    "tooltip": "Optional field to store as vertex attribute on the mesh (e.g., face IDs, curvature)"
+                }),
+                "field_name": ("STRING", {
+                    "default": "field",
+                    "tooltip": "Name for the vertex attribute"
+                }),
                 "backend": ([
                     "grid",
                     "poisson_pymeshlab",
@@ -73,6 +80,7 @@ class TextureToGeometryNode:
 
     def texture_to_geometry(self, height_scale,
                            mask=None, depth_image=None,
+                           field=None, field_name="field",
                            backend="grid", poisson_depth=8,
                            invert_height="false", smooth_normals="true",
                            skip_black="false", black_threshold=0.01):
@@ -157,7 +165,8 @@ class TextureToGeometryNode:
             mesh = self._build_grid_mesh(
                 heightmap, height_scale, width, height,
                 skip_black == "true", black_threshold,
-                smooth_normals == "true"
+                smooth_normals == "true",
+                field, field_name
             )
             backend_info = "Grid-based displacement mesh"
         elif backend == "poisson_pymeshlab":
@@ -224,8 +233,11 @@ Output Mesh:
         return np.array(points, dtype=np.float64), valid_mask
 
     def _build_grid_mesh(self, heightmap, height_scale, width, height,
-                         skip_black, black_threshold, smooth_normals):
+                         skip_black, black_threshold, smooth_normals,
+                         field=None, field_name="field"):
         """Build mesh using grid-based displacement (original algorithm)."""
+        import torch
+
         # Generate vertices
         vertices = []
         for y in range(height):
@@ -260,6 +272,26 @@ Output Mesh:
         faces = np.array(faces, dtype=np.int32)
 
         mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+
+        # Add field as vertex attribute if provided
+        if field is not None:
+            if isinstance(field, torch.Tensor):
+                field_arr = field[0].cpu().numpy()
+            else:
+                field_arr = np.array(field)
+
+            # Handle different shapes
+            if len(field_arr.shape) > 2:
+                field_arr = field_arr.squeeze()
+
+            # Check resolution matches
+            if field_arr.shape == (height, width):
+                # Sample field at each vertex position (same order as vertices)
+                field_values = field_arr.flatten()
+                mesh.vertex_attributes[field_name] = field_values.astype(np.float32)
+                print(f"[TextureToGeometry] Added vertex attribute '{field_name}' with {len(field_values)} values, range: [{field_values.min():.3f}, {field_values.max():.3f}]")
+            else:
+                print(f"[TextureToGeometry] Warning: field shape {field_arr.shape} doesn't match heightmap ({height}, {width}), skipping")
 
         if smooth_normals:
             mesh.fix_normals()
