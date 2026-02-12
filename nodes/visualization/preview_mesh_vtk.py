@@ -42,7 +42,7 @@ class PreviewMeshVTKNode:
         return {
             "required": {
                 "trimesh": ("TRIMESH",),
-                "mode": (["fields", "texture"], {"default": "fields"}),
+                "mode": (["fields", "texture", "texture (PBR)"], {"default": "fields"}),
             },
         }
 
@@ -105,7 +105,12 @@ class PreviewMeshVTKNode:
         is_pc = is_point_cloud(trimesh)
 
         # Choose export format based on visualization mode
-        if mode == "texture":
+        if mode == "texture (PBR)":
+            # PBR mode: Export GLB and use Three.js PBR viewer
+            filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.glb"
+            viewer_type = "pbr"
+            print(f"[PreviewMeshVTK] Using PBR mode - GLB export with Three.js PBR viewer")
+        elif mode == "texture":
             # Texture mode: Export GLB to preserve textures/materials/UVs
             filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.glb"
             viewer_type = "texture"
@@ -130,8 +135,8 @@ class PreviewMeshVTKNode:
 
         # Export mesh
         try:
-            if mode == "texture":
-                # Export GLB for texture rendering
+            if mode in ("texture", "texture (PBR)"):
+                # Export GLB for texture/PBR rendering
                 trimesh.export(filepath, file_type='glb', include_normals=True)
                 print(f"[PreviewMeshVTK] Exported GLB to: {filepath}")
             elif has_fields or is_pc:
@@ -206,8 +211,8 @@ class PreviewMeshVTKNode:
         }
 
         # Add mode-specific metadata
-        if viewer_type == "texture":
-            # Texture mode metadata
+        if viewer_type in ("texture", "pbr"):
+            # Texture/PBR mode metadata
             ui_data.update({
                 "has_texture": [has_texture],
                 "has_vertex_colors": [has_vertex_colors],
@@ -224,7 +229,9 @@ class PreviewMeshVTKNode:
         if area is not None:
             ui_data["area"] = [area]
 
-        if viewer_type == "texture":
+        if viewer_type == "pbr":
+            print(f"[PreviewMeshVTK] PBR mode info: watertight={is_watertight}, volume={volume}, area={area}, texture={has_texture}, vertex_colors={has_vertex_colors}")
+        elif viewer_type == "texture":
             print(f"[PreviewMeshVTK] Texture mode info: watertight={is_watertight}, volume={volume}, area={area}, texture={has_texture}, vertex_colors={has_vertex_colors}")
         elif field_names:
             print(f"[PreviewMeshVTK] Fields mode info: watertight={is_watertight}, volume={volume}, area={area}, fields={field_names}")
@@ -239,5 +246,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackPreviewMeshVTK": "Preview Mesh (VTK)",
+    "GeomPackPreviewMeshVTK": "Preview Mesh",
 }

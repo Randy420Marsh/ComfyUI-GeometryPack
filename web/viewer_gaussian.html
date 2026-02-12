@@ -30,54 +30,6 @@
             display: block;
         }
 
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            color: #888;
-            z-index: 100;
-        }
-
-        .loading.hidden {
-            display: none;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #333;
-            border-top-color: #6cc;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 12px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            font-size: 12px;
-        }
-
-        .progress-bar {
-            width: 200px;
-            height: 4px;
-            background: #333;
-            border-radius: 2px;
-            margin: 8px auto 0;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: #6cc;
-            width: 0%;
-            transition: width 0.1s ease-out;
-        }
-
         .error {
             position: absolute;
             top: 50%;
@@ -142,13 +94,6 @@
     <div id="viewerContainer">
         <canvas id="canvas"></canvas>
 
-        <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <div class="loading-text">Ready to load Gaussian Splat</div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-        </div>
 
         <div id="error" class="error hidden"></div>
 
@@ -171,9 +116,6 @@
 
         // DOM elements
         const canvas = document.getElementById('canvas');
-        const loadingEl = document.getElementById('loading');
-        const loadingText = loadingEl.querySelector('.loading-text');
-        const progressFill = document.getElementById('progressFill');
         const errorEl = document.getElementById('error');
         const infoPanel = document.getElementById('infoPanel');
         const infoContent = document.getElementById('infoContent');
@@ -216,55 +158,132 @@
             }
         }
 
-        // Show loading state
-        function showLoading(text) {
-            loadingEl.classList.remove('hidden');
-            loadingText.textContent = text || 'Loading...';
-            progressFill.style.width = '0%';
-            errorEl.classList.add('hidden');
-        }
-
-        // Hide loading
-        function hideLoading() {
-            loadingEl.classList.add('hidden');
-        }
-
         // Show error
         function showError(message) {
             errorEl.textContent = message;
             errorEl.classList.remove('hidden');
-            loadingEl.classList.add('hidden');
-        }
-
-        // Update progress
-        function updateProgress(percent) {
-            progressFill.style.width = percent + '%';
         }
 
         // Store initial camera params for reset
         let initialCameraData = null;
 
-        // Set camera from extrinsics matrix (4x4)
-        // For SHARP, extrinsics is identity - camera at origin looking down +Z
-        function setCameraFromExtrinsics(extrinsics) {
-            if (!extrinsics || !camera) return;
+        // Set camera from extrinsics and intrinsics
+        // extrinsics: 4x4 matrix (identity for SHARP = camera at origin looking down +Z)
+        // intrinsics: 3x3 matrix [[fx, 0, cx], [0, fy, cy], [0, 0, 1]]
+        // splat: the loaded Gaussian splat object (optional, used for bounds)
+        function setCameraFromExtrinsics(extrinsics, intrinsics, splat) {
+            if (!camera || !controls) return;
 
-            // For SHARP output, the camera is at origin looking down +Z
-            // Just store the data for reset - the gsplat camera defaults work
+            console.log('[GaussianViewer] Setting camera from extrinsics/intrinsics');
+            console.log('[GaussianViewer] Extrinsics:', JSON.stringify(extrinsics));
+            console.log('[GaussianViewer] Intrinsics:', JSON.stringify(intrinsics));
+
+            // Parse extrinsics to get camera position
+            // For a 4x4 extrinsics matrix [R|t], camera position in world space is -R^T * t
+            // But for identity matrix, camera is simply at origin
+            let camPosX = 0, camPosY = 0, camPosZ = 0;
+
+            if (extrinsics && Array.isArray(extrinsics) && extrinsics.length === 4) {
+                // Extract rotation and translation from 4x4 extrinsics
+                const R = [
+                    [extrinsics[0][0], extrinsics[0][1], extrinsics[0][2]],
+                    [extrinsics[1][0], extrinsics[1][1], extrinsics[1][2]],
+                    [extrinsics[2][0], extrinsics[2][1], extrinsics[2][2]]
+                ];
+                const t = [extrinsics[0][3], extrinsics[1][3], extrinsics[2][3]];
+
+                // Camera position = -R^T * t
+                camPosX = -(R[0][0] * t[0] + R[1][0] * t[1] + R[2][0] * t[2]);
+                camPosY = -(R[0][1] * t[0] + R[1][1] * t[1] + R[2][1] * t[2]);
+                camPosZ = -(R[0][2] * t[0] + R[1][2] * t[1] + R[2][2] * t[2]);
+
+                console.log('[GaussianViewer] Computed camera position from extrinsics:', camPosX, camPosY, camPosZ);
+            }
+
+            // Calculate FOV and set camera focal length from intrinsics
+            // intrinsics[0][0] = fx (focal length in pixels)
+            // intrinsics[1][1] = fy (focal length in pixels)
+            // intrinsics[1][2] = cy (principal point y = image_height / 2)
+            let targetZ = 2; // default
+            if (intrinsics && Array.isArray(intrinsics) && intrinsics.length >= 2) {
+                const fx = intrinsics[0][0];
+                const fy = intrinsics[1][1];
+                const cx = intrinsics[0][2];
+                const cy = intrinsics[1][2];
+                const imageWidth = cx * 2;  // cx is typically image_width / 2
+                const imageHeight = cy * 2; // cy is typically image_height / 2
+
+                console.log('[GaussianViewer] Intrinsics: fx=', fx, 'fy=', fy, 'cx=', cx, 'cy=', cy);
+                console.log('[GaussianViewer] Image dimensions (from intrinsics):', imageWidth, 'x', imageHeight);
+
+                // Set camera focal length to match the original camera
+                // gsplat.js uses fx/fy in screen pixels, need to scale by canvas size
+                const canvasWidth = canvas.clientWidth || 512;
+                const canvasHeight = canvas.clientHeight || 512;
+
+                // Scale focal lengths proportionally to canvas size
+                const scaledFx = fx * (canvasWidth / imageWidth);
+                const scaledFy = fy * (canvasHeight / imageHeight);
+
+                camera.data.fx = scaledFx;
+                camera.data.fy = scaledFy;
+
+                console.log('[GaussianViewer] Canvas size:', canvasWidth, 'x', canvasHeight);
+                console.log('[GaussianViewer] Scaled focal lengths: fx=', scaledFx, 'fy=', scaledFy);
+
+                // Calculate vertical FOV in radians for logging
+                const fovY = 2 * Math.atan(imageHeight / (2 * fy));
+                const fovYDeg = fovY * 180 / Math.PI;
+                console.log('[GaussianViewer] Calculated FOV:', fovYDeg, 'degrees');
+
+                // For SHARP, the scene is in front of the camera
+                // Use focal length to estimate a reasonable target distance
+                // The disparity range in metadata can help estimate scene depth
+                // For now, use a simple heuristic based on typical SHARP output
+                targetZ = Math.max(1, fy / imageHeight * 2);
+                console.log('[GaussianViewer] Target Z distance:', targetZ);
+            }
+
+            // Determine the target position (what the camera looks at)
+            // Use scene bounds center if available, otherwise use calculated targetZ
+            let targetX = 0, targetY = 0;
+            if (splat && splat.bounds) {
+                const center = splat.bounds.center();
+                targetX = center.x;
+                targetY = center.y;
+                targetZ = center.z;
+                console.log('[GaussianViewer] Using scene center as target:', targetX, targetY, targetZ);
+            }
+
+            // For SHARP: camera is at origin, scene is at positive Z
+            // The orbit controls work by having the camera orbit around a target point.
+            // To get the "original image view", we set camera at the computed position
+            // and look at the scene center.
+
+            const camPos = new SPLAT.Vector3(camPosX, camPosY, camPosZ);
+            const targetPos = new SPLAT.Vector3(targetX, targetY, targetZ);
+
+            // Store for reset
             initialCameraData = {
-                position: new SPLAT.Vector3(extrinsics[0][3], extrinsics[1][3], extrinsics[2][3])
+                position: camPos,
+                target: targetPos,
+                fx: camera.data.fx,
+                fy: camera.data.fy
             };
 
-            // Set camera position using SPLAT.Vector3
-            camera.data.position = initialCameraData.position;
+            // Set camera position
+            camera.data.position = camPos;
 
-            console.log('[GaussianViewer] Camera set from extrinsics:', extrinsics[0][3], extrinsics[1][3], extrinsics[2][3]);
+            // Update orbit controls to orbit around the target point
+            controls.setCameraTarget(targetPos);
+
+            console.log('[GaussianViewer] Camera set to position:', camPosX, camPosY, camPosZ);
+            console.log('[GaussianViewer] Looking at target:', targetX, targetY, targetZ);
+            console.log('[GaussianViewer] This should match the original input image view');
         }
 
         // Load a PLY file from ArrayBuffer data
         async function loadPLYFromData(arrayBuffer, filename, extrinsics, intrinsics) {
-            showLoading('Loading Gaussian Splat...');
-
             try {
                 // Clear existing splat
                 if (currentSplat) {
@@ -279,15 +298,7 @@
                 const blobUrl = URL.createObjectURL(blob);
 
                 // Load the PLY file from blob URL using PLYLoader
-                await SPLAT.PLYLoader.LoadAsync(
-                    blobUrl,
-                    scene,
-                    (progress) => {
-                        const percent = Math.round(progress * 100);
-                        updateProgress(percent);
-                        loadingText.textContent = `Loading... ${percent}%`;
-                    }
-                );
+                await SPLAT.PLYLoader.LoadAsync(blobUrl, scene);
 
                 // Clean up blob URL
                 URL.revokeObjectURL(blobUrl);
@@ -295,15 +306,21 @@
                 // Get the loaded splat (last object in scene)
                 if (scene.objects && scene.objects.length > 0) {
                     currentSplat = scene.objects[scene.objects.length - 1];
+
+                    // Log bounds info for debugging
+                    if (currentSplat.bounds) {
+                        const center = currentSplat.bounds.center();
+                        const size = currentSplat.bounds.size();
+                        console.log('[GaussianViewer] Scene bounds center:', center.x, center.y, center.z);
+                        console.log('[GaussianViewer] Scene bounds size:', size.x, size.y, size.z);
+                    }
                 }
 
-                // Set camera from extrinsics if provided
-                if (extrinsics) {
-                    setCameraFromExtrinsics(extrinsics);
+                // Set camera from extrinsics and intrinsics if provided
+                if (extrinsics || intrinsics) {
+                    setCameraFromExtrinsics(extrinsics, intrinsics, currentSplat);
                     if (controls) controls.update();
                 }
-
-                hideLoading();
 
                 // Show info panel
                 infoPanel.classList.remove('hidden');
@@ -335,9 +352,20 @@
             if (camera && controls) {
                 if (initialCameraData) {
                     camera.data.position = initialCameraData.position;
+                    if (initialCameraData.target) {
+                        controls.setCameraTarget(initialCameraData.target);
+                    }
+                    if (initialCameraData.fx) {
+                        camera.data.fx = initialCameraData.fx;
+                    }
+                    if (initialCameraData.fy) {
+                        camera.data.fy = initialCameraData.fy;
+                    }
+                    console.log('[GaussianViewer] Reset camera to initial position');
                 } else {
                     // Default fallback
                     camera.data.position = new SPLAT.Vector3(0, 0, 5);
+                    console.log('[GaussianViewer] Reset camera to default position (0, 0, 5)');
                 }
                 controls.update();
             }
