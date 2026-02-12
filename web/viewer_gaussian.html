@@ -82,18 +82,13 @@
             font-size: 11px;
         }
 
-        .scale-control input[type="range"] {
-            width: 100px;
-            vertical-align: middle;
-        }
-
         .scale-control input[type="number"] {
-            width: 50px;
+            width: 60px;
             background: #333;
             border: 1px solid #555;
             color: #fff;
             font-size: 11px;
-            padding: 2px 4px;
+            padding: 4px 6px;
             border-radius: 3px;
         }
 
@@ -129,8 +124,7 @@
     <div id="controlsBar">
         <div class="scale-control">
             <span>Scale:</span>
-            <input type="range" id="gaussianScale" min="0.1" max="3.0" step="0.05" value="1.0" title="Gaussian scale multiplier">
-            <input type="number" id="gaussianScaleValue" min="0.1" max="3.0" step="0.05" value="1.0">
+            <input type="number" id="gaussianScaleValue" min="0.01" max="100" step="0.1" value="1.0" title="Gaussian scale multiplier">
         </div>
         <button id="resetCamera" title="Reset camera view">Reset View</button>
         <button id="screenshot" title="Take screenshot">Screenshot</button>
@@ -156,7 +150,10 @@
         let controls = null;
         let animationId = null;
         let currentSplat = null;
+        let originalScales = null;  // Store original scales for dynamic adjustment
 
+        // Default focal length
+        const DEFAULT_FOCAL_LENGTH = 30;
 
         // Initialize the viewer
         function initViewer() {
@@ -165,6 +162,10 @@
                 camera = new SPLAT.Camera();
                 renderer = new SPLAT.WebGLRenderer(canvas);
                 controls = new SPLAT.OrbitControls(camera, canvas);
+
+                // Set default focal length
+                camera.data.fx = DEFAULT_FOCAL_LENGTH;
+                camera.data.fy = DEFAULT_FOCAL_LENGTH;
 
                 // Handle resize
                 const resize = () => {
@@ -196,6 +197,10 @@
 
         // Store initial camera params for reset
         let initialCameraData = null;
+
+        // Scale compensation: when focal length is scaled down for canvas size,
+        // gaussian scales need to be multiplied by this factor to maintain correct screen-space size
+        let gaussianScaleCompensation = 1.0;
 
         // Set camera from extrinsics and intrinsics
         // extrinsics: 4x4 matrix (identity for SHARP = camera at origin looking down +Z)
@@ -259,8 +264,14 @@
                 camera.data.fx = scaledF;
                 camera.data.fy = scaledF;
 
+                // IMPORTANT: Compensate gaussian scales for the focal length scaling
+                // Screen-space size = world_scale * fx / depth
+                // When we scale fx down, gaussians appear smaller. Multiply scales by inverse.
+                gaussianScaleCompensation = imageWidth / canvasWidth;
+
                 console.log('[GaussianViewer] Canvas size:', canvasWidth, 'x', canvasHeight);
                 console.log('[GaussianViewer] Uniform scale:', scale, 'scaled focal length:', scaledF);
+                console.log('[GaussianViewer] Gaussian scale compensation:', gaussianScaleCompensation.toFixed(2), 'x');
 
                 // Calculate vertical FOV in radians for logging
                 const fovY = 2 * Math.atan(imageHeight / (2 * fy));
@@ -346,6 +357,21 @@
                 }
                 currentSplat = null;
 
+                // Pre-calculate scale compensation from intrinsics BEFORE loading
+                // This ensures gaussian scales are correct from the start
+                gaussianScaleCompensation = 1.0;  // Default if no intrinsics
+                if (intrinsics && Array.isArray(intrinsics) && intrinsics.length >= 2) {
+                    const fx = intrinsics[0][0];
+                    const cx = intrinsics[0][2];
+                    const imageWidth = cx * 2;
+                    const canvasWidth = canvas.clientWidth || 512;
+                    // Compensation = original_size / canvas_size
+                    // This makes gaussians appear at their correct world-space size
+                    gaussianScaleCompensation = imageWidth / canvasWidth;
+                    console.log('[GaussianViewer] Pre-calculated scale compensation:', gaussianScaleCompensation.toFixed(2), 'x');
+                    console.log('[GaussianViewer] (Image:', imageWidth, 'px -> Canvas:', canvasWidth, 'px)');
+                }
+
                 console.log('[GaussianViewer] Loading from data, size:', arrayBuffer.byteLength);
 
                 // Create a blob URL from the data
@@ -376,9 +402,22 @@
                         const numGaussians = scales.length / 3;
                         let minScale = Infinity, maxScale = -Infinity, sumScale = 0;
 
-                        // Store a copy of original scales for dynamic adjustment
-                        originalScales = new Float32Array(scales);
-                        console.log('[GaussianViewer] Stored original scales for dynamic adjustment');
+                        // Store a copy of original scales (BEFORE compensation) for dynamic adjustment
+                        // The stored scales include the compensation factor so user scale=1 shows correct size
+                        originalScales = new Float32Array(scales.length);
+                        for (let i = 0; i < scales.length; i++) {
+                            // Apply compensation: gaussians need to be larger when focal length is scaled down
+                            originalScales[i] = scales[i] * gaussianScaleCompensation;
+                        }
+                        console.log('[GaussianViewer] Stored compensated scales (factor:', gaussianScaleCompensation.toFixed(2), 'x)');
+
+                        // Apply compensated scales immediately
+                        for (let i = 0; i < scales.length; i++) {
+                            scales[i] = originalScales[i];
+                        }
+
+                        // Mark data as changed so gsplat.js re-uploads to GPU
+                        currentSplat.data.changed = true;
 
                         for (let i = 0; i < scales.length; i++) {
                             const s = scales[i];
@@ -388,12 +427,12 @@
                         }
 
                         const avgScale = sumScale / scales.length;
-                        console.log('[GaussianViewer] === GAUSSIAN SCALE DEBUG ===');
+                        console.log('[GaussianViewer] === GAUSSIAN SCALE DEBUG (after compensation) ===');
                         console.log('[GaussianViewer] Number of Gaussians:', numGaussians);
-                        console.log('[GaussianViewer] Scale min:', minScale.toFixed(6));
-                        console.log('[GaussianViewer] Scale max:', maxScale.toFixed(6));
-                        console.log('[GaussianViewer] Scale avg:', avgScale.toFixed(6));
-                        console.log('[GaussianViewer] ===========================');
+                        console.log('[GaussianViewer] Compensated scale min:', minScale.toFixed(6));
+                        console.log('[GaussianViewer] Compensated scale max:', maxScale.toFixed(6));
+                        console.log('[GaussianViewer] Compensated scale avg:', avgScale.toFixed(6));
+                        console.log('[GaussianViewer] =================================================');
                     } else {
                         console.log('[GaussianViewer] No scales data found on splat object');
                         console.log('[GaussianViewer] Splat properties:', Object.keys(currentSplat));
@@ -403,8 +442,7 @@
                         originalScales = null;
                     }
 
-                    // Reset scale slider when loading new splat
-                    scaleSlider.value = 1.0;
+                    // Reset scale when loading new splat
                     scaleInput.value = 1.0;
                     currentScale = 1.0;
                 }
@@ -494,18 +532,16 @@
         }
 
         // Gaussian scale control
-        const scaleSlider = document.getElementById('gaussianScale');
         const scaleInput = document.getElementById('gaussianScaleValue');
         let currentScale = 1.0;
         let scaleUpdatePending = false;
         let lastScaleValue = 1.0;
 
         function updateGaussianScale(newScale) {
-            newScale = Math.max(0.1, Math.min(3.0, parseFloat(newScale) || 1.0));
+            newScale = Math.max(0.01, Math.min(100, parseFloat(newScale) || 1.0));
             currentScale = newScale;
 
-            // Update both controls
-            scaleSlider.value = newScale;
+            // Update input
             scaleInput.value = newScale;
 
             // Apply scale to current splat by modifying the underlying scale data
@@ -593,7 +629,6 @@
             }
         }
 
-        scaleSlider.addEventListener('input', (e) => updateGaussianScale(e.target.value));
         scaleInput.addEventListener('change', (e) => updateGaussianScale(e.target.value));
 
         // Event listeners
