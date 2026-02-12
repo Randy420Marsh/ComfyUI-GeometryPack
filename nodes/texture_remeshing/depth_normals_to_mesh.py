@@ -28,7 +28,6 @@ class DepthNormalsToMeshNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "depth": ("MASK",),
                 "normal_map": ("IMAGE",),
                 "resolution": ("INT", {
                     "default": 512,
@@ -46,6 +45,8 @@ class DepthNormalsToMeshNode:
                 }),
             },
             "optional": {
+                "depth": ("MASK",),
+                "depth_image": ("IMAGE",),
                 "method": ([
                     "poisson",
                     "ball_pivoting",
@@ -87,7 +88,8 @@ class DepthNormalsToMeshNode:
     FUNCTION = "depth_normals_to_mesh"
     CATEGORY = "geompack/texture_remeshing"
 
-    def depth_normals_to_mesh(self, depth, normal_map, resolution, depth_scale,
+    def depth_normals_to_mesh(self, normal_map, resolution, depth_scale,
+                               depth=None, depth_image=None,
                                method="poisson", poisson_depth=8, poisson_scale=1.1,
                                skip_background="true", background_threshold=0.01,
                                invert_depth="false"):
@@ -95,10 +97,11 @@ class DepthNormalsToMeshNode:
         Convert depth map and normal map to smooth 3D mesh.
 
         Args:
-            depth: Depth map as MASK tensor (B, H, W)
             normal_map: Normal map as IMAGE tensor (B, H, W, C) with Nx in R, Ny in G
             resolution: Target resolution for point cloud
             depth_scale: Scale factor for depth values
+            depth: Depth map as MASK tensor (B, H, W) - optional
+            depth_image: Depth map as IMAGE tensor (B, H, W, C) - optional, takes priority
             method: Reconstruction method ("poisson" or "ball_pivoting")
             poisson_depth: Octree depth for Poisson reconstruction
             poisson_scale: Scale factor for Poisson bounding box
@@ -115,18 +118,38 @@ class DepthNormalsToMeshNode:
         except ImportError:
             raise RuntimeError("torch and PIL required. Install with: pip install torch Pillow")
 
+        # Validate that at least one depth input is provided
+        if depth is None and depth_image is None:
+            raise ValueError("Either 'depth' (MASK) or 'depth_image' (IMAGE) must be provided")
+
         print(f"[DepthNormalsToMesh] Converting depth + normals to mesh")
         print(f"[DepthNormalsToMesh] Method: {method}, Resolution: {resolution}")
 
-        # Extract depth map from tensor
-        if isinstance(depth, torch.Tensor):
-            depth_arr = depth[0].cpu().numpy()
-        else:
-            depth_arr = np.array(depth)
+        # Extract depth map - prefer depth_image if provided
+        if depth_image is not None:
+            print(f"[DepthNormalsToMesh] Using depth_image input (averaging RGB channels)")
+            if isinstance(depth_image, torch.Tensor):
+                depth_img_arr = depth_image[0].cpu().numpy()
+            else:
+                depth_img_arr = np.array(depth_image)
 
-        # Ensure 2D
-        if len(depth_arr.shape) > 2:
-            depth_arr = depth_arr[:, :, 0] if depth_arr.shape[2] == 1 else depth_arr
+            # Average RGB channels to create grayscale depth
+            if len(depth_img_arr.shape) == 3 and depth_img_arr.shape[2] >= 3:
+                depth_arr = np.mean(depth_img_arr[:, :, :3], axis=2)
+            elif len(depth_img_arr.shape) == 3 and depth_img_arr.shape[2] == 1:
+                depth_arr = depth_img_arr[:, :, 0]
+            else:
+                depth_arr = depth_img_arr
+        else:
+            print(f"[DepthNormalsToMesh] Using depth mask input")
+            if isinstance(depth, torch.Tensor):
+                depth_arr = depth[0].cpu().numpy()
+            else:
+                depth_arr = np.array(depth)
+
+            # Ensure 2D
+            if len(depth_arr.shape) > 2:
+                depth_arr = depth_arr[:, :, 0] if depth_arr.shape[2] == 1 else np.mean(depth_arr, axis=2)
 
         # Normalize to [0, 1]
         depth_min, depth_max = depth_arr.min(), depth_arr.max()
