@@ -4,7 +4,7 @@ Professional geometry processing nodes for ComfyUI. Load, analyze, remesh, unwra
 
 <div align="center">
 <a href="https://pozzettiandrea.github.io/ComfyUI-GeometryPack/">
-<img src="docs/workflow_gallery.png" alt="Workflow Test Gallery" width="800">
+<img src="https://pozzettiandrea.github.io/ComfyUI-GeometryPack/gallery-preview.png" alt="Workflow Test Gallery" width="800">
 </a>
 <br>
 <b><a href="https://pozzettiandrea.github.io/ComfyUI-GeometryPack/">View Live Test Gallery →</a></b>
