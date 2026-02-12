@@ -75,9 +75,10 @@ export async function loadGLTF(filepath, vtk, renderer, options = {}) {
     const actorsMap = importer.getActors();
     const actors = Array.from(actorsMap.values());
 
-    // Track texture information
+    // Track texture and vertex color information
     let hasTexture = false;
     let hasMaterial = false;
+    let hasVertexColors = false;
 
     // Process actors and apply texture fixes
     if (applyTextureFixes) {
@@ -87,6 +88,12 @@ export async function loadGLTF(filepath, vtk, renderer, options = {}) {
             const input = mapper?.getInputData();
 
             if (input && input.getNumberOfPoints() > 0) {
+                // Check for vertex colors (stored as scalars in VTK)
+                const scalars = input.getPointData()?.getScalars();
+                if (scalars && scalars.getNumberOfComponents() >= 3) {
+                    hasVertexColors = true;
+                }
+
                 if (property) {
                     // CRITICAL FIX: Remove metallicRoughnessTexture if present
                     // VTK.js GLTFImporter may use this instead of baseColorTexture
@@ -131,9 +138,17 @@ export async function loadGLTF(filepath, vtk, renderer, options = {}) {
                     }
                 }
 
-                // Configure mapper for texture rendering
+                // Configure mapper for rendering
                 if (mapper) {
-                    mapper.setScalarVisibility(false);
+                    if (hasVertexColors && !hasTexture) {
+                        // Enable scalar visibility to show vertex colors
+                        mapper.setScalarVisibility(true);
+                        mapper.setScalarModeToUsePointData();
+                        mapper.setColorModeToDirectScalars();
+                    } else {
+                        // Disable scalars for texture rendering
+                        mapper.setScalarVisibility(false);
+                    }
                     mapper.modified();
                 }
             }
@@ -171,6 +186,8 @@ export async function loadGLTF(filepath, vtk, renderer, options = {}) {
         actors,
         importer,
         bounds,
+        hasTexture,
+        hasVertexColors,
         metadata: {
             format: 'GLTF',
             numActors: actors.length,
@@ -178,6 +195,7 @@ export async function loadGLTF(filepath, vtk, renderer, options = {}) {
             numPolys: totalPolys,
             bounds,
             hasTexture,
+            hasVertexColors,
             hasMaterial
         }
     };

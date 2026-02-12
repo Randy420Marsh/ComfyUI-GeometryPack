@@ -306,8 +306,17 @@ export class DualViewer {
                 // Apply texture fixes for GLTF/GLB
                 vp.textureManager.applyTextureFixesMultiple(result.actors);
                 vp.textureManager.configureRenderer(vp.renderer);
+            } else if (result.hasVertexColors) {
+                // Mesh has vertex colors - don't override with default color
+                // Just configure edges if needed, colors are already set up by loader
+                result.actors.forEach(actor => {
+                    const property = actor.getProperty();
+                    if (property && this.config.showEdges) {
+                        property.setEdgeVisibility(true);
+                    }
+                });
             } else {
-                // Standard actor configuration
+                // Standard actor configuration - apply default color
                 this.actorManager.configureActors(result.actors, {
                     color: defaultColor,
                     showEdges: this.config.showEdges
@@ -325,7 +334,8 @@ export class DualViewer {
                 viewport,
                 filename: vp.filename,
                 format: result.format,
-                hasTexture: result.hasTexture || false
+                hasTexture: result.hasTexture || false,
+                hasVertexColors: result.hasVertexColors || false
             });
 
             return result;
