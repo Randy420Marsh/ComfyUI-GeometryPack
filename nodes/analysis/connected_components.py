@@ -6,6 +6,8 @@ Connected Components Node - Label disconnected mesh parts with part_id field.
 
 Uses trimesh's graph.connected_components() to identify disconnected regions
 and assigns a unique part_id to each face based on which component it belongs to.
+
+Supports batch processing: input a list of meshes, get a list of results.
 """
 
 import numpy as np
@@ -18,7 +20,11 @@ class ConnectedComponentsNode:
     Each disconnected region of the mesh gets a unique integer ID (0, 1, 2, ...).
     The part_id is stored as a face attribute that can be visualized with the
     field-based mesh preview nodes.
+
+    Supports batch processing: input a list of meshes, get a list of results.
     """
+
+    INPUT_IS_LIST = True
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -28,8 +34,9 @@ class ConnectedComponentsNode:
             },
         }
 
-    RETURN_TYPES = ("TRIMESH", "INT")
+    RETURN_TYPES = ("TRIMESH", "STRING")
     RETURN_NAMES = ("trimesh", "num_components")
+    OUTPUT_IS_LIST = (True, True)
     FUNCTION = "label_components"
     CATEGORY = "geompack/analysis"
 
@@ -38,42 +45,63 @@ class ConnectedComponentsNode:
         Label each face with its connected component ID.
 
         Args:
-            trimesh: Input trimesh object
+            trimesh: Input trimesh object(s)
 
         Returns:
-            tuple: (trimesh with part_id face attribute, number of components)
+            tuple: (list of trimesh with part_id face attribute, list of component counts as strings)
         """
         import trimesh as trimesh_module
 
-        # Get connected components using face adjacency
-        # Returns list of arrays, each containing face indices for one component
-        components = trimesh_module.graph.connected_components(
-            trimesh.face_adjacency,
-            nodes=np.arange(len(trimesh.faces))
-        )
+        # Handle batch input
+        meshes = trimesh if isinstance(trimesh, list) else [trimesh]
 
-        num_components = len(components)
-        print(f"[ConnectedComponents] Found {num_components} disconnected component(s)")
+        result_meshes = []
+        component_counts = []
 
-        # Create part_id array for all faces
-        part_ids = np.zeros(len(trimesh.faces), dtype=np.int32)
+        for mesh in meshes:
+            # Get connected components using face adjacency
+            # Returns list of arrays, each containing face indices for one component
+            components = trimesh_module.graph.connected_components(
+                mesh.face_adjacency,
+                nodes=np.arange(len(mesh.faces))
+            )
 
-        for component_id, face_indices in enumerate(components):
-            part_ids[face_indices] = component_id
-            print(f"[ConnectedComponents] Component {component_id}: {len(face_indices)} faces")
+            num_components = len(components)
 
-        # Store as face attribute
-        # Make a copy to avoid modifying the original
-        result_mesh = trimesh.copy()
-        result_mesh.face_attributes['part_id'] = part_ids
+            # Create part_id array for all faces
+            part_ids = np.zeros(len(mesh.faces), dtype=np.int32)
 
-        # Also store in visual facets metadata for compatibility
-        if not hasattr(result_mesh, 'metadata'):
-            result_mesh.metadata = {}
-        result_mesh.metadata['part_ids'] = part_ids
-        result_mesh.metadata['num_components'] = num_components
+            component_sizes = []
+            for component_id, face_indices in enumerate(components):
+                part_ids[face_indices] = component_id
+                component_sizes.append(len(face_indices))
 
-        return (result_mesh, num_components)
+            # Print summary instead of per-component details
+            mesh_name = mesh.metadata.get('file_name', 'mesh') if hasattr(mesh, 'metadata') else 'mesh'
+            if num_components <= 5:
+                sizes_str = ", ".join(str(s) for s in component_sizes)
+                print(f"[ConnectedComponents] {mesh_name}: {num_components} component(s): [{sizes_str}] faces each")
+            else:
+                largest = max(component_sizes)
+                smallest = min(component_sizes)
+                print(f"[ConnectedComponents] {mesh_name}: {num_components} component(s) (largest: {largest} faces, smallest: {smallest} faces)")
+
+            # Store as face attribute
+            # Make a copy to avoid modifying the original
+            result_mesh = mesh.copy()
+            result_mesh.face_attributes['part_id'] = part_ids
+
+            # Also store in visual facets metadata for compatibility
+            if not hasattr(result_mesh, 'metadata'):
+                result_mesh.metadata = {}
+            result_mesh.metadata['part_ids'] = part_ids
+            result_mesh.metadata['num_components'] = num_components
+
+            result_meshes.append(result_mesh)
+            component_counts.append(str(num_components))
+
+        print(f"[ConnectedComponents] Processed {len(meshes)} mesh(es)")
+        return (result_meshes, component_counts)
 
 
 # Node mappings for ComfyUI

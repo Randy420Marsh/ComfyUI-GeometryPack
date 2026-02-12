@@ -30,8 +30,13 @@ class SaveMesh:
             "required": {
                 "trimesh": ("TRIMESH",),
                 "file_path": ("STRING", {
-                    "default": "output.obj",
-                    "multiline": False
+                    "default": "output",
+                    "multiline": False,
+                    "tooltip": "Output filename (without extension) or path"
+                }),
+                "format": (["obj", "ply", "stl", "off", "glb", "gltf", "vtp"], {
+                    "default": "obj",
+                    "tooltip": "Output file format"
                 }),
             },
         }
@@ -42,7 +47,7 @@ class SaveMesh:
     CATEGORY = "geompack/io"
     OUTPUT_NODE = True
 
-    def save_mesh(self, trimesh, file_path):
+    def save_mesh(self, trimesh, file_path, format="obj"):
         """
         Save mesh to file.
 
@@ -51,12 +56,20 @@ class SaveMesh:
         Args:
             trimesh: trimesh.Trimesh object
             file_path: Output file path (relative to output folder or absolute)
+            format: Output format (obj, ply, stl, off, glb, gltf, vtp)
 
         Returns:
             tuple: (status_message,)
         """
         if not file_path or file_path.strip() == "":
             raise ValueError("File path cannot be empty")
+
+        # Ensure file has correct extension
+        expected_ext = f".{format}"
+        if not file_path.lower().endswith(expected_ext):
+            # Remove any existing extension and add the correct one
+            base_path = os.path.splitext(file_path)[0]
+            file_path = base_path + expected_ext
 
         # Debug: Check what we received
         print(f"[SaveMesh] Received mesh type: {type(trimesh)}")

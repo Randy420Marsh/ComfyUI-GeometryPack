@@ -13,13 +13,16 @@ ray intersection count:
 This is useful for manufacturing analysis to detect undercuts that would
 prevent clean mold release.
 
-Supports two ray tracing backends:
+Supports three backends:
 - trimesh: Uses embree for fast batch ray casting (recommended)
 - pyvista: Uses VTK's multi_ray_trace
+- face_normals: Checks face normal Z-component consistency (detects flipped faces)
 """
 
 import numpy as np
 import torch
+from PIL import Image, ImageDraw, ImageFont
+import os
 
 
 class BackdraftViewNode:
@@ -42,9 +45,15 @@ class BackdraftViewNode:
                     "step": 64,
                     "tooltip": "Output image resolution. Higher = more detail but slower."
                 }),
-                "backend": (["trimesh", "pyvista"], {
+                "backend": (["trimesh", "pyvista", "face_normals"], {
                     "default": "trimesh",
-                    "tooltip": "Ray tracing backend. trimesh (embree) is faster, pyvista uses VTK."
+                    "tooltip": "trimesh (embree) is faster, pyvista uses VTK, face_normals checks Z-normal consistency (requires single connected component)."
+                }),
+            },
+            "optional": {
+                "show_filename": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Display mesh filename on the output image"
                 }),
             },
         }
@@ -54,7 +63,7 @@ class BackdraftViewNode:
     FUNCTION = "render_backdraft"
     CATEGORY = "geompack/visualization"
 
-    def render_backdraft(self, trimesh, resolution=1024, backend="trimesh"):
+    def render_backdraft(self, trimesh, resolution=1024, backend="trimesh", show_filename=True):
         """
         Render mesh with backdraft detection using batch ray casting.
 
@@ -62,6 +71,7 @@ class BackdraftViewNode:
             trimesh: Input trimesh object
             resolution: Output image size
             backend: Ray tracing backend ("trimesh" or "pyvista")
+            show_filename: Whether to display the filename on the image
 
         Returns:
             tuple: (IMAGE tensor in BHWC format)
@@ -108,8 +118,12 @@ class BackdraftViewNode:
         # Dispatch to appropriate backend
         if backend == "trimesh":
             hit_counts = self._raytrace_trimesh(trimesh, xs, ys, z_start, nx, ny, total_rays)
-        else:
+        elif backend == "pyvista":
             hit_counts = self._raytrace_pyvista(trimesh, xs, ys, z_start, z_end, nx, ny)
+        elif backend == "face_normals":
+            hit_counts = self._check_face_normals(trimesh, xs, ys, z_start, nx, ny)
+        else:
+            raise ValueError(f"Unknown backend: {backend}")
 
         # Flip Y axis for image coordinates (image origin is top-left)
         hit_counts = hit_counts[::-1, :]
@@ -127,6 +141,43 @@ class BackdraftViewNode:
         backdraft_pct = backdraft_count / max(1, hit_count) * 100
 
         print(f"[BackdraftView] Complete: {hit_count} pixels with geometry, {backdraft_count} backdraft pixels ({backdraft_pct:.1f}%)")
+
+        # Draw filename on image if requested
+        if show_filename:
+            # Get filename from mesh metadata
+            filename = trimesh.metadata.get('file_name', '')
+            if filename:
+                # Remove extension for cleaner display
+                filename = os.path.splitext(filename)[0]
+            else:
+                filename = "unknown"
+
+            # Convert to PIL Image for text drawing
+            pil_image = Image.fromarray(image)
+            draw = ImageDraw.Draw(pil_image)
+
+            # Try to get a reasonable font size based on image dimensions
+            font_size = max(12, min(ny, nx) // 30)
+            try:
+                # Try to load a monospace font
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except (IOError, OSError):
+                try:
+                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
+                except (IOError, OSError):
+                    # Fall back to default font
+                    font = ImageFont.load_default()
+
+            # Draw text with white color and slight shadow for visibility
+            text_x = 10
+            text_y = 10
+            # Shadow
+            draw.text((text_x + 1, text_y + 1), filename, fill=(0, 0, 0), font=font)
+            # Main text
+            draw.text((text_x, text_y), filename, fill=(255, 255, 255), font=font)
+
+            # Convert back to numpy array
+            image = np.array(pil_image)
 
         # Convert to ComfyUI IMAGE format: (B, H, W, C) float32 0-1
         img_tensor = torch.from_numpy(image.astype(np.float32) / 255.0)
@@ -236,6 +287,94 @@ class BackdraftViewNode:
         hit_counts = hit_counts.reshape(ny, nx)
 
         return hit_counts
+
+    def _check_face_normals(self, mesh, xs, ys, z_start, nx, ny):
+        """
+        Check face normal Z-component consistency and render visualization.
+
+        Requires mesh to be a single connected component.
+        Flags faces whose Z-normal points opposite to the majority direction.
+
+        Returns:
+            hit_counts: (ny, nx) array where:
+                0 = no geometry (background)
+                1 = face with correct normal (majority Z direction)
+                2 = face with flipped normal (minority Z direction)
+        """
+        import trimesh as trimesh_module
+
+        print(f"[BackdraftView] Using face_normals backend...")
+
+        # 1. Check for single connected component
+        # Use edges_unique to build adjacency for connected component analysis
+        adjacency = mesh.face_adjacency
+        if len(adjacency) == 0:
+            # Single face or no adjacency - treat as single component
+            num_components = 1
+        else:
+            components = trimesh_module.graph.connected_components(adjacency, nodes=np.arange(len(mesh.faces)))
+            num_components = len(components)
+
+        if num_components > 1:
+            raise ValueError(
+                f"Mesh has {num_components} disconnected components. "
+                f"Face normals check requires a single connected mesh. "
+                f"Use 'Split by Connectivity' node first to separate components."
+            )
+
+        print(f"[BackdraftView] Mesh is single connected component")
+
+        # 2. Analyze face normal Z-components
+        normals_z = mesh.face_normals[:, 2]
+        up_count = np.sum(normals_z > 0)
+        down_count = np.sum(normals_z < 0)
+        zero_count = np.sum(normals_z == 0)  # Faces pointing sideways
+
+        print(f"[BackdraftView] Face normals: {up_count} pointing up (+Z), {down_count} pointing down (-Z), {zero_count} sideways")
+
+        # Determine majority direction
+        majority_up = up_count >= down_count
+
+        if majority_up:
+            flipped_mask = normals_z < 0  # Faces pointing down are flipped
+            print(f"[BackdraftView] Majority direction: UP (+Z), {down_count} flipped faces")
+        else:
+            flipped_mask = normals_z > 0  # Faces pointing up are flipped
+            print(f"[BackdraftView] Majority direction: DOWN (-Z), {up_count} flipped faces")
+
+        flipped_count = np.sum(flipped_mask)
+        flipped_pct = flipped_count / len(mesh.faces) * 100
+        print(f"[BackdraftView] Flipped faces: {flipped_count}/{len(mesh.faces)} ({flipped_pct:.1f}%)")
+
+        # 3. Cast rays to find which face is visible at each pixel (single hit)
+        total_rays = nx * ny
+        xx, yy = np.meshgrid(xs, ys)
+        origins = np.column_stack([
+            xx.ravel(),
+            yy.ravel(),
+            np.full(total_rays, z_start)
+        ]).astype(np.float64)
+        directions = np.tile([0.0, 0.0, -1.0], (total_rays, 1))
+
+        # Single-hit ray cast to get the topmost face at each pixel
+        locations, index_ray, index_tri = mesh.ray.intersects_location(
+            ray_origins=origins,
+            ray_directions=directions,
+            multiple_hits=False  # Only get first (topmost) hit
+        )
+
+        print(f"[BackdraftView] Ray casting complete, {len(index_ray)} hits")
+
+        # 4. Build result grid based on whether topmost face is flipped
+        hit_counts = np.zeros(total_rays, dtype=np.int32)
+
+        if len(index_ray) > 0:
+            # Vectorized: check if each hit face is flipped
+            is_flipped = flipped_mask[index_tri]
+            # 1 = correct normal (green), 2 = flipped normal (red)
+            hit_counts[index_ray] = np.where(is_flipped, 2, 1)
+
+        return hit_counts.reshape(ny, nx)
 
 
 # Node mappings for ComfyUI

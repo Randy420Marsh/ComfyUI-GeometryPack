@@ -43,9 +43,15 @@ class SaveMeshBatch:
                 "base_name": ("STRING", {
                     "default": "mesh",
                     "multiline": False,
-                    "tooltip": "Base name for files (e.g., 'mesh' becomes 'mesh_001.obj')"
+                    "tooltip": "Base name for files (e.g., 'mesh' becomes 'mesh_001.obj'). Ignored if names provided."
                 }),
-                "format": (["obj", "ply", "stl", "off", "glb", "gltf"],),
+                "format": (["obj", "ply", "stl", "off", "glb", "gltf", "vtp"],),
+            },
+            "optional": {
+                "names": ("STRING", {
+                    "forceInput": True,
+                    "tooltip": "Optional list of custom filenames (without extension). If provided, overrides base_name."
+                }),
             },
         }
 
@@ -56,23 +62,31 @@ class SaveMeshBatch:
     OUTPUT_NODE = True
     INPUT_IS_LIST = True
 
-    def save_mesh_batch(self, trimesh, folder_name, base_name, format):
+    def save_mesh_batch(self, trimesh, folder_name, base_name, format, names=None):
         """
-        Save batch of meshes to folder with sequential numbering.
+        Save batch of meshes to folder with sequential numbering or custom names.
 
         Args:
             trimesh: List of trimesh.Trimesh objects
             folder_name: Name of folder to create
-            base_name: Base name for files
+            base_name: Base name for files (used if names not provided)
             format: Output format (obj, ply, stl, etc.)
+            names: Optional list of custom filenames (without extension)
 
         Returns:
             tuple: (output_folder_path, saved_count)
         """
+        import re
+
         # Extract values from lists (ComfyUI passes inputs as lists when INPUT_IS_LIST=True)
         folder_name_val = folder_name[0] if isinstance(folder_name, list) else folder_name
         base_name_val = base_name[0] if isinstance(base_name, list) else base_name
         format_val = format[0] if isinstance(format, list) else format
+
+        # Handle names list - it comes as a list when INPUT_IS_LIST=True
+        names_list = None
+        if names is not None and len(names) > 0:
+            names_list = names  # Already a list due to INPUT_IS_LIST=True
 
         # Validate inputs
         if not trimesh or len(trimesh) == 0:
@@ -85,7 +99,11 @@ class SaveMeshBatch:
             raise ValueError("Base name cannot be empty")
 
         batch_size = len(trimesh)
-        print(f"[SaveMeshBatch] Saving {batch_size} meshes to folder '{folder_name_val}'")
+        use_custom_names = names_list is not None and len(names_list) >= batch_size
+        if use_custom_names:
+            print(f"[SaveMeshBatch] Saving {batch_size} meshes with custom names to folder '{folder_name_val}'")
+        else:
+            print(f"[SaveMeshBatch] Saving {batch_size} meshes to folder '{folder_name_val}'")
 
         # Determine output folder path
         if COMFYUI_OUTPUT_FOLDER is not None:
@@ -106,9 +124,14 @@ class SaveMeshBatch:
         errors = []
 
         for i, mesh in enumerate(trimesh):
-            # Generate filename with proper zero-padding
-            file_number = str(i + 1).zfill(num_digits)
-            filename = f"{base_name_val}_{file_number}.{format_val}"
+            # Generate filename - use custom name if available, otherwise sequential
+            if use_custom_names and i < len(names_list):
+                # Sanitize custom name (remove invalid filename characters)
+                safe_name = re.sub(r'[<>:"/\\|?*]', '_', str(names_list[i]))
+                filename = f"{safe_name}.{format_val}"
+            else:
+                file_number = str(i + 1).zfill(num_digits)
+                filename = f"{base_name_val}_{file_number}.{format_val}"
             file_path = os.path.join(output_folder, filename)
 
             # Validate mesh

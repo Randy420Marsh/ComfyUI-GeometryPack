@@ -20,6 +20,14 @@ except ImportError:
     PYMESHLAB_AVAILABLE = False
     print("[mesh_utils] Warning: pymeshlab not available. Install with: pip install pymeshlab")
 
+# PyVista for VTK format support (VTP, VTU, etc.)
+try:
+    import pyvista as pv
+    PYVISTA_AVAILABLE = True
+except ImportError:
+    PYVISTA_AVAILABLE = False
+    # Don't print warning - pyvista is optional
+
 # Official CGAL Python bindings for isotropic remeshing
 try:
     from CGAL import CGAL_Polygon_mesh_processing
@@ -71,6 +79,102 @@ def get_geometry_type(mesh) -> str:
     return "Point Cloud" if is_point_cloud(mesh) else "Mesh"
 
 
+def _load_vtk_mesh(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
+    """
+    Load VTK format files (VTP, VTU, VTK) using pyvista.
+
+    Args:
+        file_path: Path to VTK format file
+
+    Returns:
+        Tuple of (mesh, error_message)
+    """
+    if not PYVISTA_AVAILABLE:
+        return None, (
+            f"VTK format files ({os.path.splitext(file_path)[1]}) require pyvista. "
+            f"Install with: pip install pyvista"
+        )
+
+    try:
+        print(f"[load_mesh_file] Loading VTK format: {file_path}")
+
+        # Load with pyvista
+        pv_mesh = pv.read(file_path)
+
+        # Ensure we have a surface mesh (triangulated)
+        if hasattr(pv_mesh, 'extract_surface'):
+            pv_mesh = pv_mesh.extract_surface()
+
+        # Triangulate if needed
+        if hasattr(pv_mesh, 'triangulate'):
+            pv_mesh = pv_mesh.triangulate()
+
+        # Extract vertices and faces
+        vertices = np.array(pv_mesh.points)
+
+        # PyVista faces are stored as [n, v0, v1, v2, n, v0, v1, v2, ...]
+        # where n is the number of vertices per face (3 for triangles)
+        if hasattr(pv_mesh, 'faces') and pv_mesh.faces is not None and len(pv_mesh.faces) > 0:
+            faces_flat = np.array(pv_mesh.faces)
+            # Parse the flat array into triangle indices
+            faces = []
+            i = 0
+            while i < len(faces_flat):
+                n_verts = faces_flat[i]
+                if n_verts == 3:
+                    faces.append([faces_flat[i+1], faces_flat[i+2], faces_flat[i+3]])
+                elif n_verts == 4:
+                    # Triangulate quads
+                    faces.append([faces_flat[i+1], faces_flat[i+2], faces_flat[i+3]])
+                    faces.append([faces_flat[i+1], faces_flat[i+3], faces_flat[i+4]])
+                i += n_verts + 1
+            faces = np.array(faces, dtype=np.int32)
+        else:
+            return None, f"VTK file has no faces: {file_path}"
+
+        if len(vertices) == 0 or len(faces) == 0:
+            return None, f"VTK file is empty: {file_path}"
+
+        print(f"[load_mesh_file] VTK mesh: {len(vertices)} vertices, {len(faces)} faces")
+
+        # Create trimesh
+        mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=True)
+
+        # Transfer scalar fields from VTK to trimesh attributes
+        if hasattr(pv_mesh, 'point_data') and pv_mesh.point_data:
+            for name in pv_mesh.point_data.keys():
+                try:
+                    data = np.array(pv_mesh.point_data[name])
+                    if len(data) == len(vertices):
+                        mesh.vertex_attributes[name] = data.astype(np.float32)
+                        print(f"[load_mesh_file] Transferred vertex attribute: {name}")
+                except Exception:
+                    pass
+
+        if hasattr(pv_mesh, 'cell_data') and pv_mesh.cell_data:
+            for name in pv_mesh.cell_data.keys():
+                try:
+                    data = np.array(pv_mesh.cell_data[name])
+                    if len(data) == len(faces):
+                        mesh.face_attributes[name] = data.astype(np.float32)
+                        print(f"[load_mesh_file] Transferred face attribute: {name}")
+                except Exception:
+                    pass
+
+        # Store metadata
+        mesh.metadata['file_path'] = file_path
+        mesh.metadata['file_name'] = os.path.basename(file_path)
+        mesh.metadata['file_format'] = os.path.splitext(file_path)[1].lower()
+
+        print(f"[load_mesh_file] ✓ Successfully loaded VTK: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        return mesh, ""
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return None, f"Error loading VTK file: {str(e)}"
+
+
 def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
     """
     Load a mesh from file.
@@ -78,13 +182,18 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
     Ensures the returned mesh has only triangular faces and is properly processed.
 
     Args:
-        file_path: Path to mesh file (OBJ, PLY, STL, OFF, etc.)
+        file_path: Path to mesh file (OBJ, PLY, STL, OFF, VTP, VTU, etc.)
 
     Returns:
         Tuple of (mesh, error_message)
     """
     if not os.path.exists(file_path):
         return None, f"File not found: {file_path}"
+
+    # Check for VTK formats (VTP, VTU) - require pyvista
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext in ['.vtp', '.vtu', '.vtk']:
+        return _load_vtk_mesh(file_path)
 
     try:
         print(f"[load_mesh_file] Loading: {file_path}")
@@ -228,7 +337,13 @@ def save_mesh_file(mesh: trimesh.Trimesh, file_path: str) -> Tuple[bool, str]:
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
 
-        # Export the mesh
+        # Handle VTP format specially - preserves vertex/face attributes (e.g., cad_face_id)
+        if file_path.lower().endswith('.vtp'):
+            from ..visualization._vtp_export import export_mesh_with_scalars_vtp
+            export_mesh_with_scalars_vtp(mesh, file_path)
+            return True, ""
+
+        # Default: use trimesh export
         mesh.export(file_path)
 
         return True, ""
