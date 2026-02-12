@@ -20,7 +20,7 @@ class TextureToGeometryNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "image": ("IMAGE",),
+                "mask": ("MASK",),
                 "height_scale": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.01,
@@ -47,16 +47,16 @@ class TextureToGeometryNode:
     FUNCTION = "texture_to_geometry"
     CATEGORY = "geompack/texture_remeshing"
 
-    def texture_to_geometry(self, image, height_scale, base_resolution,
+    def texture_to_geometry(self, mask, height_scale, base_resolution,
                            invert_height="false", smooth_normals="true"):
         """
-        Convert heightmap image to 3D mesh.
+        Convert binary mask to 3D mesh with height displacement.
 
         Args:
-            image: Input IMAGE tensor (B, H, W, C) from ComfyUI
+            mask: Input MASK tensor (B, H, W) from ComfyUI (binary 0/1 values)
             height_scale: Scale factor for height displacement
             base_resolution: Resolution of base mesh grid
-            invert_height: Invert the heightmap (dark=high, light=low)
+            invert_height: Invert the mask (0=high, 1=low)
             smooth_normals: Compute smooth vertex normals
 
         Returns:
@@ -68,25 +68,22 @@ class TextureToGeometryNode:
         except ImportError:
             raise RuntimeError("torch and PIL required. Install with: pip install torch Pillow")
 
-        print(f"[TextureToGeometry] Converting texture to geometry")
+        print(f"[TextureToGeometry] Converting mask to geometry")
 
-        # Extract image from ComfyUI tensor format (B, H, W, C)
-        if isinstance(image, torch.Tensor):
-            # Get first image in batch
-            img_array = image[0].cpu().numpy()
+        # Extract mask from ComfyUI tensor format (B, H, W)
+        if isinstance(mask, torch.Tensor):
+            # Get first mask in batch
+            heightmap = mask[0].cpu().numpy()
         else:
-            img_array = np.array(image)
+            heightmap = np.array(mask)
 
-        # Convert to grayscale for heightmap
-        if len(img_array.shape) == 3 and img_array.shape[2] >= 3:
-            # RGB to grayscale using standard weights
-            heightmap = 0.299 * img_array[:, :, 0] + 0.587 * img_array[:, :, 1] + 0.114 * img_array[:, :, 2]
-        else:
-            heightmap = img_array[:, :, 0]
+        # Ensure 2D array (masks are single-channel)
+        if len(heightmap.shape) > 2:
+            heightmap = heightmap[:, :, 0] if heightmap.shape[2] == 1 else heightmap
 
-        print(f"[TextureToGeometry] Heightmap size: {heightmap.shape}, range: [{heightmap.min():.3f}, {heightmap.max():.3f}]")
+        print(f"[TextureToGeometry] Mask size: {heightmap.shape}, range: [{heightmap.min():.3f}, {heightmap.max():.3f}]")
 
-        # Resize heightmap to base resolution
+        # Resize mask to base resolution (already normalized 0-1)
         heightmap_pil = Image.fromarray((heightmap * 255).astype(np.uint8))
         heightmap_pil = heightmap_pil.resize((base_resolution, base_resolution), Image.Resampling.LANCZOS)
         heightmap = np.array(heightmap_pil).astype(np.float32) / 255.0
@@ -142,10 +139,10 @@ class TextureToGeometryNode:
         height_max = vertices[:, 2].max()
         height_range = height_max - height_min
 
-        info = f"""Texture to Geometry Results:
+        info = f"""Depth Map to Mesh Results:
 
 Input:
-  Heightmap Size: {img_array.shape[0]}x{img_array.shape[1]}
+  Mask Size: {mask.shape[1] if isinstance(mask, torch.Tensor) else heightmap.shape[0]}x{mask.shape[2] if isinstance(mask, torch.Tensor) else heightmap.shape[1]}
   Base Resolution: {base_resolution}x{base_resolution}
   Height Scale: {height_scale}
   Inverted: {invert_height}
@@ -156,7 +153,7 @@ Output Mesh:
   Height Range: [{height_min:.3f}, {height_max:.3f}] (span: {height_range:.3f})
   Bounds: {mesh.bounds.tolist()}
 
-Note: Heightmap brightness controls vertex displacement in Z-axis.
+Note: Binary mask values (0/1) control vertex displacement in Z-axis.
 """
 
         return (mesh, info)
@@ -168,5 +165,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackTextureToGeometry": "Texture to Geometry",
+    "GeomPackTextureToGeometry": "Depth Map to Mesh",
 }
