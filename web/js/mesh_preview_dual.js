@@ -39,7 +39,11 @@ app.registerExtension({
                 console.log('[GeomPack Dual] Created iframe with minHeight:', iframe.style.minHeight);
 
                 // Point to unified dual VTK.js HTML viewer (with cache buster)
+                // Note: viewer will be dynamically switched based on mode in onExecuted
                 iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_dual.html?v=" + Date.now();
+
+                // Track current viewer type to avoid unnecessary reloads
+                let currentViewerType = "fields";
 
                 // Create mesh info panel
                 const infoPanel = document.createElement("div");
@@ -126,6 +130,14 @@ app.registerExtension({
                     }
 
                     const layout = message.layout[0];
+                    const mode = message.mode?.[0] || "fields";
+                    console.log(`[GeomPack Dual] onExecuted: layout=${layout}, mode=${mode}`);
+
+                    // Determine which viewer to use based on mode
+                    const viewerType = mode === "texture" ? "texture" : "fields";
+                    const viewerUrl = viewerType === "texture"
+                        ? "/extensions/ComfyUI-GeometryPack/viewer_dual_textured.html"
+                        : "/extensions/ComfyUI-GeometryPack/viewer_dual.html";
 
                     let infoHTML = '';
                     let postMessageData = {
@@ -157,8 +169,15 @@ app.registerExtension({
                         const extentsStr2 = extents2.length === 3 ?
                             `${extents2.map(v => v.toFixed(2)).join(' × ')}` : 'N/A';
 
+                        // Build info panel with mode info
+                        const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
+                        const modeColor = mode === "texture" ? '#c8c' : '#6cc';
+
                         infoHTML = `
                             <div style="display: grid; grid-template-columns: auto 1fr 1fr; gap: 2px 12px;">
+                                <span style="color: #888;">Mode:</span>
+                                <span colspan="2" style="grid-column: 2 / 4; color: ${modeColor}; font-weight: bold;">${modeLabel}</span>
+
                                 <span style="color: #888;"></span>
                                 <span style="color: #999; font-weight: bold; border-bottom: 1px solid #333;">Mesh 1</span>
                                 <span style="color: #999; font-weight: bold; border-bottom: 1px solid #333;">Mesh 2</span>
@@ -189,13 +208,27 @@ app.registerExtension({
                             `;
                         }
 
-                        // Add field info if available
-                        if (message.common_fields && message.common_fields[0].length > 0) {
-                            const commonFields = message.common_fields[0];
-                            infoHTML += `
-                                <span style="color: #888;">Fields:</span>
-                                <span colspan="2" style="grid-column: 2 / 4; color: #9c9;">${commonFields.length} shared field(s)</span>
-                            `;
+                        // Add mode-specific metadata
+                        if (mode === "texture") {
+                            // Texture mode info
+                            if (message.has_texture_1 !== undefined) {
+                                const tex1 = message.has_texture_1[0] ? 'Yes' : 'No';
+                                const tex2 = message.has_texture_2[0] ? 'Yes' : 'No';
+                                infoHTML += `
+                                    <span style="color: #888;">Textures:</span>
+                                    <span style="color: ${message.has_texture_1[0] ? '#c8c' : '#888'};">${tex1}</span>
+                                    <span style="color: ${message.has_texture_2[0] ? '#c8c' : '#888'};">${tex2}</span>
+                                `;
+                            }
+                        } else {
+                            // Fields mode info
+                            if (message.common_fields && message.common_fields[0].length > 0) {
+                                const commonFields = message.common_fields[0];
+                                infoHTML += `
+                                    <span style="color: #888;">Fields:</span>
+                                    <span colspan="2" style="grid-column: 2 / 4; color: #9c9;">${commonFields.length} shared field(s)</span>
+                                `;
+                            }
                         }
 
                         infoHTML += '</div>';
@@ -221,8 +254,15 @@ app.registerExtension({
                         const faces1 = message.face_count_1?.[0] || 'N/A';
                         const faces2 = message.face_count_2?.[0] || 'N/A';
 
+                        // Build info panel with mode info
+                        const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
+                        const modeColor = mode === "texture" ? '#c8c' : '#6cc';
+
                         infoHTML = `
                             <div style="display: grid; grid-template-columns: auto 1fr 1fr; gap: 2px 12px;">
+                                <span style="color: #888;">Mode:</span>
+                                <span colspan="2" style="grid-column: 2 / 4; color: ${modeColor}; font-weight: bold;">${modeLabel} (Overlay)</span>
+
                                 <span style="color: #888;"></span>
                                 <span style="color: #999; font-weight: bold; border-bottom: 1px solid #333;">Mesh 1</span>
                                 <span style="color: #999; font-weight: bold; border-bottom: 1px solid #333;">Mesh 2</span>
@@ -236,13 +276,27 @@ app.registerExtension({
                                 <span>${faces2.toLocaleString()}</span>
                         `;
 
-                        // Add color info if using vertex coloring
-                        if (message.mesh_1_color && message.mesh_2_color) {
-                            infoHTML += `
-                                <span style="color: #888;">Colors:</span>
-                                <span>${message.mesh_1_color[0]}</span>
-                                <span>${message.mesh_2_color[0]}</span>
-                            `;
+                        // Add mode-specific metadata
+                        if (mode === "texture") {
+                            // Texture mode info
+                            if (message.has_texture_1 !== undefined) {
+                                const tex1 = message.has_texture_1[0] ? 'Yes' : 'No';
+                                const tex2 = message.has_texture_2[0] ? 'Yes' : 'No';
+                                infoHTML += `
+                                    <span style="color: #888;">Textures:</span>
+                                    <span style="color: ${message.has_texture_1[0] ? '#c8c' : '#888'};">${tex1}</span>
+                                    <span style="color: ${message.has_texture_2[0] ? '#c8c' : '#888'};">${tex2}</span>
+                                `;
+                            }
+                        } else {
+                            // Fields mode info
+                            if (message.common_fields && message.common_fields[0].length > 0) {
+                                const commonFields = message.common_fields[0];
+                                infoHTML += `
+                                    <span style="color: #888;">Fields:</span>
+                                    <span colspan="2" style="grid-column: 2 / 4; color: #9c9;">${commonFields.length} shared field(s)</span>
+                                `;
+                            }
                         }
 
                         infoHTML += '</div>';
@@ -265,11 +319,29 @@ app.registerExtension({
                         }
                     };
 
-                    // Send message after iframe is loaded
-                    if (iframeLoaded) {
-                        sendMessage();
+                    // Reload iframe if viewer type changed
+                    if (viewerType !== currentViewerType) {
+                        console.log(`[GeomPack Dual] Switching viewer from ${currentViewerType} to ${viewerType}`);
+                        currentViewerType = viewerType;
+                        iframeLoaded = false;
+
+                        // Set up one-time load listener before changing src
+                        const onViewerLoaded = () => {
+                            console.log("[GeomPack Dual] New viewer loaded, sending mesh");
+                            iframeLoaded = true;
+                            sendMessage();
+                        };
+                        iframe.addEventListener('load', onViewerLoaded, { once: true });
+
+                        // Change iframe src to trigger reload
+                        iframe.src = viewerUrl + "?v=" + Date.now();
                     } else {
-                        setTimeout(sendMessage, 500);
+                        // No viewer change needed, send message immediately or after short delay
+                        if (iframeLoaded) {
+                            sendMessage();
+                        } else {
+                            setTimeout(sendMessage, 500);
+                        }
                     }
                 };
 

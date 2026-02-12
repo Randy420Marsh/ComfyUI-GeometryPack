@@ -40,7 +40,11 @@ app.registerExtension({
                 iframe.style.backgroundColor = "#2a2a2a";
 
                 // Point to VTK.js HTML viewer (with cache buster)
+                // Note: viewer will be dynamically switched based on mode in onExecuted
                 iframe.src = "/extensions/ComfyUI-GeometryPack/viewer_vtk.html?v=" + Date.now();
+
+                // Track current viewer type to avoid unnecessary reloads
+                let currentViewerType = "fields";
 
                 // Create mesh info panel
                 const infoPanel = document.createElement("div");
@@ -155,7 +159,14 @@ app.registerExtension({
                     // The message IS the UI data (not message.ui)
                     if (message?.mesh_file && message.mesh_file[0]) {
                         const filename = message.mesh_file[0];
-                        console.log(`[GeomPack VTK] Loading mesh: ${filename}`);
+                        const viewerType = message.viewer_type?.[0] || "fields";
+                        const mode = message.mode?.[0] || "fields";
+                        console.log(`[GeomPack VTK] Loading mesh: ${filename}, viewer type: ${viewerType}, mode: ${mode}`);
+
+                        // Determine which viewer HTML to use
+                        const viewerUrl = viewerType === "texture"
+                            ? "/extensions/ComfyUI-GeometryPack/viewer_vtk_textured.html"
+                            : "/extensions/ComfyUI-GeometryPack/viewer_vtk.html";
 
                         // Update mesh info panel with metadata
                         const vertices = message.vertex_count?.[0] || 'N/A';
@@ -177,8 +188,14 @@ app.registerExtension({
                         }
 
                         // Build info HTML
+                        const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
+                        const modeColor = mode === "texture" ? '#c8c' : '#6cc';
+
                         let infoHTML = `
                             <div style="display: grid; grid-template-columns: auto 1fr; gap: 2px 8px;">
+                                <span style="color: #888;">Mode:</span>
+                                <span style="color: ${modeColor}; font-weight: bold;">${modeLabel}</span>
+
                                 <span style="color: #888;">Vertices:</span>
                                 <span>${vertices.toLocaleString()}</span>
 
@@ -192,7 +209,7 @@ app.registerExtension({
                                 <span>${extentsStr}</span>
                         `;
 
-                        // Add optional fields if available
+                        // Add watertight status (always shown)
                         if (message.is_watertight !== undefined) {
                             const watertight = message.is_watertight[0] ? 'Yes' : 'No';
                             const color = message.is_watertight[0] ? '#6c6' : '#c66';
@@ -202,12 +219,45 @@ app.registerExtension({
                             `;
                         }
 
-                        if (message.field_names && message.field_names[0]?.length > 0) {
-                            const fields = message.field_names[0].join(', ');
-                            infoHTML += `
-                                <span style="color: #888;">Fields:</span>
-                                <span style="font-size: 9px;">${fields}</span>
-                            `;
+                        // Add mode-specific info
+                        if (viewerType === "texture") {
+                            // Texture mode info
+                            if (message.visual_kind !== undefined) {
+                                const visualKind = message.visual_kind[0] || 'none';
+                                infoHTML += `
+                                    <span style="color: #888;">Visual Kind:</span>
+                                    <span>${visualKind}</span>
+                                `;
+                            }
+                            if (message.has_texture !== undefined) {
+                                const hasTexture = message.has_texture[0] ? 'Yes' : 'No';
+                                const texColor = message.has_texture[0] ? '#c8c' : '#888';
+                                infoHTML += `
+                                    <span style="color: #888;">Textures:</span>
+                                    <span style="color: ${texColor};">${hasTexture}</span>
+                                `;
+                            }
+                            if (message.has_vertex_colors !== undefined) {
+                                const hasColors = message.has_vertex_colors[0] ? 'Yes' : 'No';
+                                infoHTML += `
+                                    <span style="color: #888;">Vertex Colors:</span>
+                                    <span>${hasColors}</span>
+                                `;
+                            }
+                        } else {
+                            // Fields mode info
+                            if (message.field_names && message.field_names[0]?.length > 0) {
+                                const fields = message.field_names[0].join(', ');
+                                infoHTML += `
+                                    <span style="color: #888;">Fields:</span>
+                                    <span style="font-size: 9px; color: #6cc;">${fields}</span>
+                                `;
+                            } else {
+                                infoHTML += `
+                                    <span style="color: #888;">Fields:</span>
+                                    <span style="color: #888;">None</span>
+                                `;
+                            }
                         }
 
                         infoHTML += '</div>';
@@ -231,13 +281,31 @@ app.registerExtension({
                             }
                         };
 
-                        // Send message after iframe is loaded
-                        if (iframeLoaded) {
-                            console.log("[GeomPack VTK DEBUG] Iframe already loaded, sending immediately");
-                            sendMessage();
+                        // Reload iframe if viewer type changed
+                        if (viewerType !== currentViewerType) {
+                            console.log(`[GeomPack VTK] Switching viewer from ${currentViewerType} to ${viewerType}`);
+                            currentViewerType = viewerType;
+                            iframeLoaded = false;
+
+                            // Set up one-time load listener before changing src
+                            const onViewerLoaded = () => {
+                                console.log("[GeomPack VTK] New viewer loaded, sending mesh");
+                                iframeLoaded = true;
+                                sendMessage();
+                            };
+                            iframe.addEventListener('load', onViewerLoaded, { once: true });
+
+                            // Change iframe src to trigger reload
+                            iframe.src = viewerUrl + "?v=" + Date.now();
                         } else {
-                            console.log("[GeomPack VTK DEBUG] Waiting for iframe to load...");
-                            setTimeout(sendMessage, 500);
+                            // No viewer change needed, send message immediately or after short delay
+                            if (iframeLoaded) {
+                                console.log("[GeomPack VTK DEBUG] Iframe already loaded, sending immediately");
+                                sendMessage();
+                            } else {
+                                console.log("[GeomPack VTK DEBUG] Waiting for iframe to load...");
+                                setTimeout(sendMessage, 500);
+                            }
                         }
                     } else {
                         console.log("[GeomPack VTK] No mesh_file in message data. Keys:", Object.keys(message || {}));

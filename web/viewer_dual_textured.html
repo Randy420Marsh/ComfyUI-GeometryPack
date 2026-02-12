@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>GeomPack VTK.js Dual Mesh Viewer</title>
+    <title>GeomPack VTK.js Dual Textured Mesh Viewer</title>
     <style>
         body {
             margin: 0;
@@ -357,6 +357,7 @@
         let leftFullScreenRenderer, rightFullScreenRenderer, singleFullScreenRenderer;
         let leftActor, leftMapper, rightActor, rightMapper, singleActor, singleMapper;
         let leftPolydata, rightPolydata, singlePolydata;
+        let leftActors = [], rightActors = [], singleActors = [];  // GLB actors storage
         let mesh1Bounds, mesh2Bounds, combinedBounds;
         let fieldNames1 = [], fieldNames2 = [], commonFields = [];
 
@@ -549,131 +550,154 @@
         }
 
         // Load mesh function
-        async function loadMesh(filepath, targetMapper, isMesh1 = true) {
-            console.log(`[GeomPack VTK Dual Viewer] Loading mesh ${isMesh1 ? '1' : '2'}:`, filepath);
+        // Load GLB mesh using vtkGLTFImporter (texture mode)
+        async function loadGLBMesh(filepath, targetRenderer, isMesh1 = true, isOverlay = false) {
+            const meshLabel = isOverlay ? 'combined' : (isMesh1 ? '1' : '2');
+            console.log(`[GeomPack VTK Dual Textured] Loading GLB ${meshLabel}:`, filepath);
 
             try {
-                const isSTL = filepath.includes('.stl');
-                const isOBJ = filepath.includes('.obj');
-                const isVTP = filepath.includes('.vtp');
-                const isGLB = filepath.includes('.glb');
+                const importer = vtkGLTFImporter.newInstance();
+                importer.setRenderer(targetRenderer);
+                importer.setUrl(filepath);
 
-                let reader;
-                if (isSTL) {
-                    reader = vtkSTLReader.newInstance();
-                } else if (isOBJ) {
-                    reader = vtkOBJReader.newInstance();
-                } else if (isVTP) {
-                    reader = vtkXMLPolyDataReader.newInstance();
-                } else if (isGLB) {
-                    reader = vtkGLTFImporter.newInstance();
-                } else {
-                    throw new Error(`Unsupported file format: ${filepath}`);
-                }
+                // Wait for GLTF parsing
+                await new Promise((resolve, reject) => {
+                    importer.onReady(() => {
+                        console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} parsing completed`);
+                        resolve();
+                    });
+                    importer.loadData().catch(reject);
+                });
 
-                const response = await fetch(filepath);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
+                // Import actors
+                importer.importActors();
 
-                const arrayBuffer = await response.arrayBuffer();
+                // Get actors and apply texture fixes
+                const actorsMap = importer.getActors();
+                const actors = Array.from(actorsMap.values());
 
-                if (isGLB) {
-                    // GLB handling for overlay mode
-                    reader.parseAsArrayBuffer(arrayBuffer);
-                    await reader.update();
-                    const source = reader.getOutputData();
-                    targetMapper.setInputData(source);
-                    targetMapper.update();
+                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} loaded, ${actors.length} actors`);
 
-                    // Extract polydata and calculate bounds
-                    const polydata = targetMapper.getInputData();
-                    if (!polydata) {
-                        throw new Error('Failed to extract polydata from GLB');
+                let bounds = null;
+                actors.forEach((actor, actorIndex) => {
+                    const mapper = actor.getMapper();
+                    const property = actor.getProperty();
+                    const input = mapper?.getInputData();
+
+                    const numPoints = input?.getNumberOfPoints() || 0;
+                    console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex}:`, {
+                        points: numPoints,
+                        hasDiffuseTexture: property ? !!property.getDiffuseTexture() : false,
+                        hasMapper: !!mapper,
+                        hasProperty: !!property,
+                        visibility: actor.getVisibility(),
+                        opacity: property?.getOpacity()
+                    });
+
+                    // Skip actors with no geometry - they serve no purpose and may cause rendering issues
+                    if (numPoints === 0) {
+                        console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} has NO geometry, removing from renderer`);
+                        targetRenderer.removeActor(actor);
+                        return; // Skip this actor entirely
                     }
 
-                    console.log(`[GeomPack VTK Dual Viewer] GLB loaded, extracting polydata...`);
-
-                    const bounds = polydata.getBounds();
-
-                    // Store polydata and bounds based on which mapper is being used
-                    if (targetMapper === singleMapper) {
-                        // Overlay mode
-                        singlePolydata = polydata;
-                        mesh1Bounds = bounds;  // Used by updateCombinedBounds()
-                        console.log(`[GeomPack VTK Dual Viewer] Stored to singlePolydata, bounds:`, bounds);
-                    } else if (isMesh1) {
-                        // Side-by-side mode, mesh 1
-                        leftPolydata = polydata;
-                        mesh1Bounds = bounds;
-                        console.log(`[GeomPack VTK Dual Viewer] Stored to leftPolydata, bounds:`, bounds);
-                    } else {
-                        // Side-by-side mode, mesh 2
-                        rightPolydata = polydata;
-                        mesh2Bounds = bounds;
-                        console.log(`[GeomPack VTK Dual Viewer] Stored to rightPolydata, bounds:`, bounds);
-                    }
-                } else {
-                    // STL/OBJ/VTP handling
-                    if (isSTL) {
-                        reader.parseAsArrayBuffer(arrayBuffer);
-                    } else if (isOBJ) {
-                        const text = new TextDecoder().decode(arrayBuffer);
-                        reader.parseAsText(text);
-                    } else if (isVTP) {
-                        reader.parseAsArrayBuffer(arrayBuffer);
-                    }
-
-                    const polydata = reader.getOutputData();
-                    if (!polydata) {
-                        throw new Error('Failed to parse mesh data');
-                    }
-
-                    // Extract field information from reader output (before normals filter)
-                    // We'll store the actual polydata reference later from mapper input
-                    if (isVTP) {
-                        const pointData = polydata.getPointData();
-                        const cellData = polydata.getCellData();
-                        const fields = [];
-
-                        for (let i = 0; i < pointData.getNumberOfArrays(); i++) {
-                            const array = pointData.getArray(i);
-                            fields.push(array.getName());
-                        }
-                        for (let i = 0; i < cellData.getNumberOfArrays(); i++) {
-                            const array = cellData.getArray(i);
-                            fields.push(`face.${array.getName()}`);
-                        }
-
-                        if (isMesh1) {
-                            fieldNames1 = fields;
+                    if (input && input.getNumberOfPoints() > 0) {
+                        // Calculate bounds
+                        const actorBounds = input.getBounds();
+                        if (!bounds) {
+                            bounds = actorBounds;
                         } else {
-                            fieldNames2 = fields;
+                            bounds = [
+                                Math.min(bounds[0], actorBounds[0]),
+                                Math.max(bounds[1], actorBounds[1]),
+                                Math.min(bounds[2], actorBounds[2]),
+                                Math.max(bounds[3], actorBounds[3]),
+                                Math.min(bounds[4], actorBounds[4]),
+                                Math.max(bounds[5], actorBounds[5])
+                            ];
+                        }
+
+                        // Apply texture fixes from viewer_vtk_textured.html
+                        if (property) {
+                            const diffuseTexture = property.getDiffuseTexture();
+                            if (diffuseTexture) {
+                                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} HAS diffuseTexture, applying...`);
+                                actor.addTexture(diffuseTexture);
+
+                                // CRITICAL FIX: Set texture repeat mode to handle out-of-range UVs
+                                // By default, textures clamp which causes zoomed-in appearance when UVs > 1.0
+                                // Setting to REPEAT makes UVs wrap around correctly
+                                diffuseTexture.setRepeat(true);
+                                diffuseTexture.setEdgeClamp(false);
+
+                                // Also set interpolation for better quality
+                                diffuseTexture.setInterpolate(true);
+
+                                // Debug texture info
+                                const img = diffuseTexture.getImage?.();
+                                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} texture image:`, img ? `${img.width}x${img.height}` : 'null (loading async)');
+
+                                // Verify texture was added to actor
+                                const actorTextures = actor.getTextures();
+                                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} textures count after addTexture:`, actorTextures ? actorTextures.length : 0);
+                            } else {
+                                console.warn(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} has NO diffuseTexture!`);
+                            }
+
+                            // Set Phong shading
+                            property.setInterpolation(2);
+                            if (property.getRMTexture?.()) {
+                                property.setRMTexture(null);
+                            }
+
+                            // Configure material properties
+                            property.setMetallic(0.0);
+                            property.setRoughness(1.0);
+                            property.setAmbient(0.2);
+                            property.setDiffuse(0.9);
+                            property.setSpecular(0.1);
+                            property.setSpecularPower(10.0);
+                            property.modified();
+                        }
+
+                        // Configure mapper and check UV coordinates
+                        if (mapper) {
+                            mapper.setScalarVisibility(false);
+                            mapper.setColorMode(0);
+                            if (mapper.setInterpolateScalarsBeforeMapping) {
+                                mapper.setInterpolateScalarsBeforeMapping(false);
+                            }
+
+                            // Debug: Check UV coordinates
+                            if (input) {
+                                const tcoords = input.getPointData().getTCoords();
+                                if (tcoords) {
+                                    const range = tcoords.getRange();
+                                    const numTuples = tcoords.getNumberOfTuples();
+                                    console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} UVs: ${numTuples} coords, range=[${range[0].toFixed(4)}, ${range[1].toFixed(4)}]`);
+                                } else {
+                                    console.warn(`[GeomPack VTK Dual Textured] GLB ${meshLabel} actor ${actorIndex} has NO UV coordinates!`);
+                                }
+                            }
                         }
                     }
+                });
 
-                    // Set up pipeline
-                    const normalsFilter = vtkPolyDataNormals.newInstance();
-                    normalsFilter.setInputConnection(reader.getOutputPort());
-                    targetMapper.setInputConnection(normalsFilter.getOutputPort());
-                    targetMapper.update();
-
-                    // CRITICAL: Store the polydata from mapper input, NOT reader output!
-                    // The normals filter creates a new polydata with computed normals
-                    const mapperPolydata = targetMapper.getInputData();
-
-                    if (isMesh1) {
-                        leftPolydata = mapperPolydata;  // Store mapper's input
-                        mesh1Bounds = mapperPolydata.getBounds();
-                    } else {
-                        rightPolydata = mapperPolydata;  // Store mapper's input
-                        mesh2Bounds = mapperPolydata.getBounds();
-                    }
+                // Store bounds and actors based on mode
+                if (isOverlay) {
+                    mesh1Bounds = bounds;  // Used by updateCombinedBounds()
+                    singleActors = actors;
+                } else if (isMesh1) {
+                    mesh1Bounds = bounds;
+                    leftActors = actors;
+                } else {
+                    mesh2Bounds = bounds;
+                    rightActors = actors;
                 }
 
-                console.log(`[GeomPack VTK Dual Viewer] Mesh ${isMesh1 ? '1' : '2'} loaded successfully`);
+                console.log(`[GeomPack VTK Dual Textured] GLB ${meshLabel} loaded successfully, bounds:`, bounds);
             } catch (error) {
-                console.error(`[GeomPack VTK Dual Viewer] Error loading mesh ${isMesh1 ? '1' : '2'}:`, error);
+                console.error(`[GeomPack VTK Dual Textured] Error loading GLB ${meshLabel}:`, error);
                 throw error;
             }
         }
@@ -899,11 +923,11 @@
             if (event.data.type === 'LOAD_DUAL_MESH') {
                 const data = event.data;
 
-                console.log('[GeomPack VTK Dual Viewer] Received LOAD_DUAL_MESH message:', data);
+                console.log('[GeomPack VTK Dual Textured] Received LOAD_DUAL_MESH message:', data);
 
                 viewerLayout = data.layout;
 
-                loading.textContent = 'Loading meshes...';
+                loading.textContent = 'Loading textured meshes...';
                 loading.style.display = 'block';
 
                 try {
@@ -917,13 +941,19 @@
                         const mesh1Changed = currentMesh1Path !== data.mesh1Filepath;
                         const mesh2Changed = currentMesh2Path !== data.mesh2Filepath;
 
-                        if (mesh1Changed || !leftPolydata) {
-                            await loadMesh(data.mesh1Filepath, leftMapper, true);
+                        if (mesh1Changed || leftActors.length === 0) {
+                            // Clear previous actors
+                            leftActors.forEach(actor => leftRenderer.removeActor(actor));
+                            leftActors = [];
+                            await loadGLBMesh(data.mesh1Filepath, leftRenderer, true);
                             currentMesh1Path = data.mesh1Filepath;
                         }
 
-                        if (mesh2Changed || !rightPolydata) {
-                            await loadMesh(data.mesh2Filepath, rightMapper, false);
+                        if (mesh2Changed || rightActors.length === 0) {
+                            // Clear previous actors
+                            rightActors.forEach(actor => rightRenderer.removeActor(actor));
+                            rightActors = [];
+                            await loadGLBMesh(data.mesh2Filepath, rightRenderer, false);
                             currentMesh2Path = data.mesh2Filepath;
                         }
 
@@ -946,8 +976,11 @@
                         // Check if mesh has changed before reloading
                         const meshChanged = currentMeshPath !== data.meshFilepath;
 
-                        if (meshChanged || !singlePolydata) {
-                            await loadMesh(data.meshFilepath, singleMapper, true);
+                        if (meshChanged || singleActors.length === 0) {
+                            // Clear previous actors
+                            singleActors.forEach(actor => singleRenderer.removeActor(actor));
+                            singleActors = [];
+                            await loadGLBMesh(data.meshFilepath, singleRenderer, true, true);  // isOverlay = true
                             currentMeshPath = data.meshFilepath;
                         }
 
@@ -956,65 +989,20 @@
                         renderWithClippingRangeUpdate(singleRenderer, singleRenderWindow);
                     }
 
-                    // Populate field selectors (preserves current selections)
-                    populateColormapSelector();
-                    populateFieldSelectors();
-
-                    // Re-apply field visualization after populating selectors
-                    const fieldMode = document.getElementById('fieldMode')?.value || 'synchronized';
-
-                    if (viewerLayout === 'side_by_side') {
-                        if (fieldMode === 'independent') {
-                            const field1 = document.getElementById('field1Selector')?.value;
-                            const field2 = document.getElementById('field2Selector')?.value;
-                            if (field1 && field1 !== 'none' && leftPolydata) {
-                                applyFieldToMapper(leftMapper, leftPolydata, field1);
-                            }
-                            if (field2 && field2 !== 'none' && rightPolydata) {
-                                applyFieldToMapper(rightMapper, rightPolydata, field2);
-                            }
-                        } else if (fieldMode === 'synchronized') {
-                            const sharedField = document.getElementById('sharedFieldSelector')?.value;
-                            if (sharedField && sharedField !== 'none') {
-                                // Calculate shared range from both meshes
-                                let sharedRange = null;
-                                if (leftPolydata && rightPolydata) {
-                                    const isCellData = sharedField.startsWith('face.');
-                                    const actualFieldName = isCellData ? sharedField.substring(5) : sharedField;
-
-                                    const leftData = isCellData ? leftPolydata.getCellData() : leftPolydata.getPointData();
-                                    const rightData = isCellData ? rightPolydata.getCellData() : rightPolydata.getPointData();
-
-                                    const leftArray = leftData.getArrayByName(actualFieldName);
-                                    const rightArray = rightData.getArrayByName(actualFieldName);
-
-                                    if (leftArray && rightArray) {
-                                        const [leftMin, leftMax] = leftArray.getRange();
-                                        const [rightMin, rightMax] = rightArray.getRange();
-                                        sharedRange = [Math.min(leftMin, rightMin), Math.max(leftMax, rightMax)];
-                                    }
-                                }
-
-                                if (leftPolydata) applyFieldToMapper(leftMapper, leftPolydata, sharedField, sharedRange);
-                                if (rightPolydata) applyFieldToMapper(rightMapper, rightPolydata, sharedField, sharedRange);
-                            }
-                        }
-
-                        // Re-render both viewports
-                        if (leftRenderWindow && rightRenderWindow) {
-                            renderWithClippingRangeUpdate(leftRenderer, leftRenderWindow);
-                            renderWithClippingRangeUpdate(rightRenderer, rightRenderWindow);
-                        }
+                    // Hide field controls in texture mode
+                    const fieldControls = document.getElementById('fieldControls');
+                    if (fieldControls) {
+                        fieldControls.style.display = 'none';
                     }
 
                     // Mark as initialized
                     isInitialized = true;
 
                     loading.style.display = 'none';
-                    console.log('[GeomPack VTK Dual Viewer] Meshes loaded successfully');
+                    console.log('[GeomPack VTK Dual Textured] Meshes loaded successfully');
 
                 } catch (error) {
-                    console.error('[GeomPack VTK Dual Viewer] Error loading meshes:', error);
+                    console.error('[GeomPack VTK Dual Textured] Error loading meshes:', error);
                     loading.textContent = `Error: ${error.message}`;
                     loading.style.color = '#ff6b6b';
                 }
@@ -1082,38 +1070,48 @@
 
             // Apply settings to actors
             if (viewerLayout === 'side_by_side') {
-                // Apply to both actors in side-by-side mode
-                const leftProperty = leftActor.getProperty();
-                const rightProperty = rightActor.getProperty();
-
-                leftProperty.setPointSize(newPointSize);
-                leftProperty.setColor(r, g, b);
-                leftProperty.setLineWidth(newEdgeWidth);
-                leftProperty.setRepresentation(newRepresentation);
-
-                rightProperty.setPointSize(newPointSize);
-                rightProperty.setColor(r, g, b);
-                rightProperty.setLineWidth(newEdgeWidth);
-                rightProperty.setRepresentation(newRepresentation);
+                // Apply to all actors in side-by-side mode (GLB can have multiple actors)
+                leftActors.forEach(actor => {
+                    if (actor && actor.getProperty) {
+                        const property = actor.getProperty();
+                        property.setPointSize(newPointSize);
+                        property.setColor(r, g, b);
+                        property.setLineWidth(newEdgeWidth);
+                        property.setRepresentation(newRepresentation);
+                    }
+                });
+                rightActors.forEach(actor => {
+                    if (actor && actor.getProperty) {
+                        const property = actor.getProperty();
+                        property.setPointSize(newPointSize);
+                        property.setColor(r, g, b);
+                        property.setLineWidth(newEdgeWidth);
+                        property.setRepresentation(newRepresentation);
+                    }
+                });
 
                 // Apply parallel projection to both cameras
-                leftRenderer.getActiveCamera().setParallelProjection(newParallelProjection);
-                rightRenderer.getActiveCamera().setParallelProjection(newParallelProjection);
+                if (leftRenderer) leftRenderer.getActiveCamera().setParallelProjection(newParallelProjection);
+                if (rightRenderer) rightRenderer.getActiveCamera().setParallelProjection(newParallelProjection);
 
-                leftRenderWindow.render();
-                rightRenderWindow.render();
+                if (leftRenderWindow) leftRenderWindow.render();
+                if (rightRenderWindow) rightRenderWindow.render();
             } else {
-                // Apply to single actor in overlay mode
-                const property = singleActor.getProperty();
-                property.setPointSize(newPointSize);
-                property.setColor(r, g, b);
-                property.setLineWidth(newEdgeWidth);
-                property.setRepresentation(newRepresentation);
+                // Apply to all actors in overlay mode
+                singleActors.forEach(actor => {
+                    if (actor && actor.getProperty) {
+                        const property = actor.getProperty();
+                        property.setPointSize(newPointSize);
+                        property.setColor(r, g, b);
+                        property.setLineWidth(newEdgeWidth);
+                        property.setRepresentation(newRepresentation);
+                    }
+                });
 
                 // Apply parallel projection to camera
-                singleRenderer.getActiveCamera().setParallelProjection(newParallelProjection);
+                if (singleRenderer) singleRenderer.getActiveCamera().setParallelProjection(newParallelProjection);
 
-                singleRenderWindow.render();
+                if (singleRenderWindow) singleRenderWindow.render();
             }
 
             // Update stored settings
@@ -1132,14 +1130,30 @@
         // Event handlers
         document.getElementById('showEdges').addEventListener('change', (e) => {
             const edgeViz = e.target.checked;
+            console.log(`[GeomPack VTK Dual Textured] Edges toggle: ${edgeViz}`);
+
             if (viewerLayout === 'side_by_side') {
-                leftActor.getProperty().setEdgeVisibility(edgeViz);
-                rightActor.getProperty().setEdgeVisibility(edgeViz);
-                leftRenderWindow.render();
-                rightRenderWindow.render();
+                // Apply to all actors in left and right (GLB can have multiple actors)
+                leftActors.forEach(actor => {
+                    if (actor && actor.getProperty) {
+                        actor.getProperty().setEdgeVisibility(edgeViz);
+                    }
+                });
+                rightActors.forEach(actor => {
+                    if (actor && actor.getProperty) {
+                        actor.getProperty().setEdgeVisibility(edgeViz);
+                    }
+                });
+                if (leftRenderWindow) leftRenderWindow.render();
+                if (rightRenderWindow) rightRenderWindow.render();
             } else {
-                singleActor.getProperty().setEdgeVisibility(edgeViz);
-                singleRenderWindow.render();
+                // Apply to all actors in single overlay
+                singleActors.forEach(actor => {
+                    if (actor && actor.getProperty) {
+                        actor.getProperty().setEdgeVisibility(edgeViz);
+                    }
+                });
+                if (singleRenderWindow) singleRenderWindow.render();
             }
         });
 
