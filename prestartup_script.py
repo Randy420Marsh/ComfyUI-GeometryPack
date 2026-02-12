@@ -1,6 +1,6 @@
 """
 GeometryPack PreStartup Script
-Copies example 3D assets and workflows to ComfyUI folders on startup.
+Copies example 3D assets to ComfyUI input folder on startup.
 """
 import os
 import shutil
@@ -55,44 +55,5 @@ def copy_example_assets():
     except Exception as e:
         print(f"[GeometryPack] Error copying assets: {e}")
 
-def copy_example_workflows():
-    """Copy workflow files to ComfyUI user workflows directory with GeometryPack- prefix."""
-    try:
-        import folder_paths
-        
-        input_folder = folder_paths.get_input_directory()
-        custom_node_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        workflows_src = os.path.join(custom_node_dir, "workflows")
-        if not os.path.exists(workflows_src):
-            print(f"[GeometryPack] Warning: workflows folder not found at {workflows_src}")
-            return
-        
-        # Get user workflows directory
-        comfyui_root = os.path.dirname(input_folder)
-        user_workflows_dir = os.path.join(comfyui_root, "user", "default", "workflows")
-        os.makedirs(user_workflows_dir, exist_ok=True)
-        
-        # Copy each workflow with prefix
-        copied_count = 0
-        for workflow_file in os.listdir(workflows_src):
-            if workflow_file.endswith('.json'):
-                source_workflow = os.path.join(workflows_src, workflow_file)
-                dest_workflow = os.path.join(user_workflows_dir, f"GeometryPack-{workflow_file}")
-                
-                if not os.path.exists(dest_workflow):
-                    shutil.copy2(source_workflow, dest_workflow)
-                    copied_count += 1
-                    print(f"[GeometryPack] Copied workflow: GeometryPack-{workflow_file}")
-        
-        if copied_count > 0:
-            print(f"[GeometryPack] [OK] Copied {copied_count} workflow(s) to {user_workflows_dir}")
-        else:
-            print(f"[GeometryPack] All workflows already exist in {user_workflows_dir}")
-            
-    except Exception as e:
-        print(f"[GeometryPack] Error copying workflows: {e}")
-
 # Run on import
 copy_example_assets()
-copy_example_workflows()

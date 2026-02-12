@@ -33,7 +33,25 @@ class SkeletonToMesh:
         vertices = skeleton["vertices"]
         edges = skeleton["edges"]
 
+        # Read metadata (with fallback for old skeletons without metadata)
+        scale = skeleton.get("scale", None)
+        center = skeleton.get("center", None)
+        is_normalized = skeleton.get("normalized", True)  # Assume old skeletons were normalized
+
         print(f"[SkeletonToMesh] Creating solid mesh: {len(vertices)} joints, {len(edges)} bones")
+        if scale is not None:
+            print(f"[SkeletonToMesh] Skeleton metadata: scale={scale:.3f}, normalized={is_normalized}")
+
+        # Print input skeleton bounding box
+        skel_min = vertices.min(axis=0)
+        skel_max = vertices.max(axis=0)
+        skel_size = skel_max - skel_min
+        skel_center = (skel_min + skel_max) / 2
+        print(f"[SkeletonToMesh] Input skeleton bounding box:")
+        print(f"  Min: [{skel_min[0]:.3f}, {skel_min[1]:.3f}, {skel_min[2]:.3f}]")
+        print(f"  Max: [{skel_max[0]:.3f}, {skel_max[1]:.3f}, {skel_max[2]:.3f}]")
+        print(f"  Size: [{skel_size[0]:.3f}, {skel_size[1]:.3f}, {skel_size[2]:.3f}]")
+        print(f"  Center: [{skel_center[0]:.3f}, {skel_center[1]:.3f}, {skel_center[2]:.3f}]")
 
         meshes = []
 
@@ -93,6 +111,17 @@ class SkeletonToMesh:
 
         print(f"[SkeletonToMesh] Created mesh: {len(combined_mesh.vertices)} vertices, "
               f"{len(combined_mesh.faces)} faces")
+
+        # Print output mesh bounding box
+        mesh_min = combined_mesh.bounds[0]
+        mesh_max = combined_mesh.bounds[1]
+        mesh_size = mesh_max - mesh_min
+        mesh_center = (mesh_min + mesh_max) / 2
+        print(f"[SkeletonToMesh] Output mesh bounding box:")
+        print(f"  Min: [{mesh_min[0]:.3f}, {mesh_min[1]:.3f}, {mesh_min[2]:.3f}]")
+        print(f"  Max: [{mesh_max[0]:.3f}, {mesh_max[1]:.3f}, {mesh_max[2]:.3f}]")
+        print(f"  Size: [{mesh_size[0]:.3f}, {mesh_size[1]:.3f}, {mesh_size[2]:.3f}]")
+        print(f"  Center: [{mesh_center[0]:.3f}, {mesh_center[1]:.3f}, {mesh_center[2]:.3f}]")
 
         return (combined_mesh,)
 

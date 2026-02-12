@@ -80,7 +80,8 @@ class PreviewMeshDualNode:
             "optional": {
                 "layout": (["side_by_side", "overlay"], {"default": "side_by_side"}),
                 "mode": (["fields", "texture"], {"default": "fields"}),
-                "opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
+                "opacity_1": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
+                "opacity_2": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
             }
         }
 
@@ -89,7 +90,7 @@ class PreviewMeshDualNode:
     FUNCTION = "preview_dual"
     CATEGORY = "geompack/visualization"
 
-    def preview_dual(self, mesh_1, mesh_2, layout="side_by_side", mode="fields", opacity=1.0):
+    def preview_dual(self, mesh_1, mesh_2, layout="side_by_side", mode="fields", opacity_1=1.0, opacity_2=1.0):
         """
         Preview two meshes with chosen layout and visualization mode.
 
@@ -98,7 +99,8 @@ class PreviewMeshDualNode:
             mesh_2: Second trimesh object
             layout: "side_by_side" or "overlay"
             mode: "fields" (scientific visualization) or "texture" (textured rendering)
-            opacity: Opacity for both meshes (0.0-1.0)
+            opacity_1: Opacity for mesh 1 (0.0-1.0)
+            opacity_2: Opacity for mesh 2 (0.0-1.0)
 
         Returns:
             dict: UI data for frontend widget
@@ -161,6 +163,8 @@ class PreviewMeshDualNode:
                 "extents_2": [mesh_2.extents.tolist()],
                 "is_watertight_1": [bool(mesh_1.is_watertight) if not is_point_cloud(mesh_1) else False],
                 "is_watertight_2": [bool(mesh_2.is_watertight) if not is_point_cloud(mesh_2) else False],
+                "opacity_1": [float(opacity_1)],
+                "opacity_2": [float(opacity_2)],
             }
 
             # Add mode-specific metadata
@@ -190,13 +194,13 @@ class PreviewMeshDualNode:
             if mode == "texture":
                 # Texture mode: export combined mesh as GLB
                 filename, filepath = self._export_combined_mesh(
-                    mesh_1, mesh_2, preview_id, opacity,
+                    mesh_1, mesh_2, preview_id, opacity_1, opacity_2,
                     mesh_1_has_fields, mesh_2_has_fields, use_glb=True
                 )
             else:
                 # Fields mode: export combined mesh as VTP
                 filename, filepath = self._export_combined_mesh(
-                    mesh_1, mesh_2, preview_id, opacity,
+                    mesh_1, mesh_2, preview_id, opacity_1, opacity_2,
                     mesh_1_has_fields, mesh_2_has_fields, use_glb=False
                 )
 
@@ -217,7 +221,8 @@ class PreviewMeshDualNode:
                 "bounds_min": [combined_bounds_min.tolist()],
                 "bounds_max": [combined_bounds_max.tolist()],
                 "extents": [combined_extents.tolist()],
-                "opacity": [float(opacity)],
+                "opacity_1": [float(opacity_1)],
+                "opacity_2": [float(opacity_2)],
                 "is_watertight_1": [bool(mesh_1.is_watertight) if not is_point_cloud(mesh_1) else False],
                 "is_watertight_2": [bool(mesh_2.is_watertight) if not is_point_cloud(mesh_2) else False],
             }
@@ -280,9 +285,13 @@ class PreviewMeshDualNode:
 
         return filename, filepath
 
-    def _export_combined_mesh(self, mesh_1, mesh_2, preview_id, opacity,
+    def _export_combined_mesh(self, mesh_1, mesh_2, preview_id, opacity_1, opacity_2,
                               mesh_1_has_fields, mesh_2_has_fields, use_glb):
-        """Export combined mesh for overlay mode as VTP or GLB."""
+        """Export combined mesh for overlay mode as VTP or GLB.
+
+        Note: opacity_1 and opacity_2 are passed but not used in export.
+        They are applied on the frontend in the viewer.
+        """
 
         # Combine meshes (with or without fields)
         try:

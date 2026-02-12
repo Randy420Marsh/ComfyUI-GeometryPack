@@ -36,7 +36,8 @@ class ExtractSkeleton:
     """
     Extract skeleton from 3D mesh using Skeletor library.
 
-    Outputs normalized skeleton data (vertices + edges) in [-1, 1] range.
+    Outputs skeleton data (vertices + edges) with optional normalization to [-1, 1] range.
+    By default, preserves the original mesh scale.
     """
 
     @classmethod
@@ -48,6 +49,8 @@ class ExtractSkeleton:
                              {"default": "wavefront"}),
                 "fix_mesh": ("BOOLEAN", {"default": True,
                                         "tooltip": "Fix mesh issues before skeletonization"}),
+                "normalize": ("BOOLEAN", {"default": False,
+                                         "tooltip": "Normalize skeleton to [-1, 1] range (False preserves original mesh scale)"}),
             },
             "optional": {
                 # Wavefront parameters
@@ -81,12 +84,20 @@ class ExtractSkeleton:
     FUNCTION = "extract"
     CATEGORY = "geompack/skeleton"
 
-    def extract(self, trimesh, algorithm, fix_mesh,
+    def extract(self, trimesh, algorithm, fix_mesh, normalize,
                 waves=1, step_size=1.0,
                 sampling_dist=1.0, cluster_pos="median",
                 shape_weight=1.0, sample_weight=0.1,
                 inv_dist=10.0, min_length=0.0):
-        """Extract skeleton from mesh."""
+        """Extract skeleton from mesh.
+
+        Args:
+            trimesh: Input mesh
+            algorithm: Skeletonization algorithm to use
+            fix_mesh: Whether to fix mesh issues before extraction
+            normalize: If True, normalize skeleton to [-1, 1] range. If False, preserve original scale.
+            ... (algorithm-specific parameters)
+        """
         try:
             import skeletor as sk
         except ImportError:
@@ -95,6 +106,17 @@ class ExtractSkeleton:
             )
 
         print(f"[ExtractSkeleton] Extracting skeleton using {algorithm} algorithm...")
+
+        # Print input mesh bounding box
+        mesh_min = trimesh.bounds[0]
+        mesh_max = trimesh.bounds[1]
+        mesh_size = mesh_max - mesh_min
+        mesh_center = (mesh_min + mesh_max) / 2
+        print(f"[ExtractSkeleton] Input mesh bounding box:")
+        print(f"  Min: [{mesh_min[0]:.3f}, {mesh_min[1]:.3f}, {mesh_min[2]:.3f}]")
+        print(f"  Max: [{mesh_max[0]:.3f}, {mesh_max[1]:.3f}, {mesh_max[2]:.3f}]")
+        print(f"  Size: [{mesh_size[0]:.3f}, {mesh_size[1]:.3f}, {mesh_size[2]:.3f}]")
+        print(f"  Center: [{mesh_center[0]:.3f}, {mesh_center[1]:.3f}, {mesh_center[2]:.3f}]")
 
         # Fix mesh if requested
         if fix_mesh:
@@ -146,14 +168,44 @@ class ExtractSkeleton:
 
         print(f"[ExtractSkeleton] Extracted {len(vertices)} joints, {len(edges)} bones")
 
-        # NORMALIZE IMMEDIATELY to [-1, 1]
-        vertices = normalize_skeleton(vertices)
-        print(f"[ExtractSkeleton] Normalized to range [{vertices.min():.3f}, {vertices.max():.3f}]")
+        # Print skeleton bounding box before any normalization
+        skel_min = vertices.min(axis=0)
+        skel_max = vertices.max(axis=0)
+        skel_size = skel_max - skel_min
+        skel_center = (skel_min + skel_max) / 2
+        print(f"[ExtractSkeleton] Skeleton bounding box (original):")
+        print(f"  Min: [{skel_min[0]:.3f}, {skel_min[1]:.3f}, {skel_min[2]:.3f}]")
+        print(f"  Max: [{skel_max[0]:.3f}, {skel_max[1]:.3f}, {skel_max[2]:.3f}]")
+        print(f"  Size: [{skel_size[0]:.3f}, {skel_size[1]:.3f}, {skel_size[2]:.3f}]")
+        print(f"  Center: [{skel_center[0]:.3f}, {skel_center[1]:.3f}, {skel_center[2]:.3f}]")
+
+        # Store original scale and center for metadata
+        original_scale = float((skel_max - skel_min).max() / 2)
+        original_center = skel_center.copy()
+
+        # Conditionally normalize
+        if normalize:
+            vertices = normalize_skeleton(vertices)
+
+            # Print skeleton bounding box after normalization
+            norm_min = vertices.min(axis=0)
+            norm_max = vertices.max(axis=0)
+            norm_size = norm_max - norm_min
+            print(f"[ExtractSkeleton] Skeleton bounding box AFTER normalization:")
+            print(f"  Min: [{norm_min[0]:.3f}, {norm_min[1]:.3f}, {norm_min[2]:.3f}]")
+            print(f"  Max: [{norm_max[0]:.3f}, {norm_max[1]:.3f}, {norm_max[2]:.3f}]")
+            print(f"  Size: [{norm_size[0]:.3f}, {norm_size[1]:.3f}, {norm_size[2]:.3f}]")
+            print(f"  Overall range: [{vertices.min():.3f}, {vertices.max():.3f}]")
+        else:
+            print(f"[ExtractSkeleton] Normalization skipped - preserving original scale")
 
         # Package as skeleton data
         skeleton = {
             "vertices": vertices,  # [N, 3] joint positions
             "edges": edges,        # [M, 2] bone connections (vertex indices)
+            "scale": original_scale,  # Original scale factor (for denormalization if needed)
+            "center": original_center.tolist(),  # Original center point
+            "normalized": normalize,  # Whether this skeleton was normalized
         }
 
         return (skeleton,)

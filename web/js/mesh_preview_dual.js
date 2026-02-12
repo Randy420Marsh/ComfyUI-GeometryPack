@@ -239,6 +239,8 @@ app.registerExtension({
 
                         postMessageData.mesh1Filepath = filepath1;
                         postMessageData.mesh2Filepath = filepath2;
+                        postMessageData.opacity1 = message.opacity_1?.[0] || 1.0;
+                        postMessageData.opacity2 = message.opacity_2?.[0] || 1.0;
 
                     } else {
                         // Overlay mode
@@ -305,6 +307,8 @@ app.registerExtension({
                         const filepath = `/view?filename=${encodeURIComponent(filename)}&type=output&subfolder=`;
 
                         postMessageData.meshFilepath = filepath;
+                        postMessageData.opacity1 = message.opacity_1?.[0] || 1.0;
+                        postMessageData.opacity2 = message.opacity_2?.[0] || 1.0;
                     }
 
                     infoPanel.innerHTML = infoHTML;
