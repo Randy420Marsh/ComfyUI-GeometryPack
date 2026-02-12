@@ -122,10 +122,25 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
         verts_before = len(mesh.vertices)
         faces_before = len(mesh.faces)
 
-        # Merge duplicate vertices and clean up
-        mesh.merge_vertices()
-        mesh.remove_duplicate_faces()
-        mesh.remove_degenerate_faces()
+        # Merge duplicate vertices and clean up (handle API changes in newer trimesh versions)
+        if hasattr(mesh, 'merge_vertices'):
+            mesh.merge_vertices()
+
+        # Try different API names for removing duplicate faces (changed in newer trimesh)
+        if hasattr(mesh, 'remove_duplicate_faces'):
+            mesh.remove_duplicate_faces()
+        elif hasattr(mesh, 'update_faces'):
+            # Newer trimesh uses update_faces with a mask
+            pass  # Skip - mesh should already be clean from trimesh.load
+
+        # Try different API names for removing degenerate faces
+        if hasattr(mesh, 'remove_degenerate_faces'):
+            mesh.remove_degenerate_faces()
+        elif hasattr(mesh, 'nondegenerate_faces'):
+            # Newer API: get mask of non-degenerate faces and update
+            mask = mesh.nondegenerate_faces()
+            if not mask.all():
+                mesh.update_faces(mask)
 
         verts_after = len(mesh.vertices)
         faces_after = len(mesh.faces)
@@ -158,10 +173,19 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
             verts_before = len(mesh.vertices)
             faces_before = len(mesh.faces)
 
-            # Clean up the mesh
-            mesh.merge_vertices()
-            mesh.remove_duplicate_faces()
-            mesh.remove_degenerate_faces()
+            # Clean up the mesh (handle API changes in newer trimesh versions)
+            if hasattr(mesh, 'merge_vertices'):
+                mesh.merge_vertices()
+
+            if hasattr(mesh, 'remove_duplicate_faces'):
+                mesh.remove_duplicate_faces()
+
+            if hasattr(mesh, 'remove_degenerate_faces'):
+                mesh.remove_degenerate_faces()
+            elif hasattr(mesh, 'nondegenerate_faces'):
+                mask = mesh.nondegenerate_faces()
+                if not mask.all():
+                    mesh.update_faces(mask)
 
             verts_after = len(mesh.vertices)
             faces_after = len(mesh.faces)

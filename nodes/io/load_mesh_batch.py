@@ -11,9 +11,14 @@ import os
 try:
     import folder_paths
     COMFYUI_INPUT_FOLDER = folder_paths.get_input_directory()
+    COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
+    # Get ComfyUI root (parent of input/output folders)
+    COMFYUI_ROOT = os.path.dirname(COMFYUI_INPUT_FOLDER)
 except (ImportError, AttributeError):
     # Fallback if folder_paths not available (e.g., during testing)
     COMFYUI_INPUT_FOLDER = None
+    COMFYUI_OUTPUT_FOLDER = None
+    COMFYUI_ROOT = None
 
 from .._utils import mesh_ops
 
@@ -69,21 +74,38 @@ class LoadMeshBatch:
         if not folder_path or folder_path.strip() == "":
             raise ValueError("Folder path cannot be empty")
 
-        # Resolve folder path
+        # Resolve folder path - check multiple locations
+        # Order: ComfyUI root (for paths like "output/folder"), input folder, output folder, absolute
         full_folder_path = None
         searched_paths = []
 
-        if COMFYUI_INPUT_FOLDER is not None:
-            # Try in ComfyUI input folder
+        # 1. Try relative to ComfyUI root (handles "output/mesh_output", "input/3d", etc.)
+        if COMFYUI_ROOT is not None:
+            root_path = os.path.join(COMFYUI_ROOT, folder_path)
+            searched_paths.append(f"{root_path} (ComfyUI root)")
+            if os.path.exists(root_path) and os.path.isdir(root_path):
+                full_folder_path = root_path
+                print(f"[LoadMeshBatch] Found folder relative to ComfyUI root: {folder_path}")
+
+        # 2. Try in ComfyUI input folder
+        if full_folder_path is None and COMFYUI_INPUT_FOLDER is not None:
             input_path = os.path.join(COMFYUI_INPUT_FOLDER, folder_path)
-            searched_paths.append(input_path)
+            searched_paths.append(f"{input_path} (input folder)")
             if os.path.exists(input_path) and os.path.isdir(input_path):
                 full_folder_path = input_path
                 print(f"[LoadMeshBatch] Found folder in input: {folder_path}")
 
-        # If not found, try as absolute path
+        # 3. Try in ComfyUI output folder
+        if full_folder_path is None and COMFYUI_OUTPUT_FOLDER is not None:
+            output_path = os.path.join(COMFYUI_OUTPUT_FOLDER, folder_path)
+            searched_paths.append(f"{output_path} (output folder)")
+            if os.path.exists(output_path) and os.path.isdir(output_path):
+                full_folder_path = output_path
+                print(f"[LoadMeshBatch] Found folder in output: {folder_path}")
+
+        # 4. Try as absolute path
         if full_folder_path is None:
-            searched_paths.append(folder_path)
+            searched_paths.append(f"{folder_path} (absolute)")
             if os.path.exists(folder_path) and os.path.isdir(folder_path):
                 full_folder_path = folder_path
                 print(f"[LoadMeshBatch] Using absolute path: {folder_path}")
