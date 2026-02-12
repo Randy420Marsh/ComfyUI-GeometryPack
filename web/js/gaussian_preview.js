@@ -143,6 +143,13 @@ app.registerExtension({
                             console.error('[GeomPack Gaussian] Error saving screenshot:', error);
                         }
                     }
+                    // Handle copy image to clipboard messages
+                    else if (event.data.type === 'COPY_IMAGE' && event.data.success) {
+                        console.log('[GeomPack Gaussian] Image copied to clipboard successfully');
+                    }
+                    else if (event.data.type === 'COPY_IMAGE' && !event.data.success) {
+                        console.error('[GeomPack Gaussian] Failed to copy image to clipboard:', event.data.error);
+                    }
                     // Handle error messages from iframe
                     else if (event.data.type === 'MESH_ERROR' && event.data.error) {
                         console.error('[GeomPack Gaussian] Error from viewer:', event.data.error);

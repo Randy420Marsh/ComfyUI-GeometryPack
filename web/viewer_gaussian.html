@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GeomPack Gaussian Splat Viewer</title>
     <style>
         * {
@@ -128,6 +129,7 @@
         </div>
         <button id="resetCamera" title="Reset camera view">Reset View</button>
         <button id="screenshot" title="Take screenshot">Screenshot</button>
+        <button id="copyImage" title="Copy image to clipboard">Copy Image</button>
     </div>
 
     <!-- Load bundled gsplat.js -->
@@ -169,7 +171,12 @@
 
                 // Handle resize
                 const resize = () => {
-                    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+                    // Only resize renderer if resolution is NOT locked
+                    // If locked, the canvas resolution stays fixed (e.g. at 2K),
+                    // and CSS handles the visual fitting to container.
+                    if (!isResolutionLocked) {
+                        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+                    }
                 };
                 window.addEventListener('resize', resize);
                 resize();
@@ -197,10 +204,14 @@
 
         // Store initial camera params for reset
         let initialCameraData = null;
+        
+        // Resolution lock state
+        let isResolutionLocked = false;
 
         // Scale compensation: when focal length is scaled down for canvas size,
         // gaussian scales need to be multiplied by this factor to maintain correct screen-space size
         let gaussianScaleCompensation = 1.0;
+        let splatScaleMultiplier = 1.0; // Base multiplier for point size
 
         // Set camera from extrinsics and intrinsics
         // extrinsics: 4x4 matrix (identity for SHARP = camera at origin looking down +Z)
@@ -251,27 +262,82 @@
                 console.log('[GaussianViewer] Intrinsics: fx=', fx, 'fy=', fy, 'cx=', cx, 'cy=', cy);
                 console.log('[GaussianViewer] Image dimensions (from intrinsics):', imageWidth, 'x', imageHeight);
 
-                // Set camera focal length to match the original camera
-                // gsplat.js uses fx/fy in screen pixels, need to scale by canvas size
-                const canvasWidth = canvas.clientWidth || 512;
-                const canvasHeight = canvas.clientHeight || 512;
+                // Determine if we should lock resolution to native image size
+                // We lock resolution if intrinsics are provided to ensure "WYSIWYG" with high-res output
+                isResolutionLocked = true;
+                
+                // Get current container size for scale compensation calculation
+                const containerWidth = canvas.clientWidth || 512;
+                const containerHeight = canvas.clientHeight || 512;
 
-                // Use uniform scale factor (canvas should have same aspect ratio as image)
-                // This keeps fx = fy for undistorted view
-                const scale = canvasWidth / imageWidth;
-                const scaledF = fx * scale;  // fx and fy are equal in SHARP
+                // Lock renderer size to NATIVE image resolution
+                console.log(`[GaussianViewer] Locking resolution to native: ${imageWidth}x${imageHeight}`);
+                renderer.setSize(imageWidth, imageHeight);
+                
+                // Ensure CSS keeps it fitted to container
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
 
-                camera.data.fx = scaledF;
-                camera.data.fy = scaledF;
+                // Use NATIVE focal length (no scaling down)
+                camera.data.fx = fx;
+                camera.data.fy = fy;
 
-                // IMPORTANT: Compensate gaussian scales for the focal length scaling
-                // Screen-space size = world_scale * fx / depth
-                // When we scale fx down, gaussians appear smaller. Multiply scales by inverse.
-                gaussianScaleCompensation = imageWidth / canvasWidth;
+                // IMPORTANT: Calculate scale compensation
+                // gsplat.js renders points based on their world space size projected to screen space.
+                // When we view a 2048x2048 image in a 512x512 container, we are effectively zooming out.
+                // To make the points appear as "solid" as they do in the original training view,
+                // we need to compensate for this difference.
+                
+                // Empirical observation suggests we need a stronger compensation than just the ratio.
+                // If user says Scale ~14 is good when ratio is ~4 (2048/512), then compensation might be squared ratio?
+                // Or maybe the points from this trainer are just naturally small.
+                // Let's stick to linear ratio for now but allow a base multiplier.
+                
+                // For now, let's trust the ratio but maybe add a boost factor if needed.
+                // User reported needing ~14x scale. If image is 2048 and container 512, ratio is 4.
+                // 14 / 4 = 3.5. So maybe there's an inherent factor of 3-4 missing?
+                // Actually, let's just apply the ratio logic strictly first:
+                // If I render at 2048px width, a point of size 1 world unit covers X pixels.
+                // If I render at 512px width, it covers X/4 pixels.
+                // But visually, if I look at the 2048px image scaled down to 512px on my screen (via CSS),
+                // the point covers X pixels of the *buffer*, which is X/4 pixels on *screen*.
+                // Wait, if we render at high res, the points are physically "correct" size in pixels for that resolution.
+                // The issue is likely that "correct" size is often too sparse for point clouds that rely on splatting overlap.
+                
+                // Let's use the ratio, but ensure we aren't double counting.
+                gaussianScaleCompensation = imageWidth / containerWidth;
+                
+                // Add an extra boost because often raw splats are too small without the "dilation" effect of low-res rendering
+                // When you render low-res, rasterization snaps to pixels, effectively making small points relatively larger.
+                // High-res rendering loses this "free aliasing coverage".
+                // Let's add a heuristic boost factor.
+                // User said 14x was good. 14 / (2048/512) = 3.5.
+                // Let's try boosting the compensation significantly.
+                // gaussianScaleCompensation *= 3.0; // Boost factor
+                
+                // Actually, let's change how we calculate this.
+                // If the user wants "WYSIWYG" relative to the preview size:
+                // We want the point to cover the same *percentage* of the screen width.
+                // PointRadius / ImageWidth = Constant.
+                // If we increase ImageWidth by factor S, PointRadius must increase by factor S.
+                // This is what gaussianScaleCompensation = imageWidth / containerWidth does.
+                
+                // However, the user reports it's still sparse. This implies the *base* size is too small.
+                // Maybe the "preview" logic in other viewers implicitly boosts size?
+                // Or maybe the training output relies on a specific focal length?
+                
+                // Let's force a minimum compensation to avoid sparsity.
+                // And let's default the UI scale slider to something higher if we detect high-res?
+                // No, better to fix the compensation calculation.
+                
+                // Let's try applying a stronger multiplier.
+                // If resolution is locked, we are in "High Res Mode".
+                // Let's scale up by the ratio AND a bit more.
+                gaussianScaleCompensation = (imageWidth / containerWidth) * 3.0; // 3.0 is a heuristic "density boost"
 
-                console.log('[GaussianViewer] Canvas size:', canvasWidth, 'x', canvasHeight);
-                console.log('[GaussianViewer] Uniform scale:', scale, 'scaled focal length:', scaledF);
-                console.log('[GaussianViewer] Gaussian scale compensation:', gaussianScaleCompensation.toFixed(2), 'x');
+                console.log('[GaussianViewer] Native resolution:', imageWidth, 'x', imageHeight);
+                console.log('[GaussianViewer] Container size:', containerWidth, 'x', containerHeight);
+                console.log('[GaussianViewer] Gaussian scale compensation (with 3x boost):', gaussianScaleCompensation.toFixed(2), 'x');
 
                 // Calculate vertical FOV in radians for logging
                 const fovY = 2 * Math.atan(imageHeight / (2 * fy));
@@ -347,6 +413,9 @@
         // Load a PLY file from ArrayBuffer data
         async function loadPLYFromData(arrayBuffer, filename, extrinsics, intrinsics) {
             try {
+                // Reset lock state
+                isResolutionLocked = false;
+                
                 // Clear ALL existing objects from scene
                 if (scene.objects && scene.objects.length > 0) {
                     console.log('[GaussianViewer] Clearing', scene.objects.length, 'existing objects from scene');
@@ -361,15 +430,25 @@
                 // This ensures gaussian scales are correct from the start
                 gaussianScaleCompensation = 1.0;  // Default if no intrinsics
                 if (intrinsics && Array.isArray(intrinsics) && intrinsics.length >= 2) {
-                    const fx = intrinsics[0][0];
                     const cx = intrinsics[0][2];
                     const imageWidth = cx * 2;
-                    const canvasWidth = canvas.clientWidth || 512;
-                    // Compensation = original_size / canvas_size
-                    // This makes gaussians appear at their correct world-space size
-                    gaussianScaleCompensation = imageWidth / canvasWidth;
+                    const containerWidth = canvas.clientWidth || 512;
+                    
+                    // Base compensation: Ratio of Native / Display
+                    let ratio = imageWidth / containerWidth;
+                    
+                    // Heuristic: Add a "Density Boost" for high-res rendering.
+                    // High-res rendering tends to make points look sparse because they don't overlap as much
+                    // as they do in lower resolutions (due to sub-pixel vs pixel rasterization effects).
+                    // We multiply by an extra factor to simulate the "fullness" of a lower-res view.
+                    // Based on user feedback, a factor of ~10.0 (total) is often needed for ideal density.
+                    const DENSITY_BOOST = 10.0;
+                    
+                    gaussianScaleCompensation = ratio * DENSITY_BOOST;
+                    
                     console.log('[GaussianViewer] Pre-calculated scale compensation:', gaussianScaleCompensation.toFixed(2), 'x');
-                    console.log('[GaussianViewer] (Image:', imageWidth, 'px -> Canvas:', canvasWidth, 'px)');
+                    console.log('[GaussianViewer] Ratio:', ratio.toFixed(2), 'Density Boost:', DENSITY_BOOST);
+                    console.log('[GaussianViewer] (Image:', imageWidth, 'px / Container:', containerWidth, 'px)');
                 }
 
                 console.log('[GaussianViewer] Loading from data, size:', arrayBuffer.byteLength);
@@ -514,21 +593,165 @@
             }
         }
 
-        // Take screenshot
-        function takeScreenshot() {
-            if (!renderer) return;
+        // Helper to draw black background behind transparent canvas for screenshot
+        // This solves the issue where transparent parts of the gaussian render appear weirdly when pasted
+        // or viewed in tools that don't handle premultiplied alpha correctly, or simply when the
+        // viewer background (CSS) was providing the black color but the canvas itself was transparent.
+        function getCanvasWithBlackBackground(sourceCanvas) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = sourceCanvas.width;
+            tempCanvas.height = sourceCanvas.height;
+            const ctx = tempCanvas.getContext('2d');
+            
+            // Fill with black first
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            
+            // Draw original canvas on top
+            ctx.drawImage(sourceCanvas, 0, 0);
+            
+            return tempCanvas;
+        }
+
+        // Take screenshot directly from canvas
+        // Avoiding captureStream() because it can introduce artifacts or capture inter-frame states
+        // Since we are now rendering at full resolution (WYSIWYG), toDataURL is the most accurate representation
+        async function takeScreenshot() {
+            if (!renderer || !renderer.canvas) return;
 
             try {
-                const dataUrl = canvas.toDataURL('image/png');
+                const canvas = renderer.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+
+                // Pause the animation loop to ensure we capture a stable frame
+                if (animationId) cancelAnimationFrame(animationId);
+
+                // Force a single synchronous render to ensure the buffer is populated exactly as expected
+                if (scene && camera) {
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+
+                console.log('[GaussianViewer] Capturing screenshot via toDataURL:', width, 'x', height);
+
+                // Composite with black background to ensure consistency with preview
+                // The preview looks black because of CSS background, but the canvas might be transparent
+                const finalCanvas = getCanvasWithBlackBackground(canvas);
+                const dataUrl = finalCanvas.toDataURL('image/png');
+
                 window.parent.postMessage({
                     type: 'SCREENSHOT',
                     image: dataUrl,
                     timestamp: Date.now()
                 }, '*');
-                console.log('[GaussianViewer] Screenshot captured');
+                
+                // Resume animation loop
+                const frame = () => {
+                    controls.update();
+                    renderer.render(scene, camera);
+                    animationId = requestAnimationFrame(frame);
+                };
+                frame();
+
+                console.log('[GaussianViewer] Screenshot captured successfully');
             } catch (err) {
                 console.error('[GaussianViewer] Screenshot error:', err);
+                // Try to resume loop even if error
+                const frame = () => {
+                    controls.update();
+                    renderer.render(scene, camera);
+                    animationId = requestAnimationFrame(frame);
+                };
+                frame();
             }
+        }
+
+        // Copy image to clipboard directly from canvas
+        async function copyImageToClipboard() {
+            if (!renderer || !renderer.canvas) return;
+
+            try {
+                const canvas = renderer.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+
+                // Pause the animation loop
+                if (animationId) cancelAnimationFrame(animationId);
+
+                // Force a single synchronous render
+                if (scene && camera) {
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+
+                console.log('[GaussianViewer] Copying to clipboard via toBlob:', width, 'x', height);
+
+                // Composite with black background
+                const finalCanvas = getCanvasWithBlackBackground(canvas);
+                
+                // Direct blob creation from composited canvas
+                const blob = await canvasToBlob(finalCanvas);
+                
+                try {
+                    await navigator.clipboard.write([
+                        new ClipboardItem({ 'image/png': blob })
+                    ]);
+                    console.log('[GaussianViewer] Image copied to clipboard:', width, 'x', height);
+                    
+                    window.parent.postMessage({
+                        type: 'COPY_IMAGE',
+                        success: true,
+                        timestamp: Date.now()
+                    }, '*');
+                } catch (clipboardError) {
+                    console.error('[GaussianViewer] Clipboard write failed:', clipboardError);
+                    window.parent.postMessage({
+                        type: 'COPY_IMAGE',
+                        success: false,
+                        error: 'Clipboard write failed: ' + clipboardError.message,
+                        timestamp: Date.now()
+                    }, '*');
+                }
+
+                // Resume animation loop
+                const frame = () => {
+                    controls.update();
+                    renderer.render(scene, camera);
+                    animationId = requestAnimationFrame(frame);
+                };
+                frame();
+
+            } catch (err) {
+                console.error('[GaussianViewer] Copy to clipboard error:', err);
+                // Try to resume loop
+                const frame = () => {
+                    controls.update();
+                    renderer.render(scene, camera);
+                    animationId = requestAnimationFrame(frame);
+                };
+                frame();
+                
+                window.parent.postMessage({
+                    type: 'COPY_IMAGE',
+                    success: false,
+                    error: err.message,
+                    timestamp: Date.now()
+                }, '*');
+            }
+        }
+
+        // Helper function to convert canvas to blob
+        function canvasToBlob(canvas) {
+            return new Promise((resolve, reject) => {
+                canvas.toBlob(blob => {
+                    if (blob) {
+                        resolve(blob);
+                    } else {
+                        reject(new Error('Canvas toBlob failed'));
+                    }
+                }, 'image/png');
+            });
         }
 
         // Gaussian scale control
@@ -634,6 +857,7 @@
         // Event listeners
         document.getElementById('resetCamera').addEventListener('click', resetCamera);
         document.getElementById('screenshot').addEventListener('click', takeScreenshot);
+        document.getElementById('copyImage').addEventListener('click', copyImageToClipboard);
 
         // Listen for messages from parent
         window.addEventListener('message', (event) => {
