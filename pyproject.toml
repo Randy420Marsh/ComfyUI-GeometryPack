@@ -34,7 +34,7 @@ Documentation = "https://github.com/PozzettiAndrea/ComfyUI-GeometryPack/blob/mai
 
 [tool.comfy]
 PublisherId = "pznodes"
-DisplayName = "ComfyUI-GeometryPack"
+DisplayName = "GeometryPack"
 Icon = ""
 
 [build-system]
