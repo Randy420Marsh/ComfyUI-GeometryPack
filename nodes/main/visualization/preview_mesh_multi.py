@@ -87,6 +87,18 @@ class PreviewMeshMultiNode:
                 "mesh_3": ("TRIMESH",),
                 "mesh_4": ("TRIMESH",),
                 "mode": (["fields", "texture"], {"default": "fields"}),
+                "show_edges": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Show mesh edge overlay"
+                }),
+                "camera_state": ("STRING", {
+                    "default": "",
+                    "tooltip": "Camera position/orientation state (managed by viewer)"
+                }),
+                "selected_field": ("STRING", {
+                    "default": "",
+                    "tooltip": "Active scalar field for visualization (managed by viewer)"
+                }),
             }
         }
 
@@ -95,7 +107,7 @@ class PreviewMeshMultiNode:
     FUNCTION = "preview_multi"
     CATEGORY = "geompack/visualization"
 
-    def preview_multi(self, mesh_1, mesh_2=None, mesh_3=None, mesh_4=None, mode="fields"):
+    def preview_multi(self, mesh_1, mesh_2=None, mesh_3=None, mesh_4=None, mode="fields", show_edges=False, camera_state="", selected_field=""):
         """
         Preview multiple meshes in a grid layout.
 
@@ -205,6 +217,9 @@ class PreviewMeshMultiNode:
             "bounds_list": [bounds_list],
             "extents_list": [extents_list],
             "is_watertight_list": [is_watertight_list],
+            "show_edges": [bool(show_edges)],
+            "camera_state": [camera_state],
+            "selected_field": [selected_field],
         }
 
         # Add mode-specific metadata

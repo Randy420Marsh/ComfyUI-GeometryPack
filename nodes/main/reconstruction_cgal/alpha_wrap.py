@@ -57,9 +57,10 @@ class AlphaWrapNode:
         }
 
     RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("wrapped_mesh", "report")
+    RETURN_NAMES = ("wrapped_mesh", "info")
     FUNCTION = "alpha_wrap"
     CATEGORY = "geompack/reconstruction"
+    OUTPUT_NODE = True
 
     def alpha_wrap(self, input_mesh, alpha_percent=0.04, offset_percent=1.1):
         """
@@ -197,7 +198,7 @@ Tips:
   - Lower values = slower computation
 """
 
-        return (result_mesh, report)
+        return {"ui": {"text": [report]}, "result": (result_mesh, report)}
 
 
 NODE_CLASS_MAPPINGS = {
