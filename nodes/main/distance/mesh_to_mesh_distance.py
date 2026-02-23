@@ -5,7 +5,11 @@
 Mesh Distance Node - Compare two meshes using various metrics
 """
 
+import logging
+
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 
 class MeshDistanceNode:
@@ -66,9 +70,9 @@ class MeshDistanceNode:
                 "point-cloud-utils not installed. Install with: pip install point-cloud-utils"
             )
 
-        print(f"[MeshDistance] Metric: {metric}, Samples: {sample_count}")
-        print(f"[MeshDistance] Mesh A: {len(mesh_a.vertices)} vertices, {len(mesh_a.faces)} faces")
-        print(f"[MeshDistance] Mesh B: {len(mesh_b.vertices)} vertices, {len(mesh_b.faces)} faces")
+        log.info("Metric: %s, Samples: %d", metric, sample_count)
+        log.info("Mesh A: %d vertices, %d faces", len(mesh_a.vertices), len(mesh_a.faces))
+        log.info("Mesh B: %d vertices, %d faces", len(mesh_b.vertices), len(mesh_b.faces))
 
         # Sample point clouds from meshes
         points_a = mesh_a.sample(sample_count)
@@ -129,7 +133,7 @@ Chamfer distance measures average nearest-neighbor distance (overall similarity)
         else:
             raise ValueError(f"Unknown metric: {metric}")
 
-        print(f"[MeshDistance] Result: {dist:.6f}")
+        log.info("Result: %.6f", dist)
         return {
             "result": (float(dist), info),
             "ui": {"text": [info]}

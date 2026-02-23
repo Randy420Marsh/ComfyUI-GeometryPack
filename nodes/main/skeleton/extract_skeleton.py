@@ -5,8 +5,12 @@
 Extract Skeleton Node - Extract skeleton from 3D mesh
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 def normalize_skeleton(vertices: np.ndarray) -> np.ndarray:
@@ -108,22 +112,22 @@ class ExtractSkeleton:
                 "Skeletor library not found. Please install: pip install skeletor"
             )
 
-        print(f"[ExtractSkeleton] Extracting skeleton using {algorithm} algorithm...")
+        log.info("Extracting skeleton using %s algorithm...", algorithm)
 
         # Print input mesh bounding box
         mesh_min = trimesh.bounds[0]
         mesh_max = trimesh.bounds[1]
         mesh_size = mesh_max - mesh_min
         mesh_center = (mesh_min + mesh_max) / 2
-        print(f"[ExtractSkeleton] Input mesh bounding box:")
-        print(f"  Min: [{mesh_min[0]:.3f}, {mesh_min[1]:.3f}, {mesh_min[2]:.3f}]")
-        print(f"  Max: [{mesh_max[0]:.3f}, {mesh_max[1]:.3f}, {mesh_max[2]:.3f}]")
-        print(f"  Size: [{mesh_size[0]:.3f}, {mesh_size[1]:.3f}, {mesh_size[2]:.3f}]")
-        print(f"  Center: [{mesh_center[0]:.3f}, {mesh_center[1]:.3f}, {mesh_center[2]:.3f}]")
+        log.info("Input mesh bounding box:")
+        log.info("  Min: [%.3f, %.3f, %.3f]", mesh_min[0], mesh_min[1], mesh_min[2])
+        log.info("  Max: [%.3f, %.3f, %.3f]", mesh_max[0], mesh_max[1], mesh_max[2])
+        log.info("  Size: [%.3f, %.3f, %.3f]", mesh_size[0], mesh_size[1], mesh_size[2])
+        log.info("  Center: [%.3f, %.3f, %.3f]", mesh_center[0], mesh_center[1], mesh_center[2])
 
         # Fix mesh if requested
         if fix_mesh:
-            print("[ExtractSkeleton] Fixing mesh...")
+            log.info("Fixing mesh...")
             mesh = sk.pre.fix_mesh(trimesh, remove_disconnected=5, inplace=False)
         else:
             mesh = trimesh
@@ -131,11 +135,11 @@ class ExtractSkeleton:
         # Extract skeleton based on algorithm
         try:
             if algorithm == "wavefront":
-                print(f"  Parameters: waves={waves}, step_size={step_size}")
+                log.info("  Parameters: waves=%d, step_size=%s", waves, step_size)
                 skel = sk.skeletonize.by_wavefront(mesh, waves=waves, step_size=step_size)
 
             elif algorithm == "vertex_clusters":
-                print(f"  Parameters: sampling_dist={sampling_dist}, cluster_pos={cluster_pos}")
+                log.info("  Parameters: sampling_dist=%s, cluster_pos=%s", sampling_dist, cluster_pos)
                 skel = sk.skeletonize.by_vertex_clusters(
                     mesh,
                     sampling_dist=sampling_dist,
@@ -143,7 +147,7 @@ class ExtractSkeleton:
                 )
 
             elif algorithm == "edge_collapse":
-                print(f"  Parameters: shape_weight={shape_weight}, sample_weight={sample_weight}")
+                log.info("  Parameters: shape_weight=%s, sample_weight=%s", shape_weight, sample_weight)
                 skel = sk.skeletonize.by_edge_collapse(
                     mesh,
                     shape_weight=shape_weight,
@@ -151,7 +155,7 @@ class ExtractSkeleton:
                 )
 
             elif algorithm == "teasar":
-                print(f"  Parameters: inv_dist={inv_dist}, min_length={min_length}")
+                log.info("  Parameters: inv_dist=%s, min_length=%s", inv_dist, min_length)
                 skel = sk.skeletonize.by_teasar(
                     mesh,
                     inv_dist=inv_dist,
@@ -162,25 +166,25 @@ class ExtractSkeleton:
                 raise ValueError(f"Unknown algorithm: {algorithm}")
 
         except Exception as e:
-            print(f"[ExtractSkeleton] Error during skeletonization: {e}")
+            log.error("Error during skeletonization: %s", e)
             raise RuntimeError(f"Skeletonization failed: {e}")
 
         # Get vertices and edges
         vertices = np.array(skel.vertices)
         edges = np.array(skel.edges)
 
-        print(f"[ExtractSkeleton] Extracted {len(vertices)} joints, {len(edges)} bones")
+        log.info("Extracted %d joints, %d bones", len(vertices), len(edges))
 
         # Print skeleton bounding box before any normalization
         skel_min = vertices.min(axis=0)
         skel_max = vertices.max(axis=0)
         skel_size = skel_max - skel_min
         skel_center = (skel_min + skel_max) / 2
-        print(f"[ExtractSkeleton] Skeleton bounding box (original):")
-        print(f"  Min: [{skel_min[0]:.3f}, {skel_min[1]:.3f}, {skel_min[2]:.3f}]")
-        print(f"  Max: [{skel_max[0]:.3f}, {skel_max[1]:.3f}, {skel_max[2]:.3f}]")
-        print(f"  Size: [{skel_size[0]:.3f}, {skel_size[1]:.3f}, {skel_size[2]:.3f}]")
-        print(f"  Center: [{skel_center[0]:.3f}, {skel_center[1]:.3f}, {skel_center[2]:.3f}]")
+        log.info("Skeleton bounding box (original):")
+        log.info("  Min: [%.3f, %.3f, %.3f]", skel_min[0], skel_min[1], skel_min[2])
+        log.info("  Max: [%.3f, %.3f, %.3f]", skel_max[0], skel_max[1], skel_max[2])
+        log.info("  Size: [%.3f, %.3f, %.3f]", skel_size[0], skel_size[1], skel_size[2])
+        log.info("  Center: [%.3f, %.3f, %.3f]", skel_center[0], skel_center[1], skel_center[2])
 
         # Store original scale and center for metadata
         original_scale = float((skel_max - skel_min).max() / 2)
@@ -194,13 +198,13 @@ class ExtractSkeleton:
             norm_min = vertices.min(axis=0)
             norm_max = vertices.max(axis=0)
             norm_size = norm_max - norm_min
-            print(f"[ExtractSkeleton] Skeleton bounding box AFTER normalization:")
-            print(f"  Min: [{norm_min[0]:.3f}, {norm_min[1]:.3f}, {norm_min[2]:.3f}]")
-            print(f"  Max: [{norm_max[0]:.3f}, {norm_max[1]:.3f}, {norm_max[2]:.3f}]")
-            print(f"  Size: [{norm_size[0]:.3f}, {norm_size[1]:.3f}, {norm_size[2]:.3f}]")
-            print(f"  Overall range: [{vertices.min():.3f}, {vertices.max():.3f}]")
+            log.info("Skeleton bounding box AFTER normalization:")
+            log.info("  Min: [%.3f, %.3f, %.3f]", norm_min[0], norm_min[1], norm_min[2])
+            log.info("  Max: [%.3f, %.3f, %.3f]", norm_max[0], norm_max[1], norm_max[2])
+            log.info("  Size: [%.3f, %.3f, %.3f]", norm_size[0], norm_size[1], norm_size[2])
+            log.info("  Overall range: [%.3f, %.3f]", vertices.min(), vertices.max())
         else:
-            print(f"[ExtractSkeleton] Normalization skipped - preserving original scale")
+            log.info("Normalization skipped - preserving original scale")
 
         # Package as skeleton data
         skeleton = {

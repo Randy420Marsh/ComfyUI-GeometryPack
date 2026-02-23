@@ -6,9 +6,13 @@ Scramble integer field values to maximize contrast between adjacent faces.
 Uses graph coloring to ensure neighboring segments get visually distinct values.
 """
 
+import logging
+from collections import defaultdict
+
 import numpy as np
 import trimesh
-from collections import defaultdict
+
+log = logging.getLogger("geometrypack")
 
 
 class ScrambleIntField:
@@ -59,12 +63,12 @@ class ScrambleIntField:
             if hasattr(mesh, 'metadata') and face_data_key in mesh.metadata:
                 labels = np.array(mesh.metadata[face_data_key])
             else:
-                print(f"[ScrambleIntField] Field '{field_name}' not found, returning unchanged")
+                log.warning("Field '%s' not found, returning unchanged", field_name)
                 return (mesh,)
         else:
             labels = np.array(mesh.face_attributes[face_data_key])
 
-        print(f"[ScrambleIntField] Input field '{field_name}': {len(np.unique(labels))} unique values")
+        log.info("Input field '%s': %d unique values", field_name, len(np.unique(labels)))
 
         # Build face adjacency (which faces share edges)
         face_adjacency = mesh.face_adjacency  # Nx2 array of adjacent face pairs
@@ -83,7 +87,7 @@ class ScrambleIntField:
                 segment_adj[l1].add(l2)
                 segment_adj[l2].add(l1)
 
-        print(f"[ScrambleIntField] Built segment adjacency graph: {n_labels} nodes")
+        log.debug("Built segment adjacency graph: %d nodes", n_labels)
 
         # Greedy graph coloring to assign new values
         # Goal: adjacent segments get maximally different values
@@ -136,7 +140,7 @@ class ScrambleIntField:
             output_mesh.metadata = {}
         output_mesh.metadata[face_data_key] = new_labels
 
-        print(f"[ScrambleIntField] Output: scrambled {n_labels} segments using {max_color} colors")
+        log.info("Output: scrambled %d segments using %d colors", n_labels, max_color)
 
         return (output_mesh,)
 

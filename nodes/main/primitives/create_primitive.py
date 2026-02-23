@@ -5,8 +5,11 @@
 Create Primitive Node - Create basic geometric shapes
 """
 
+import logging
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 def _create_cube(size: float = 1.0) -> trimesh.Trimesh:
@@ -110,7 +113,7 @@ class CreatePrimitive:
         else:
             raise ValueError(f"Unknown shape: {shape}")
 
-        print(f"[CreatePrimitive] Created {shape}: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        log.info("Created %s: %d vertices, %d faces", shape, len(mesh.vertices), len(mesh.faces))
 
         return (mesh,)
 

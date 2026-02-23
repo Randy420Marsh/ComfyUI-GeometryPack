@@ -8,8 +8,11 @@ Creates a watertight mesh that tightly wraps around input geometry.
 Useful for point clouds, non-manifold meshes, or polygon soups.
 """
 
+import logging
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class AlphaWrapNode:
@@ -112,12 +115,10 @@ class AlphaWrapNode:
         alpha = (alpha_percent / 100.0) * bbox_diagonal
         offset = (offset_percent / 100.0) * bbox_diagonal
 
-        print(f"\n{'='*60}")
-        print(f"[AlphaWrap] Input: {input_vertex_count:,} vertices, {input_face_count:,} faces ({input_type})")
-        print(f"[AlphaWrap] Bounding box diagonal: {bbox_diagonal:.4f}")
-        print(f"[AlphaWrap] Alpha: {alpha:.6f} ({alpha_percent}% of bbox)")
-        print(f"[AlphaWrap] Offset: {offset:.6f} ({offset_percent}% of bbox)")
-        print(f"{'='*60}\n")
+        log.info("Input: %s vertices, %s faces (%s)", f"{input_vertex_count:,}", f"{input_face_count:,}", input_type)
+        log.info("Bounding box diagonal: %.4f", bbox_diagonal)
+        log.info("Alpha: %.6f (%s%% of bbox)", alpha, alpha_percent)
+        log.info("Offset: %.6f (%s%% of bbox)", offset, offset_percent)
 
         # Create PyMeshLab MeshSet
         ms = pymeshlab.MeshSet()
@@ -131,7 +132,7 @@ class AlphaWrapNode:
         ms.add_mesh(pml_mesh)
 
         # Run Alpha Wrap
-        print("[AlphaWrap] Running CGAL Alpha Wrap... (this may take a while)")
+        log.info("Running CGAL Alpha Wrap... (this may take a while)")
         ms.generate_alpha_wrap(
             alpha=pymeshlab.PureValue(alpha),
             offset=pymeshlab.PureValue(offset)
@@ -170,8 +171,8 @@ class AlphaWrapNode:
         output_face_count = len(result_mesh.faces)
         is_watertight = result_mesh.is_watertight
 
-        print(f"[AlphaWrap] Result: {output_vertex_count:,} vertices, {output_face_count:,} faces")
-        print(f"[AlphaWrap] Watertight: {is_watertight}")
+        log.info("Result: %s vertices, %s faces", f"{output_vertex_count:,}", f"{output_face_count:,}")
+        log.info("Watertight: %s", is_watertight)
 
         # Build report
         report = f"""Alpha Wrap Report

@@ -5,7 +5,10 @@
 Save Mesh Node - Save a mesh to file (OBJ, PLY, STL, OFF, etc.)
 """
 
+import logging
 import os
+
+log = logging.getLogger("geometrypack")
 
 # ComfyUI folder paths
 try:
@@ -73,7 +76,7 @@ class SaveMesh:
             file_path = base_path + expected_ext
 
         # Debug: Check what we received
-        print(f"[SaveMesh] Received mesh type: {type(trimesh)}")
+        log.debug("Received mesh type: %s", type(trimesh))
         if trimesh is None:
             raise ValueError("Cannot save mesh: received None instead of a mesh object. Check that the previous node is outputting a mesh.")
 
@@ -82,7 +85,7 @@ class SaveMesh:
         try:
             vertex_count = len(trimesh.vertices) if hasattr(trimesh, 'vertices') else 0
             face_count = len(trimesh.faces) if hasattr(trimesh, 'faces') else 0
-            print(f"[SaveMesh] Mesh has {vertex_count} vertices, {face_count} faces")
+            log.info("Mesh has %d vertices, %d faces", vertex_count, face_count)
 
             if vertex_count == 0:
                 raise ValueError(
@@ -93,8 +96,8 @@ class SaveMesh:
             # Point cloud (no faces) - only PLY format supports this well
             is_point_cloud = face_count == 0
             if is_point_cloud and format not in ["ply"]:
-                print(f"[SaveMesh] Warning: Point cloud detected but format is '{format}'. "
-                      f"Switching to PLY format for point cloud export.")
+                log.warning("Point cloud detected but format is '%s'. "
+                            "Switching to PLY format for point cloud export.", format)
                 format = "ply"
                 # Update file path extension
                 base_path = os.path.splitext(file_path)[0]
@@ -109,9 +112,9 @@ class SaveMesh:
         # If path is relative and we have output folder, use it
         if not os.path.isabs(file_path) and COMFYUI_OUTPUT_FOLDER is not None:
             full_path = os.path.join(COMFYUI_OUTPUT_FOLDER, file_path)
-            print(f"[SaveMesh] Saving to output folder: {file_path}")
+            log.info("Saving to output folder: %s", file_path)
         else:
-            print(f"[SaveMesh] Saving to: {file_path}")
+            log.info("Saving to: %s", file_path)
 
         # Save the mesh
         success, error = mesh_io.save_mesh_file(trimesh, full_path)
@@ -120,10 +123,10 @@ class SaveMesh:
             raise ValueError(f"Failed to save trimesh: {error}")
 
         geom_type = "point cloud" if is_point_cloud else "mesh"
-        print(f"[SaveMesh] Successfully saved {geom_type} to: {full_path}")
-        print(f"[SaveMesh]   Vertices: {len(trimesh.vertices)}")
+        log.info("Successfully saved %s to: %s", geom_type, full_path)
+        log.info("  Vertices: %d", len(trimesh.vertices))
         if not is_point_cloud:
-            print(f"[SaveMesh]   Faces: {len(trimesh.faces)}")
+            log.info("  Faces: %d", len(trimesh.faces))
 
         return (full_path,)
 

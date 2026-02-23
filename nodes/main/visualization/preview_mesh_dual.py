@@ -12,6 +12,8 @@ field visualization support. Displays two meshes either:
 Supports scalar field visualization with shared colormap when meshes have fields.
 """
 
+import logging
+
 import trimesh as trimesh_module
 import numpy as np
 import os
@@ -21,6 +23,8 @@ import uuid
 from .mesh_helpers import is_point_cloud, get_face_count, get_geometry_type
 
 from ._vtp_export import export_mesh_with_scalars_vtp
+
+log = logging.getLogger("geometrypack")
 
 try:
     import folder_paths
@@ -105,9 +109,9 @@ class PreviewMeshDualNode:
         Returns:
             dict: UI data for frontend widget
         """
-        print(f"[PreviewMeshDual] Layout: {layout}, Mode: {mode}")
-        print(f"[PreviewMeshDual] Mesh 1: {get_geometry_type(mesh_1)} - {len(mesh_1.vertices)} vertices, {get_face_count(mesh_1)} faces")
-        print(f"[PreviewMeshDual] Mesh 2: {get_geometry_type(mesh_2)} - {len(mesh_2.vertices)} vertices, {get_face_count(mesh_2)} faces")
+        log.info("Layout: %s, Mode: %s", layout, mode)
+        log.info("Mesh 1: %s - %d vertices, %d faces", get_geometry_type(mesh_1), len(mesh_1.vertices), get_face_count(mesh_1))
+        log.info("Mesh 2: %s - %d vertices, %d faces", get_geometry_type(mesh_2), len(mesh_2.vertices), get_face_count(mesh_2))
 
         # Check for field data
         mesh_1_has_fields = has_fields(mesh_1)
@@ -116,16 +120,16 @@ class PreviewMeshDualNode:
         field_names_2 = extract_field_names(mesh_2)
         common_fields = list(set(field_names_1) & set(field_names_2))
 
-        print(f"[PreviewMeshDual] Mesh 1 fields: {field_names_1}")
-        print(f"[PreviewMeshDual] Mesh 2 fields: {field_names_2}")
-        print(f"[PreviewMeshDual] Common fields: {common_fields}")
+        log.info("Mesh 1 fields: %s", field_names_1)
+        log.info("Mesh 2 fields: %s", field_names_2)
+        log.info("Common fields: %s", common_fields)
 
         # Check for texture/visual data
         texture_info_1 = get_texture_info(mesh_1)
         texture_info_2 = get_texture_info(mesh_2)
 
-        print(f"[PreviewMeshDual] Mesh 1 visual: kind={texture_info_1['visual_kind']}, texture={texture_info_1['has_texture']}, vertex_colors={texture_info_1['has_vertex_colors']}")
-        print(f"[PreviewMeshDual] Mesh 2 visual: kind={texture_info_2['visual_kind']}, texture={texture_info_2['has_texture']}, vertex_colors={texture_info_2['has_vertex_colors']}")
+        log.info("Mesh 1 visual: kind=%s, texture=%s, vertex_colors=%s", texture_info_1['visual_kind'], texture_info_1['has_texture'], texture_info_1['has_vertex_colors'])
+        log.info("Mesh 2 visual: kind=%s, texture=%s, vertex_colors=%s", texture_info_2['visual_kind'], texture_info_2['has_texture'], texture_info_2['has_vertex_colors'])
 
         # Check if meshes are point clouds (need VTP, STL doesn't support point clouds)
         mesh_1_is_pc = is_point_cloud(mesh_1)
@@ -259,7 +263,7 @@ class PreviewMeshDualNode:
                     "common_fields": [overlay_common],
                 })
 
-        print(f"[PreviewMeshDual] Preview ready")
+        log.info("Preview ready")
         return {"ui": ui_data}
 
     def _export_mesh(self, mesh, base_filename, use_vtp, use_glb):
@@ -279,20 +283,20 @@ class PreviewMeshDualNode:
         try:
             if use_glb:
                 mesh.export(filepath, file_type='glb', include_normals=True)
-                print(f"[PreviewMeshDual] Exported GLB: {filepath}")
+                log.info("Exported GLB: %s", filepath)
             elif use_vtp:
                 export_mesh_with_scalars_vtp(mesh, filepath)
-                print(f"[PreviewMeshDual] Exported VTP with fields: {filepath}")
+                log.info("Exported VTP with fields: %s", filepath)
             else:
                 mesh.export(filepath, file_type='stl')
-                print(f"[PreviewMeshDual] Exported STL: {filepath}")
+                log.info("Exported STL: %s", filepath)
         except Exception as e:
-            print(f"[PreviewMeshDual] Export failed: {e}, trying fallback")
+            log.error("Export failed: %s, trying fallback", e)
             # Fallback to OBJ
             filename = filename.replace('.vtp', '.obj').replace('.stl', '.obj').replace('.glb', '.obj')
             filepath = filepath.replace('.vtp', '.obj').replace('.stl', '.obj').replace('.glb', '.obj')
             mesh.export(filepath, file_type='obj')
-            print(f"[PreviewMeshDual] Exported OBJ fallback: {filepath}")
+            log.info("Exported OBJ fallback: %s", filepath)
 
         return filename, filepath
 
@@ -322,7 +326,7 @@ class PreviewMeshDualNode:
             blue_colors = np.full((len(mesh_2_copy.vertices), 4), [77, 77, 255, 255], dtype=np.uint8)
             mesh_2_copy.visual.vertex_colors = blue_colors
 
-            print(f"[PreviewMeshDual] Added mesh_id field and red/blue colors for overlay")
+            log.info("Added mesh_id field and red/blue colors for overlay")
 
             combined = trimesh_module.util.concatenate([mesh_1_copy, mesh_2_copy])
 
@@ -338,15 +342,15 @@ class PreviewMeshDualNode:
 
             if use_glb:
                 combined.export(filepath, file_type='glb', include_normals=True)
-                print(f"[PreviewMeshDual] Exported combined GLB: {filepath}")
+                log.info("Exported combined GLB: %s", filepath)
             else:
                 export_mesh_with_scalars_vtp(combined, filepath)
-                print(f"[PreviewMeshDual] Exported combined VTP: {filepath}")
+                log.info("Exported combined VTP: %s", filepath)
 
-            print(f"[PreviewMeshDual] Combined {get_geometry_type(combined)}: {len(combined.vertices)} vertices, {get_face_count(combined)} faces")
+            log.info("Combined %s: %d vertices, %d faces", get_geometry_type(combined), len(combined.vertices), get_face_count(combined))
             return filename, filepath
         except Exception as e:
-            print(f"[PreviewMeshDual] Failed to export combined mesh: {e}")
+            log.error("Failed to export combined mesh: %s", e)
             raise
 
 

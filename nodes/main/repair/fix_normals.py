@@ -5,8 +5,12 @@
 Fix inconsistent normal orientations.
 """
 
+import logging
+
 import trimesh
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 try:
     import igl
@@ -189,7 +193,7 @@ class FixNormalsNode:
         Returns:
             tuple: (fixed_trimesh, info_string)
         """
-        print(f"[FixNormals] Input: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        log.info("Input: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
 
         # Create a copy to avoid modifying the original
         fixed_mesh = trimesh.copy()
@@ -206,7 +210,7 @@ class FixNormalsNode:
         # Check if igl is required but not available
         igl_methods = ["igl_bfs", "igl_winding", "igl_raycast", "igl_signed_dist"]
         if method in igl_methods and not HAS_IGL:
-            print(f"[FixNormals] igl not available, falling back to trimesh method")
+            log.warning("igl not available, falling back to trimesh method")
             fixed_mesh.fix_normals()
             method_used = "trimesh (fallback - igl not available)"
 
@@ -223,7 +227,7 @@ class FixNormalsNode:
 
             # Track number of orientation components
             num_components = len(np.unique(C))
-            print(f"[FixNormals] igl.bfs_orient: {num_components} orientation components")
+            log.info("igl.bfs_orient: %d orientation components", num_components)
             extra_info = "\nNote: BFS makes faces consistent but doesn't determine inside/outside"
 
         elif method == "igl_winding":
@@ -238,7 +242,7 @@ class FixNormalsNode:
             FF, flip_mask, num_flipped = _orient_outward_winding(V, F, face_normals)
             fixed_mesh.faces = FF
 
-            print(f"[FixNormals] igl_winding: flipped {num_flipped}/{len(F)} faces")
+            log.info("igl_winding: flipped %d/%d faces", num_flipped, len(F))
             extra_info = "\nNote: Winding number works best on closed/watertight meshes"
 
         elif method == "igl_raycast":
@@ -253,7 +257,7 @@ class FixNormalsNode:
             FF, flip_mask, num_flipped = _orient_outward_raycast(V, F, face_normals)
             fixed_mesh.faces = FF
 
-            print(f"[FixNormals] igl_raycast: flipped {num_flipped}/{len(F)} faces")
+            log.info("igl_raycast: flipped %d/%d faces", num_flipped, len(F))
             extra_info = "\nNote: Raycasting works best on closed meshes without self-intersections"
 
         elif method == "igl_signed_dist":
@@ -268,7 +272,7 @@ class FixNormalsNode:
             FF, flip_mask, num_flipped = _orient_outward_signed_dist(V, F, face_normals)
             fixed_mesh.faces = FF
 
-            print(f"[FixNormals] igl_signed_dist: flipped {num_flipped}/{len(F)} faces")
+            log.info("igl_signed_dist: flipped %d/%d faces", num_flipped, len(F))
             extra_info = "\nNote: Signed distance works best on watertight meshes"
 
         else:
@@ -294,7 +298,7 @@ Faces: {len(fixed_mesh.faces):,}
 {'[OK] Normals are now consistently oriented!' if is_consistent else '[WARN] Some inconsistencies may remain (check mesh topology)'}
 """
 
-        print(f"[FixNormals] {'[OK]' if is_consistent else '[WARN]'} Normal orientation: {was_consistent} -> {is_consistent}")
+        log.info("Normal orientation: %s -> %s", was_consistent, is_consistent)
 
         return {"ui": {"text": [info]}, "result": (fixed_mesh, info)}
 

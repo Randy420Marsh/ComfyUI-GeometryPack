@@ -5,8 +5,12 @@
 Combine Meshes from Batch Node - Concatenate a batch/list of meshes into one
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 class CombineMeshesBatchNode:
@@ -56,7 +60,7 @@ class CombineMeshesBatchNode:
         if not meshes:
             raise ValueError("No valid meshes provided to combine")
 
-        print(f"[CombineMeshesBatch] Combining {len(meshes)} meshes")
+        log.info("Combining %d meshes", len(meshes))
 
         # Track input stats
         input_stats = []
@@ -73,7 +77,7 @@ class CombineMeshesBatchNode:
             })
             total_vertices += vertex_count
             total_faces += face_count
-            print(f"[CombineMeshesBatch] Mesh {i+1}: {vertex_count} vertices, {face_count} faces")
+            log.info("Mesh %d: %d vertices, %d faces", i+1, vertex_count, face_count)
 
         # Concatenate meshes
         if len(meshes) == 1:
@@ -121,7 +125,7 @@ Note: Meshes are concatenated without boolean operations.
 Components remain separate within the combined mesh.
 """
 
-        print(f"[CombineMeshesBatch] Result: {len(result.vertices)} vertices, {len(result.faces)} faces")
+        log.info("Result: %d vertices, %d faces", len(result.vertices), len(result.faces))
         return {"ui": {"text": [info]}, "result": (result, info)}
 
 

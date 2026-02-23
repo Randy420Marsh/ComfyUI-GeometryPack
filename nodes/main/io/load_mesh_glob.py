@@ -5,9 +5,12 @@
 Load Mesh (Glob) Node - Load meshes matching a glob pattern
 """
 
+import logging
 import os
 import glob as glob_module
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 from . import mesh_io
 
@@ -116,7 +119,7 @@ class LoadMeshGlob:
         matched_files = glob_module.glob(glob_pattern, recursive=True)
 
         if not matched_files:
-            print(f"[LoadMeshGlob] No files matched pattern: {glob_pattern}")
+            log.warning("No files matched pattern: %s", glob_pattern)
             return ([], [], [])
 
         # Sort files
@@ -125,7 +128,7 @@ class LoadMeshGlob:
         else:
             matched_files.sort(key=os.path.getmtime)
 
-        print(f"[LoadMeshGlob] Found {len(matched_files)} files matching pattern")
+        log.info("Found %d files matching pattern", len(matched_files))
 
         meshes = []
         textures = []
@@ -133,28 +136,28 @@ class LoadMeshGlob:
 
         for path in matched_files:
             try:
-                print(f"[LoadMeshGlob] Loading: {path}")
+                log.info("Loading: %s", path)
                 mesh, error = mesh_io.load_mesh_file(path)
 
                 if mesh is None:
-                    print(f"[LoadMeshGlob] Failed to load {path}: {error}")
+                    log.warning("Failed to load %s: %s", path, error)
                     continue
 
                 # Handle both meshes and pointclouds
                 if hasattr(mesh, 'faces') and mesh.faces is not None:
-                    print(f"[LoadMeshGlob] Loaded: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+                    log.info("Loaded: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
                 else:
-                    print(f"[LoadMeshGlob] Loaded pointcloud: {len(mesh.vertices)} points")
+                    log.info("Loaded pointcloud: %d points", len(mesh.vertices))
 
                 meshes.append(mesh)
                 textures.append(self._extract_texture_image(mesh))
                 file_paths.append(path)
 
             except Exception as e:
-                print(f"[LoadMeshGlob] Error loading {path}: {e}")
+                log.error("Error loading %s: %s", path, e)
                 continue
 
-        print(f"[LoadMeshGlob] Successfully loaded {len(meshes)} mesh(es)")
+        log.info("Successfully loaded %d mesh(es)", len(meshes))
         return (meshes, textures, file_paths)
 
 

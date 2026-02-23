@@ -6,8 +6,12 @@ Merge duplicate vertices in mesh with configurable tolerance.
 Useful for fixing disconnected mesh components from CAD meshing or other sources.
 """
 
+import logging
+
 import trimesh
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 
 class MergeVerticesNode:
@@ -58,8 +62,8 @@ class MergeVerticesNode:
         Returns:
             tuple: (merged_trimesh, info_string)
         """
-        print(f"[MergeVertices] Input: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
-        print(f"[MergeVertices] Tolerance: {tolerance:.2e}")
+        log.info("Input: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
+        log.info("Tolerance: %.2e", tolerance)
 
         # Check initial state
         verts_before = len(mesh.vertices)
@@ -76,7 +80,7 @@ class MergeVerticesNode:
 
         # Convert tolerance to digits for trimesh: 1e-5 -> 5 digits
         digits = max(0, -int(np.floor(np.log10(tolerance))))
-        print(f"[MergeVertices] Using {digits} decimal places for vertex matching")
+        log.debug("Using %d decimal places for vertex matching", digits)
 
         # Merge vertices with specified precision
         merged_mesh.merge_vertices(digits_vertex=digits)
@@ -120,9 +124,9 @@ After:
 {'[WARN] Mesh still has multiple disconnected components.' if components_after is not None and components_after > 1 else ''}
 """
 
-        print(f"[MergeVertices] Removed {verts_removed} duplicate vertices")
+        log.info("Removed %d duplicate vertices", verts_removed)
         if components_change is not None:
-            print(f"[MergeVertices] Components: {components_before} -> {components_after}")
+            log.info("Components: %d -> %d", components_before, components_after)
 
         return {"ui": {"text": [info]}, "result": (merged_mesh, info)}
 

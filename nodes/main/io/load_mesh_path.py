@@ -5,8 +5,11 @@
 Load Mesh (Path) Node - Load a mesh from a string path input
 """
 
+import logging
 import os
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 # ComfyUI folder paths
 try:
@@ -136,23 +139,23 @@ class LoadMeshPath:
                     img = material.baseColorTexture
                     if isinstance(img, Image.Image):
                         texture_image = img
-                        print(f"[LoadMeshPath] Found texture in material.baseColorTexture: {texture_image.size}")
+                        log.debug("Found texture in material.baseColorTexture: %s", texture_image.size)
                     elif isinstance(img, str) and os.path.exists(img):
                         texture_image = Image.open(img)
-                        print(f"[LoadMeshPath] Loaded texture from material.baseColorTexture path: {texture_image.size}")
+                        log.debug("Loaded texture from material.baseColorTexture path: %s", texture_image.size)
 
                 # Check for standard material.image (OBJ/MTL files)
                 if texture_image is None and hasattr(material, 'image') and material.image is not None:
                     img = material.image
                     if isinstance(img, Image.Image):
                         texture_image = img
-                        print(f"[LoadMeshPath] Found texture in material.image: {texture_image.size}")
+                        log.debug("Found texture in material.image: %s", texture_image.size)
                     elif isinstance(img, str) and os.path.exists(img):
                         texture_image = Image.open(img)
-                        print(f"[LoadMeshPath] Loaded texture from material.image path: {texture_image.size}")
+                        log.debug("Loaded texture from material.image path: %s", texture_image.size)
 
         if texture_image is None:
-            print("[LoadMeshPath] No texture found in mesh")
+            log.debug("No texture found in mesh")
             # Return black 64x64 placeholder
             texture_image = Image.new('RGB', (64, 64), color=(0, 0, 0))
 
@@ -181,7 +184,7 @@ class LoadMeshPath:
                 error_msg += f"\n  - {path}"
             raise ValueError(error_msg)
 
-        print(f"[LoadMeshPath] Loading mesh from: {full_path}")
+        log.info("Loading mesh from: %s", full_path)
 
         # Load the mesh
         loaded_mesh, error = mesh_io.load_mesh_file(full_path)
@@ -191,9 +194,9 @@ class LoadMeshPath:
 
         # Handle both meshes and pointclouds
         if hasattr(loaded_mesh, 'faces') and loaded_mesh.faces is not None:
-            print(f"[LoadMeshPath] Loaded: {len(loaded_mesh.vertices)} vertices, {len(loaded_mesh.faces)} faces")
+            log.info("Loaded: %d vertices, %d faces", len(loaded_mesh.vertices), len(loaded_mesh.faces))
         else:
-            print(f"[LoadMeshPath] Loaded pointcloud: {len(loaded_mesh.vertices)} points")
+            log.info("Loaded pointcloud: %d points", len(loaded_mesh.vertices))
 
         # Extract texture
         texture = self._extract_texture_image(loaded_mesh)
@@ -220,7 +223,7 @@ class LoadMeshPath:
         if not paths:
             raise ValueError("No valid paths provided")
 
-        print(f"[LoadMeshPath] Loading {len(paths)} mesh(es)")
+        log.info("Loading %d mesh(es)", len(paths))
 
         meshes = []
         textures = []
@@ -231,11 +234,11 @@ class LoadMeshPath:
                 meshes.append(mesh)
                 textures.append(texture)
             except Exception as e:
-                print(f"[LoadMeshPath] Error loading mesh {i+1} ({path}): {e}")
+                log.error("Error loading mesh %d (%s): %s", i + 1, path, e)
                 # Continue with other paths instead of failing completely
                 raise
 
-        print(f"[LoadMeshPath] Successfully loaded {len(meshes)} mesh(es)")
+        log.info("Successfully loaded %d mesh(es)", len(meshes))
         return (meshes, textures)
 
 

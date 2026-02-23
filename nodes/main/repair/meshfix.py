@@ -8,8 +8,12 @@ Closes holes, removes self-intersections, and creates watertight meshes
 with light touch-ups.
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class MeshFixNode:
@@ -119,10 +123,9 @@ class MeshFixNode:
         clean_mesh = clean_mesh == "true"
 
         # Log input
-        print(f"\n{'='*60}")
-        print(f"[MeshFix] Input: {len(input_mesh.vertices):,} vertices, {len(input_mesh.faces):,} faces")
-        print(f"[MeshFix] Options: remove_small={remove_small_components}, join={join_components}, fill_holes={fill_holes}, clean={clean_mesh}")
-        print(f"{'='*60}\n")
+        log.info("Input: %d vertices, %d faces", len(input_mesh.vertices), len(input_mesh.faces))
+        log.info("Options: remove_small=%s, join=%s, fill_holes=%s, clean=%s",
+                 remove_small_components, join_components, fill_holes, clean_mesh)
 
         # Track initial state
         initial_vertices = len(input_mesh.vertices)
@@ -148,36 +151,38 @@ class MeshFixNode:
         # Get initial boundary count
         try:
             initial_boundaries = tin.boundaries()
-        except:
+        except Exception as e:
+            log.debug("Failed to get initial boundary count: %s", e)
             initial_boundaries = -1
 
         # Apply repairs in order
         if remove_small_components:
-            print("[MeshFix] Removing small components...")
+            log.info("Removing small components...")
             tin.remove_smallest_components()
             operations.append("Removed small components")
 
         if join_components:
-            print("[MeshFix] Joining nearby components...")
+            log.info("Joining nearby components...")
             tin.join_closest_components()
             operations.append("Joined nearby components")
 
         if fill_holes:
             # 0 means fill all holes - use large number since pymeshfix requires int
             nbe = max_hole_edges if max_hole_edges > 0 else 100000
-            print(f"[MeshFix] Filling holes (max_edges={nbe}, refine={refine_holes})...")
+            log.info("Filling holes (max_edges=%d, refine=%s)...", nbe, refine_holes)
             tin.fill_small_boundaries(nbe=nbe, refine=refine_holes)
             operations.append(f"Filled holes (max_edges={'all' if max_hole_edges == 0 else nbe})")
 
         if clean_mesh:
-            print(f"[MeshFix] Cleaning mesh (iterations={clean_iterations}, inner_loops={inner_loops})...")
+            log.info("Cleaning mesh (iterations=%d, inner_loops=%d)...", clean_iterations, inner_loops)
             tin.clean(max_iters=clean_iterations, inner_loops=inner_loops)
             operations.append(f"Cleaned (iters={clean_iterations})")
 
         # Get final boundary count
         try:
             final_boundaries = tin.boundaries()
-        except:
+        except Exception as e:
+            log.debug("Failed to get final boundary count: %s", e)
             final_boundaries = -1
 
         # Extract result
@@ -224,8 +229,8 @@ After:
 Status: {'Mesh is now watertight!' if is_watertight and not was_watertight else 'Mesh was already watertight.' if was_watertight else 'Mesh still has open boundaries.'}
 """
 
-        print(f"[MeshFix] Result: {final_vertices:,} vertices, {final_faces:,} faces")
-        print(f"[MeshFix] Watertight: {was_watertight} -> {is_watertight}")
+        log.info("Result: %d vertices, %d faces", final_vertices, final_faces)
+        log.info("Watertight: %s -> %s", was_watertight, is_watertight)
 
         return {"ui": {"text": [report]}, "result": (result_mesh, report)}
 

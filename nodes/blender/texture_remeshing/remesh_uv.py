@@ -5,18 +5,22 @@
 Remesh UV Node - Remesh with texture preservation using Blender
 """
 
-import numpy as np
-import trimesh as trimesh_module
+import logging
 import os
 import subprocess
 import tempfile
 
+import numpy as np
+import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
+
 
 def _transfer_texture_via_closest_point(original_mesh, remeshed_mesh):
     """Transfer texture from original mesh to remeshed mesh using closest-point projection."""
-    print(f"[transfer_texture] Starting texture transfer via closest-point projection")
-    print(f"[transfer_texture] Original: {len(original_mesh.vertices)} verts, {len(original_mesh.faces)} faces")
-    print(f"[transfer_texture] Remeshed: {len(remeshed_mesh.vertices)} verts, {len(remeshed_mesh.faces)} faces")
+    log.info("Starting texture transfer via closest-point projection")
+    log.info("Original: %d verts, %d faces", len(original_mesh.vertices), len(original_mesh.faces))
+    log.info("Remeshed: %d verts, %d faces", len(remeshed_mesh.vertices), len(remeshed_mesh.faces))
 
     if not hasattr(original_mesh, 'visual') or original_mesh.visual is None:
         raise ValueError("Original mesh has no visual data")
@@ -34,26 +38,26 @@ def _transfer_texture_via_closest_point(original_mesh, remeshed_mesh):
     if texture_image is None:
         raise ValueError("Original mesh material has no texture image")
 
-    print(f"[transfer_texture] Original texture size: {texture_image.size}")
+    log.info("Original texture size: %s", texture_image.size)
 
     texture_array = np.array(texture_image)
     tex_height, tex_width = texture_array.shape[:2]
     original_uvs = original_mesh.visual.uv
 
-    print(f"[transfer_texture] Finding closest points...")
+    log.info("Finding closest points...")
     closest_points, distances, triangle_ids = trimesh_module.proximity.closest_point(original_mesh, remeshed_mesh.vertices)
-    print(f"[transfer_texture] Closest points found, max distance: {distances.max():.6f}")
+    log.info("Closest points found, max distance: %.6f", distances.max())
 
-    print(f"[transfer_texture] Computing barycentric coordinates...")
+    log.info("Computing barycentric coordinates...")
     triangles = original_mesh.vertices[original_mesh.faces[triangle_ids]]
     bary_coords = trimesh_module.triangles.points_to_barycentric(triangles, closest_points)
 
-    print(f"[transfer_texture] Interpolating UV coordinates...")
+    log.info("Interpolating UV coordinates...")
     triangle_uvs = original_uvs[original_mesh.faces[triangle_ids]]
     interpolated_uvs = np.einsum('ij,ijk->ik', bary_coords, triangle_uvs)
     interpolated_uvs = np.clip(interpolated_uvs, 0.0, 1.0)
 
-    print(f"[transfer_texture] Sampling texture...")
+    log.info("Sampling texture...")
     pixel_x = (interpolated_uvs[:, 0] * (tex_width - 1)).astype(int)
     pixel_y = ((1.0 - interpolated_uvs[:, 1]) * (tex_height - 1)).astype(int)
     pixel_x = np.clip(pixel_x, 0, tex_width - 1)
@@ -66,12 +70,12 @@ def _transfer_texture_via_closest_point(original_mesh, remeshed_mesh):
         vertex_colors = np.hstack([vertex_colors, alpha])
 
     non_black = np.sum((vertex_colors[:, 0] > 10) | (vertex_colors[:, 1] > 10) | (vertex_colors[:, 2] > 10))
-    print(f"[transfer_texture] Non-black vertices: {non_black}/{len(vertex_colors)} ({100*non_black/len(vertex_colors):.1f}%)")
+    log.info("Non-black vertices: %d/%d (%.1f%%)", non_black, len(vertex_colors), 100*non_black/len(vertex_colors))
 
     result_mesh = remeshed_mesh.copy()
     result_mesh.visual.vertex_colors = vertex_colors
 
-    print(f"[transfer_texture] Texture transfer complete")
+    log.info("Texture transfer complete")
     return result_mesh
 
 try:
@@ -111,36 +115,36 @@ def _extract_texture(mesh):
             img = material.image
             if isinstance(img, Image.Image):
                 texture_image = img
-                print(f"[TextureExtract] Found texture in material.image: {texture_image.size}")
+                log.info("Found texture in material.image: %s", texture_image.size)
             elif isinstance(img, str) and os.path.exists(img):
                 texture_image = Image.open(img)
-                print(f"[TextureExtract] Loaded texture from material.image path: {texture_image.size}")
+                log.info("Loaded texture from material.image path: %s", texture_image.size)
 
         # Check for PBR baseColorTexture (GLB/GLTF files)
         if texture_image is None and hasattr(material, 'baseColorTexture'):
             img = material.baseColorTexture
             if isinstance(img, Image.Image):
                 texture_image = img
-                print(f"[TextureExtract] Found texture in material.baseColorTexture: {texture_image.size}")
+                log.info("Found texture in material.baseColorTexture: %s", texture_image.size)
             elif isinstance(img, str) and os.path.exists(img):
                 texture_image = Image.open(img)
-                print(f"[TextureExtract] Loaded texture from material.baseColorTexture path: {texture_image.size}")
+                log.info("Loaded texture from material.baseColorTexture path: %s", texture_image.size)
 
         # Fallback: Check for main texture property
         if texture_image is None and hasattr(material, 'main'):
             img = material.main
             if isinstance(img, Image.Image):
                 texture_image = img
-                print(f"[TextureExtract] Found texture in material.main: {texture_image.size}")
+                log.info("Found texture in material.main: %s", texture_image.size)
             elif isinstance(img, str) and os.path.exists(img):
                 texture_image = Image.open(img)
-                print(f"[TextureExtract] Loaded texture from material.main path: {texture_image.size}")
+                log.info("Loaded texture from material.main path: %s", texture_image.size)
 
     is_placeholder = False
     if texture_image is None and uvs is not None:
         # Create checkerboard placeholder
-        print("[WARNING] Mesh has UVs but no texture image - using placeholder checkerboard")
-        print("[WARNING] For proper texture baking, input mesh must have embedded texture data")
+        log.warning("Mesh has UVs but no texture image - using placeholder checkerboard")
+        log.warning("For proper texture baking, input mesh must have embedded texture data")
         is_placeholder = True
         texture_image = Image.new('RGB', (512, 512), color=(200, 200, 200))
         arr = np.array(texture_image)
@@ -229,8 +233,8 @@ class RemeshWithTexture:
         if _get_torch() is None:
             raise RuntimeError("torch required. Install: pip install torch")
 
-        print(f"[BlenderRemeshWithTexture] Input: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
-        print(f"[BlenderRemeshWithTexture] Using Python texture transfer (no Blender baking)")
+        log.info("Input: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
+        log.info("Using Python texture transfer (no Blender baking)")
 
         # Extract texture from source mesh
         texture_path, original_uvs, is_placeholder = _extract_texture(trimesh)
@@ -245,12 +249,12 @@ class RemeshWithTexture:
             # (4096x4096 with 128 samples on complex meshes can crash Blender)
             actual_texture_size = min(source_tex_size, 2048)
             if actual_texture_size < source_tex_size:
-                print(f"[BlenderRemeshWithTexture] Auto-detected texture size: {source_tex_size}x{source_tex_size}, capped at {actual_texture_size}x{actual_texture_size} to avoid memory issues")
+                log.info("Auto-detected texture size: %dx%d, capped at %dx%d to avoid memory issues", source_tex_size, source_tex_size, actual_texture_size, actual_texture_size)
             else:
-                print(f"[BlenderRemeshWithTexture] Auto-detected texture size: {actual_texture_size}x{actual_texture_size}")
+                log.info("Auto-detected texture size: %dx%d", actual_texture_size, actual_texture_size)
         else:
             actual_texture_size = 2048  # Fallback default
-            print(f"[BlenderRemeshWithTexture] PIL not available, using default texture size: {actual_texture_size}x{actual_texture_size}")
+            log.info("PIL not available, using default texture size: %dx%d", actual_texture_size, actual_texture_size)
 
         # Find Blender
         import shutil
@@ -282,10 +286,10 @@ class RemeshWithTexture:
             # Rough heuristic: voxel_size = mesh_size / (target_faces ** (1/3) * 2)
             fallback_voxel_size = mesh_size / (target_face_count ** (1/3) * 2)
 
-            print(f"[BlenderRemeshWithTexture] Mesh bounds: {bounds}")
-            print(f"[BlenderRemeshWithTexture] Mesh size: {mesh_size:.3f}")
-            print(f"[BlenderRemeshWithTexture] Original voxel_size: {voxel_size}, Adjusted: {adjusted_voxel_size:.5f}")
-            print(f"[BlenderRemeshWithTexture] Fallback voxel size (targeting ~{target_face_count} faces): {fallback_voxel_size:.5f}")
+            log.debug("Mesh bounds: %s", bounds)
+            log.debug("Mesh size: %.3f", mesh_size)
+            log.debug("Original voxel_size: %s, Adjusted: %.5f", voxel_size, adjusted_voxel_size)
+            log.debug("Fallback voxel size (targeting ~%d faces): %.5f", target_face_count, fallback_voxel_size)
 
             # Build Blender script (remeshing will be applied to remeshed_obj)
             if remesh_method == "voxel":
@@ -434,11 +438,11 @@ bpy.ops.export_scene.gltf(
 print(f"[Blender] Export complete")
 """
 
-            print(f"[BlenderRemeshWithTexture] Running Blender...")
+            log.info("Running Blender...")
             # DEBUG: Save script for inspection
             with open('/tmp/blender_remesh_script.py', 'w') as f:
                 f.write(script)
-            print(f"[BlenderRemeshWithTexture] Script saved to /tmp/blender_remesh_script.py")
+            log.debug("Script saved to /tmp/blender_remesh_script.py")
 
             result = subprocess.run(
                 [blender_path, '--background', '--python-expr', script],
@@ -448,8 +452,8 @@ print(f"[Blender] Export complete")
             )
 
             if result.returncode != 0:
-                print(f"[BlenderRemeshWithTexture] Blender stderr: {result.stderr}")
-                print(f"[BlenderRemeshWithTexture] Blender stdout: {result.stdout}")
+                log.error("Blender stderr: %s", result.stderr)
+                log.error("Blender stdout: %s", result.stdout)
                 raise RuntimeError(f"Blender failed: {result.stderr}")
 
             # Log Blender output for debugging
@@ -457,41 +461,41 @@ print(f"[Blender] Export complete")
                 # Always show Blender's remesh feedback
                 for line in result.stdout.split('\n'):
                     if '[Blender]' in line:
-                        print(line)
+                        log.info(line)
                 # Show ALL output if there's an error or warning
                 if "error" in result.stdout.lower() or "warning" in result.stdout.lower() or "traceback" in result.stdout.lower():
-                    print(f"[BlenderRemeshWithTexture] Full Blender output (error detected):")
-                    print(result.stdout[-2000:])
+                    log.warning("Full Blender output (error detected):")
+                    log.warning("%s", result.stdout[-2000:])
 
             # Check if output file was created
             if not os.path.exists(output_glb.name) or os.path.getsize(output_glb.name) == 0:
-                print(f"[BlenderRemeshWithTexture] ERROR: Output GLB not created or is empty!")
-                print(f"[BlenderRemeshWithTexture] Full Blender output:")
-                print(result.stdout[-2000:])
+                log.error("Output GLB not created or is empty!")
+                log.error("Full Blender output:")
+                log.error("%s", result.stdout[-2000:])
                 raise RuntimeError("Blender did not create output GLB file - check logs above")
 
             # Load remeshed mesh
-            print(f"[BlenderRemeshWithTexture] Loading GLB from: {output_glb.name}")
+            log.info("Loading GLB from: %s", output_glb.name)
             remeshed = trimesh_module.load(output_glb.name, process=False)
-            print(f"[BlenderRemeshWithTexture] Loaded type: {type(remeshed)}")
+            log.debug("Loaded type: %s", type(remeshed))
 
             if isinstance(remeshed, trimesh_module.Scene):
-                print(f"[BlenderRemeshWithTexture] Scene contains {len(remeshed.geometry)} geometries")
+                log.debug("Scene contains %d geometries", len(remeshed.geometry))
                 # Concatenate
                 remeshed = remeshed.dump(concatenate=True)
-                print(f"[BlenderRemeshWithTexture] After concatenate: {len(remeshed.vertices)} vertices, {len(remeshed.faces)} faces")
+                log.info("After concatenate: %d vertices, %d faces", len(remeshed.vertices), len(remeshed.faces))
 
             # Merge duplicate vertices from GLB export
             remeshed.merge_vertices()
-            print(f"[BlenderRemeshWithTexture] After merge_vertices: {len(remeshed.vertices)} vertices, {len(remeshed.faces)} faces")
+            log.info("After merge_vertices: %d vertices, %d faces", len(remeshed.vertices), len(remeshed.faces))
 
             # Validate remesh results
             if len(remeshed.faces) == len(trimesh.faces):
-                print(f"[WARNING] Face count unchanged ({len(remeshed.faces)}) - remesh may have failed!")
-                print(f"[WARNING] Check Blender output above for details")
+                log.warning("Face count unchanged (%d) - remesh may have failed!", len(remeshed.faces))
+                log.warning("Check Blender output above for details")
 
             # PYTHON TEXTURE TRANSFER: Use closest-point projection instead of Blender baking
-            print(f"[BlenderRemeshWithTexture] Applying Python texture transfer...")
+            log.info("Applying Python texture transfer...")
             remeshed_with_colors = _transfer_texture_via_closest_point(trimesh, remeshed)
 
             # Create visualization texture from vertex colors for IMAGE output
@@ -525,7 +529,7 @@ print(f"[Blender] Export complete")
                 if torch is not None:
                     comfy_image = torch.from_numpy(comfy_image)
 
-                print(f"[BlenderRemeshWithTexture] Created vertex color visualization: {viz_size}x{viz_size}")
+                log.info("Created vertex color visualization: %dx%d", viz_size, viz_size)
             else:
                 # Fallback: black image
                 comfy_image = np.zeros((1, 256, 256, 3), dtype=np.float32)
@@ -541,7 +545,7 @@ Faces: {len(trimesh.faces)} -> {len(remeshed_with_colors.faces)}
 Texture Transfer: Closest-Point Projection{placeholder_warning}
 """
 
-            print(f"[BlenderRemeshWithTexture] Complete")
+            log.info("Complete")
             return {"ui": {"text": [info]}, "result": (remeshed_with_colors, comfy_image, info)}
 
         finally:

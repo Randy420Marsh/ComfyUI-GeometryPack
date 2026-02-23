@@ -12,6 +12,8 @@ Provides interactive buttons to compute:
 Fields are added to the mesh and visualized in the VTK.js viewer.
 """
 
+import logging
+
 import trimesh as trimesh_module
 import os
 import uuid
@@ -19,6 +21,8 @@ import numpy as np
 
 from .mesh_helpers import is_point_cloud, get_face_count, get_geometry_type
 from ._vtp_export import export_mesh_with_scalars_vtp
+
+log = logging.getLogger("geometrypack")
 
 try:
     import folder_paths
@@ -76,7 +80,7 @@ def compute_boundary_vertices(mesh):
     mesh.vertex_attributes['boundary_vertex'] = boundary_field
 
     num_boundary = int(np.sum(boundary_field > 0.5))
-    print(f"[MeshAnalysis] Open edges: {len(boundary_edges)} edges, {num_boundary} vertices")
+    log.info("Open edges: %d edges, %d vertices", len(boundary_edges), num_boundary)
 
     return mesh, num_boundary
 
@@ -98,7 +102,7 @@ def compute_connected_components(mesh):
 
     mesh.face_attributes['part_id'] = part_ids
 
-    print(f"[MeshAnalysis] Connected components: {len(components)}")
+    log.info("Connected components: %d", len(components))
 
     return mesh, len(components)
 
@@ -129,17 +133,17 @@ def compute_self_intersections(mesh):
         mesh.face_attributes['self_intersect'] = intersect_field
 
         num_intersecting = int(np.sum(intersect_field > 0.5))
-        print(f"[MeshAnalysis] Self-intersections: {num_intersecting} faces")
+        log.info("Self-intersections: %d faces", num_intersecting)
 
         return mesh, num_intersecting
 
     except ImportError:
-        print("[MeshAnalysis] WARNING: libigl not available for self-intersection detection")
+        log.warning("WARNING: libigl not available for self-intersection detection")
         # Fallback: mark no intersections
         mesh.face_attributes['self_intersect'] = np.zeros(len(mesh.faces), dtype=np.float32)
         return mesh, 0
     except Exception as e:
-        print(f"[MeshAnalysis] Error computing self-intersections: {e}")
+        log.error("Error computing self-intersections: %s", e)
         mesh.face_attributes['self_intersect'] = np.zeros(len(mesh.faces), dtype=np.float32)
         return mesh, 0
 
@@ -179,7 +183,7 @@ class PreviewMeshAnalysisNode:
         Returns:
             dict: UI data for frontend widget with mesh_id for API calls
         """
-        print(f"[PreviewMeshAnalysis] Preparing preview: {len(trimesh.vertices)} vertices, {get_face_count(trimesh)} faces")
+        log.info("Preparing preview: %d vertices, %d faces", len(trimesh.vertices), get_face_count(trimesh))
 
         # Generate unique mesh ID for this execution
         mesh_id = uuid.uuid4().hex[:12]
@@ -199,9 +203,9 @@ class PreviewMeshAnalysisNode:
         # Export mesh
         try:
             export_mesh_with_scalars_vtp(mesh_copy, filepath)
-            print(f"[PreviewMeshAnalysis] Exported VTP to: {filepath}")
+            log.info("Exported VTP to: %s", filepath)
         except Exception as e:
-            print(f"[PreviewMeshAnalysis] VTP export failed: {e}, using STL")
+            log.error("VTP export failed: %s, using STL", e)
             filename = f"analysis_{mesh_id}.stl"
             filepath = filepath.replace('.vtp', '.stl')
             mesh_copy.export(filepath, file_type='stl')

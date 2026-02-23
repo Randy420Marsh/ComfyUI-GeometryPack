@@ -11,8 +11,12 @@ Degenerate faces have:
 Also shows the 30 smallest faces by area (for informational purposes).
 """
 
+import logging
 import os
+
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 
 class DegenerateFacesNode:
@@ -160,13 +164,13 @@ class DegenerateFacesNode:
             })
 
             # Console output
-            print(f"[DegenerateFaces] {mesh_name_short}: {num_degenerate} degenerate faces ({duplicate_count} duplicate verts, {zero_count} zero area)")
+            log.info("%s: %d degenerate faces (%d duplicate verts, %d zero area)", mesh_name_short, num_degenerate, duplicate_count, zero_count)
             if num_degenerate > 0:
                 for info in degenerate_faces[:5]:
-                    print(f"[DegenerateFaces]   Face {info['id']}: {info['reason']}")
+                    log.info("  Face %d: %s", info['id'], info['reason'])
                 if num_degenerate > 5:
-                    print(f"[DegenerateFaces]   ... and {num_degenerate - 5} more")
-            print(f"[DegenerateFaces] Smallest face area: {smallest_faces[0]['area']:.2e}")
+                    log.info("  ... and %d more", num_degenerate - 5)
+            log.info("Smallest face area: %.2e", smallest_faces[0]['area'])
 
             # Store result
             result_mesh = mesh.copy()
@@ -181,7 +185,7 @@ class DegenerateFacesNode:
 
         summary = "\n\n".join(summary_lines)
 
-        print(f"[DegenerateFaces] Processed {len(meshes)} mesh(es)")
+        log.info("Processed %d mesh(es)", len(meshes))
 
         return {
             "result": (result_meshes, summary),

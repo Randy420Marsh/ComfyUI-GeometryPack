@@ -5,10 +5,13 @@
 Split By Field Node - Split point cloud/mesh by discrete vertex attribute
 """
 
+import logging
 from typing import Tuple
 
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class SplitByFieldNode:
@@ -42,7 +45,7 @@ class SplitByFieldNode:
 
     def split(self, geometry, field_name: str) -> Tuple:
         """Split geometry by a discrete field."""
-        print(f"[SplitByField] Splitting by field: '{field_name}'")
+        log.info("Splitting by field: '%s'", field_name)
 
         # Check field exists
         if not hasattr(geometry, 'vertex_attributes') or geometry.vertex_attributes is None:
@@ -63,7 +66,7 @@ class SplitByFieldNode:
         if len(unique_values) > 100:
             raise ValueError(f"Too many unique values ({len(unique_values)}). Maximum allowed: 100")
 
-        print(f"   Found {len(unique_values)} unique values: {unique_values}")
+        log.info("Found %d unique values: %s", len(unique_values), unique_values)
 
         # Determine if input is a point cloud or mesh
         is_point_cloud = (
@@ -129,7 +132,7 @@ class SplitByFieldNode:
 
             result.append(subset)
             summary_lines.append(f"  {field_name}={val}: {num_points} points")
-            print(f"   {field_name}={val}: {num_points} points")
+            log.info("%s=%s: %d points", field_name, val, num_points)
 
         summary = "\n".join(summary_lines)
         return {"ui": {"text": [summary]}, "result": (result, summary)}

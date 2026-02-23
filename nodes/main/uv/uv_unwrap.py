@@ -17,8 +17,12 @@ Supports:
 Parameters are method-specific; unused ones are ignored.
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 def _extract_uvs_from_blender_mesh(mesh, vertices_np):
@@ -324,8 +328,8 @@ class UVUnwrapNode:
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        print(f"[UVUnwrap] Input: {initial_vertices} vertices, {initial_faces} faces")
-        print(f"[UVUnwrap] Method: {method}")
+        log.info("Input: %d vertices, %d faces", initial_vertices, initial_faces)
+        log.info("Method: %s", method)
 
         if method == "xatlas":
             unwrapped_mesh, info = self._xatlas(trimesh)
@@ -351,7 +355,7 @@ class UVUnwrapNode:
         else:
             raise ValueError(f"Unknown method: {method}")
 
-        print(f"[UVUnwrap] Output: {len(unwrapped_mesh.vertices)} vertices, {len(unwrapped_mesh.faces)} faces")
+        log.info("Output: %d vertices, %d faces", len(unwrapped_mesh.vertices), len(unwrapped_mesh.faces))
 
         return {"ui": {"text": [info]}, "result": (unwrapped_mesh, info)}
 
@@ -419,15 +423,15 @@ Fast automatic UV unwrapping with vertex splitting at seams.
                 "Alternatively, use 'xatlas' method which works on CPU."
             )
 
-        if not torch.cuda.is_available():
+        import comfy.model_management
+        if comfy.model_management.get_torch_device().type != "cuda":
             raise RuntimeError(
                 "CUDA not available. CuMesh requires a CUDA-capable GPU.\n"
                 "Use 'xatlas' method for CPU-based UV unwrapping."
             )
 
-        print(f"[UVUnwrap] CuMesh: chart_cone_angle={chart_cone_angle}, "
-              f"refine_iter={chart_refine_iterations}, global_iter={chart_global_iterations}, "
-              f"smooth={chart_smooth_strength}")
+        log.info("CuMesh: chart_cone_angle=%s, refine_iter=%s, global_iter=%s, smooth=%s",
+                 chart_cone_angle, chart_refine_iterations, chart_global_iterations, chart_smooth_strength)
 
         # Convert to torch tensors on GPU
         vertices = torch.tensor(trimesh.vertices, dtype=torch.float32).cuda()
@@ -441,7 +445,7 @@ Fast automatic UV unwrapping with vertex splitting at seams.
         cumesh.init(vertices, faces)
 
         # UV Unwrap with two-stage process (fast clustering + xatlas)
-        print("[UVUnwrap] Running CuMesh UV unwrap...")
+        log.info("Running CuMesh UV unwrap...")
         out_vertices, out_faces, out_uvs, out_vmaps = cumesh.uv_unwrap(
             compute_charts_kwargs={
                 "threshold_cone_half_angle_rad": chart_cone_angle_rad,
@@ -485,7 +489,8 @@ Fast automatic UV unwrapping with vertex splitting at seams.
         }
 
         # Clean up GPU memory
-        torch.cuda.empty_cache()
+        import comfy.model_management
+        comfy.model_management.soft_empty_cache()
 
         info = f"""UV Unwrap Results (CuMesh):
 
@@ -703,7 +708,7 @@ Better preservation of angles and shapes.
 
         angle_limit_rad = math.radians(angle_limit)
 
-        print(f"[UVUnwrap] Running Blender Smart UV Project...")
+        log.info("Running Blender Smart UV Project...")
         result = _bpy_smart_uv_project(
             vertices=np.asarray(trimesh.vertices, dtype=np.float32),
             faces=np.asarray(trimesh.faces, dtype=np.int32),
@@ -751,7 +756,7 @@ Automatic seam-based unwrapping with intelligent island creation.
 
     def _blender_cube(self, trimesh, cube_size, scale_to_bounds):
         """Blender Cube Projection using bpy."""
-        print(f"[UVUnwrap] Running Blender Cube Projection...")
+        log.info("Running Blender Cube Projection...")
         result = _bpy_cube_uv_project(
             vertices=np.asarray(trimesh.vertices, dtype=np.float32),
             faces=np.asarray(trimesh.faces, dtype=np.int32),
@@ -792,7 +797,7 @@ Best for box-like objects.
 
     def _blender_cylinder(self, trimesh, cylinder_radius, scale_to_bounds):
         """Blender Cylinder Projection using bpy."""
-        print(f"[UVUnwrap] Running Blender Cylinder Projection...")
+        log.info("Running Blender Cylinder Projection...")
         result = _bpy_cylinder_uv_project(
             vertices=np.asarray(trimesh.vertices, dtype=np.float32),
             faces=np.asarray(trimesh.faces, dtype=np.int32),
@@ -833,7 +838,7 @@ Best for cylindrical objects.
 
     def _blender_sphere(self, trimesh, scale_to_bounds):
         """Blender Sphere Projection using bpy."""
-        print(f"[UVUnwrap] Running Blender Sphere Projection...")
+        log.info("Running Blender Sphere Projection...")
         result = _bpy_sphere_uv_project(
             vertices=np.asarray(trimesh.vertices, dtype=np.float32),
             faces=np.asarray(trimesh.faces, dtype=np.int32),

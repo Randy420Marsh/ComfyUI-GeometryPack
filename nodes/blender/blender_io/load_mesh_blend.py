@@ -5,9 +5,13 @@
 Load Mesh Blend Node - Load Blender .blend files using bpy.
 """
 
+import logging
 import os
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 # ComfyUI folder paths
 try:
@@ -159,7 +163,7 @@ class LoadMeshBlend:
             searched_paths.append(input_3d_path)
             if os.path.exists(input_3d_path):
                 full_path = input_3d_path
-                print(f"[LoadMeshBlend] Found .blend in input/3d folder: {file_path}")
+                log.info("Found .blend in input/3d folder: %s", file_path)
 
             # Second, try in ComfyUI input folder
             if full_path is None:
@@ -167,14 +171,14 @@ class LoadMeshBlend:
                 searched_paths.append(input_path)
                 if os.path.exists(input_path):
                     full_path = input_path
-                    print(f"[LoadMeshBlend] Found .blend in input folder: {file_path}")
+                    log.info("Found .blend in input folder: %s", file_path)
 
         # If not found in input folders, try as absolute path
         if full_path is None:
             searched_paths.append(file_path)
             if os.path.exists(file_path):
                 full_path = file_path
-                print(f"[LoadMeshBlend] Loading from absolute path: {file_path}")
+                log.info("Loading from absolute path: %s", file_path)
             else:
                 # Generate error message with all searched paths
                 error_msg = f"File not found: '{file_path}'\nSearched in:"
@@ -183,7 +187,7 @@ class LoadMeshBlend:
                 raise ValueError(error_msg)
 
         # Load .blend file using bpy directly
-        print(f"[LoadMeshBlend] Loading via bpy: {full_path}")
+        log.info("Loading via bpy: %s", full_path)
         try:
             result = _bpy_import_blend(full_path)
         except Exception as e:
@@ -211,7 +215,7 @@ class LoadMeshBlend:
         info += f"Vertices: {len(loaded_mesh.vertices):,}\n"
         info += f"Faces: {len(loaded_mesh.faces):,}"
 
-        print(f"[LoadMeshBlend] Loaded: {len(loaded_mesh.vertices)} vertices, {len(loaded_mesh.faces)} faces")
+        log.info("Loaded: %d vertices, %d faces", len(loaded_mesh.vertices), len(loaded_mesh.faces))
 
         return {"ui": {"text": [info]}, "result": (loaded_mesh, info)}
 

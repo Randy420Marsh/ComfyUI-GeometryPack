@@ -5,8 +5,11 @@
 Save Mesh Batch Node - Save multiple meshes to a folder with sequential numbering.
 """
 
+import logging
 import os
 import math
+
+log = logging.getLogger("geometrypack")
 
 # ComfyUI folder paths
 try:
@@ -101,9 +104,9 @@ class SaveMeshBatch:
         batch_size = len(trimesh)
         use_custom_names = names_list is not None and len(names_list) >= batch_size
         if use_custom_names:
-            print(f"[SaveMeshBatch] Saving {batch_size} meshes with custom names to folder '{folder_name_val}'")
+            log.info("Saving %d meshes with custom names to folder '%s'", batch_size, folder_name_val)
         else:
-            print(f"[SaveMeshBatch] Saving {batch_size} meshes to folder '{folder_name_val}'")
+            log.info("Saving %d meshes to folder '%s'", batch_size, folder_name_val)
 
         # Determine output folder path
         if COMFYUI_OUTPUT_FOLDER is not None:
@@ -113,12 +116,12 @@ class SaveMeshBatch:
 
         # Create folder if it doesn't exist
         os.makedirs(output_folder, exist_ok=True)
-        print(f"[SaveMeshBatch] Output folder: {output_folder}")
+        log.info("Output folder: %s", output_folder)
 
         # Calculate number of digits needed based on batch size
         # For 1-9: 1 digit, 10-99: 2 digits, 100-999: 3 digits, etc.
         num_digits = max(1, math.ceil(math.log10(batch_size + 1)))
-        print(f"[SaveMeshBatch] Using {num_digits} digits for numbering (batch size: {batch_size})")
+        log.debug("Using %d digits for numbering (batch size: %d)", num_digits, batch_size)
 
         saved_count = 0
         errors = []
@@ -153,7 +156,7 @@ class SaveMeshBatch:
                 if success:
                     saved_count += 1
                     if (i + 1) % 10 == 0 or i == 0 or i == batch_size - 1:
-                        print(f"[SaveMeshBatch] Saved {filename} ({vertex_count} verts, {face_count} faces)")
+                        log.info("Saved %s (%d verts, %d faces)", filename, vertex_count, face_count)
                 else:
                     errors.append(f"Mesh {i + 1}: {error}")
 
@@ -161,14 +164,14 @@ class SaveMeshBatch:
                 errors.append(f"Mesh {i + 1}: {str(e)}")
 
         # Report results
-        print(f"[SaveMeshBatch] Saved {saved_count}/{batch_size} meshes to {output_folder}")
+        log.info("Saved %d/%d meshes to %s", saved_count, batch_size, output_folder)
 
         if errors:
-            print(f"[SaveMeshBatch] Errors ({len(errors)}):")
+            log.warning("Errors (%d):", len(errors))
             for error in errors[:5]:  # Show first 5 errors
-                print(f"  - {error}")
+                log.warning("  - %s", error)
             if len(errors) > 5:
-                print(f"  ... and {len(errors) - 5} more errors")
+                log.warning("  ... and %d more errors", len(errors) - 5)
 
         if saved_count == 0:
             raise ValueError(f"Failed to save any meshes. Errors: {'; '.join(errors[:3])}")

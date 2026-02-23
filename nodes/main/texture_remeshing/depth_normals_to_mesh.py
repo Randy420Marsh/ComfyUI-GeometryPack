@@ -6,8 +6,12 @@ Depth + Normals to Mesh Node - Convert depth map and normal map to smooth 3D mes
 Designed for CAD raytracing output using Poisson surface reconstruction.
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 def _to_numpy(x):
@@ -128,12 +132,12 @@ class DepthNormalsToMeshNode:
         if depth is None and depth_image is None:
             raise ValueError("Either 'depth' (MASK) or 'depth_image' (IMAGE) must be provided")
 
-        print(f"[DepthNormalsToMesh] Converting depth + normals to mesh")
-        print(f"[DepthNormalsToMesh] Method: {method}, Resolution: {resolution}")
+        log.info("Converting depth + normals to mesh")
+        log.info("Method: %s, Resolution: %d", method, resolution)
 
         # Extract depth map - prefer depth_image if provided
         if depth_image is not None:
-            print(f"[DepthNormalsToMesh] Using depth_image input (averaging RGB channels)")
+            log.info("Using depth_image input (averaging RGB channels)")
             depth_img_arr = _to_numpy(depth_image)
             if depth_img_arr.ndim == 4:
                 depth_img_arr = depth_img_arr[0]
@@ -146,7 +150,7 @@ class DepthNormalsToMeshNode:
             else:
                 depth_arr = depth_img_arr
         else:
-            print(f"[DepthNormalsToMesh] Using depth mask input")
+            log.info("Using depth mask input")
             depth_arr = _to_numpy(depth)
             if depth_arr.ndim == 3:
                 depth_arr = depth_arr[0]
@@ -160,7 +164,7 @@ class DepthNormalsToMeshNode:
         if depth_max > depth_min:
             depth_arr = (depth_arr - depth_min) / (depth_max - depth_min)
 
-        print(f"[DepthNormalsToMesh] Depth size: {depth_arr.shape}, range: [{depth_min:.3f}, {depth_max:.3f}]")
+        log.info("Depth size: %s, range: [%.3f, %.3f]", depth_arr.shape, depth_min, depth_max)
 
         # Extract normal map from tensor (B, H, W, C)
         normal_arr = _to_numpy(normal_map)
@@ -171,7 +175,7 @@ class DepthNormalsToMeshNode:
         if len(normal_arr.shape) == 2:
             raise ValueError("Normal map must be RGB image with Nx in R, Ny in G channels")
 
-        print(f"[DepthNormalsToMesh] Normal map size: {normal_arr.shape}")
+        log.info("Normal map size: %s", normal_arr.shape)
 
         # Resize both to target resolution
         depth_pil = Image.fromarray((depth_arr * 255).astype(np.uint8))
@@ -225,7 +229,7 @@ class DepthNormalsToMeshNode:
         points = np.array(points, dtype=np.float64)
         normals = np.array(normals, dtype=np.float64)
 
-        print(f"[DepthNormalsToMesh] Point cloud: {len(points)} points")
+        log.info("Point cloud: %d points", len(points))
 
         if len(points) < 10:
             raise ValueError(f"Too few valid points ({len(points)}). Check depth map and threshold settings.")
@@ -242,7 +246,7 @@ class DepthNormalsToMeshNode:
         else:
             raise ValueError(f"Unknown method: {method}")
 
-        print(f"[DepthNormalsToMesh] Output: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        log.info("Output: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
 
         # Generate info string
         info = f"""Depth + Normals to Mesh Results:
@@ -274,7 +278,7 @@ Output Mesh:
         try:
             import open3d as o3d
 
-            print(f"[DepthNormalsToMesh] Using Open3D Poisson reconstruction...")
+            log.info("Using Open3D Poisson reconstruction...")
 
             # Create point cloud with normals
             pcd = o3d.geometry.PointCloud()
@@ -313,7 +317,7 @@ Output Mesh:
         try:
             import pymeshlab
 
-            print(f"[DepthNormalsToMesh] Using PyMeshLab Poisson reconstruction...")
+            log.info("Using PyMeshLab Poisson reconstruction...")
 
             ms = pymeshlab.MeshSet()
             pml_mesh = pymeshlab.Mesh(
@@ -352,7 +356,7 @@ Output Mesh:
         try:
             import pymeshlab
 
-            print(f"[DepthNormalsToMesh] Using PyMeshLab Ball Pivoting...")
+            log.info("Using PyMeshLab Ball Pivoting...")
 
             ms = pymeshlab.MeshSet()
             pml_mesh = pymeshlab.Mesh(

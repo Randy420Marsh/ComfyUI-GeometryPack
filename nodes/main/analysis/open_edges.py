@@ -10,8 +10,12 @@ that contain these edges. Useful for detecting holes and mesh boundaries.
 Supports batch processing: input a list of meshes, get a list of results.
 """
 
+import logging
 import os
+
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 
 class OpenEdgesNode:
@@ -148,11 +152,11 @@ class OpenEdgesNode:
             })
 
             # Print to console
-            print(f"[OpenEdges] {mesh_name_short}: {num_boundary_edges} open edges, {num_boundary_faces} faces with open edges")
+            log.info("%s: %d open edges, %d faces with open edges", mesh_name_short, num_boundary_edges, num_boundary_faces)
             for info in face_edge_info[:5]:
-                print(f"[OpenEdges]   Face {info['face_id']}: {info['num_open_edges']} open edge(s)")
+                log.info("  Face %d: %d open edge(s)", info['face_id'], info['num_open_edges'])
             if len(face_edge_info) > 5:
-                print(f"[OpenEdges]   ... and {len(face_edge_info) - 5} more faces")
+                log.info("  ... and %d more faces", len(face_edge_info) - 5)
 
             # Create face attribute for visualization
             # 0 = interior face, 1+ = number of open edges on that face
@@ -176,7 +180,7 @@ class OpenEdgesNode:
         # Create summary string
         summary = "\n\n".join(summary_lines)
 
-        print(f"[OpenEdges] Processed {len(meshes)} mesh(es)")
+        log.info("Processed %d mesh(es)", len(meshes))
 
         return {
             "result": (result_meshes, summary),

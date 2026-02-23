@@ -8,7 +8,10 @@ Similar to CADGetFilename in CADabra, this extracts the original filename
 from meshes loaded via LoadMesh or LoadMeshBatch.
 """
 
+import logging
 import os
+
+log = logging.getLogger("geometrypack")
 
 
 class GetMeshFilename:
@@ -61,7 +64,7 @@ class GetMeshFilename:
                 name = "unknown"
             filenames.append(name)
 
-        print(f"[GetMeshFilename] Extracted {len(filenames)} filename(s)")
+        log.info("Extracted %d filename(s)", len(filenames))
         return (filenames,)
 
 

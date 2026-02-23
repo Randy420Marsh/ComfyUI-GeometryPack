@@ -8,12 +8,16 @@ Displays mesh in an interactive Three.js viewer with orbit controls.
 Allows rotating, panning, and zooming to inspect the mesh geometry.
 """
 
+import logging
+
 import trimesh as trimesh_module
 import os
 import tempfile
 import uuid
 
 from .mesh_helpers import is_point_cloud, get_face_count, get_geometry_type
+
+log = logging.getLogger("geometrypack")
 
 try:
     import folder_paths
@@ -53,7 +57,7 @@ class PreviewMeshNode:
         Returns:
             dict: UI data for frontend widget
         """
-        print(f"[PreviewMesh] Preparing preview: {get_geometry_type(trimesh)} - {len(trimesh.vertices)} vertices, {get_face_count(trimesh)} faces")
+        log.info("Preparing preview: %s - %d vertices, %d faces", get_geometry_type(trimesh), len(trimesh.vertices), get_face_count(trimesh))
 
         # Generate unique filename
         filename = f"preview_{uuid.uuid4().hex[:8]}.glb"
@@ -67,14 +71,14 @@ class PreviewMeshNode:
         # Export to GLB (best format for Three.js)
         try:
             trimesh.export(filepath, file_type='glb')
-            print(f"[PreviewMesh] Exported to: {filepath}")
+            log.info("Exported to: %s", filepath)
         except Exception as e:
-            print(f"[PreviewMesh] Export failed: {e}")
+            log.error("Export failed: %s", e)
             # Fallback to OBJ
             filename = filename.replace('.glb', '.obj')
             filepath = filepath.replace('.glb', '.obj')
             trimesh.export(filepath, file_type='obj')
-            print(f"[PreviewMesh] Exported to OBJ: {filepath}")
+            log.info("Exported to OBJ: %s", filepath)
 
         # Calculate bounding box info for camera setup
         bounds = trimesh.bounds

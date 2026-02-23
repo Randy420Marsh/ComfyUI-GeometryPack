@@ -5,8 +5,12 @@
 Fix self-intersections by removing intersecting faces and filling holes.
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class FixSelfIntersectionsByRemovalNode:
@@ -53,7 +57,7 @@ class FixSelfIntersectionsByRemovalNode:
         Returns:
             tuple: (fixed_mesh, report_string)
         """
-        print(f"[FixByRemoval] Processing mesh: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        log.info("Processing mesh: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
 
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
@@ -61,7 +65,7 @@ class FixSelfIntersectionsByRemovalNode:
         # Check if mesh has self-intersection data
         if 'self_intersecting' not in trimesh.face_attributes:
             # No intersection data - try to detect first
-            print("[FixByRemoval] No intersection data found. Please run DetectSelfIntersections first.")
+            log.warning("No intersection data found. Please run DetectSelfIntersections first.")
 
             warning_msg = """Warning: No self-intersection data found!
 
@@ -81,7 +85,7 @@ Workflow suggestion:
         num_intersecting = np.sum(intersecting_face_mask)
 
         if num_intersecting == 0:
-            print("[FixByRemoval] No self-intersecting faces found")
+            log.info("No self-intersecting faces found")
             report = """No Self-Intersections to Fix:
 
 The mesh has no self-intersecting faces marked.
@@ -92,7 +96,7 @@ Returning mesh unchanged.
 """
             return {"ui": {"text": [report]}, "result": (trimesh, report)}
 
-        print(f"[FixByRemoval] Found {num_intersecting} intersecting faces to remove")
+        log.info("Found %d intersecting faces to remove", num_intersecting)
 
         # Create a copy and remove intersecting faces
         result_mesh = trimesh.copy()
@@ -104,12 +108,12 @@ Returning mesh unchanged.
         faces_after_removal = len(result_mesh.faces)
         vertices_after_removal = len(result_mesh.vertices)
 
-        print(f"[FixByRemoval] After removal: {vertices_after_removal} vertices, {faces_after_removal} faces")
+        log.info("After removal: %d vertices, %d faces", vertices_after_removal, faces_after_removal)
 
         # Fill holes if requested
         holes_filled = 0
         if fill_holes and faces_after_removal > 0:
-            print(f"[FixByRemoval] Filling holes (max size: {max_hole_size} edges)...")
+            log.info("Filling holes (max size: %d edges)...", max_hole_size)
             try:
                 # Count holes before
                 boundaries_before = len(result_mesh.outline_segments) if hasattr(result_mesh, 'outline_segments') else 0
@@ -122,25 +126,25 @@ Returning mesh unchanged.
                 faces_after_fill = len(result_mesh.faces)
                 holes_filled = faces_after_fill - faces_after_removal
 
-                print(f"[FixByRemoval] Added {holes_filled} faces to fill holes")
+                log.info("Added %d faces to fill holes", holes_filled)
             except Exception as e:
-                print(f"[FixByRemoval] Warning: Could not fill holes: {e}")
+                log.warning("Could not fill holes: %s", e)
                 holes_filled = 0
 
         # Fix normals if requested
         if fix_normals and len(result_mesh.faces) > 0:
-            print("[FixByRemoval] Fixing normals...")
+            log.info("Fixing normals...")
             try:
                 result_mesh.fix_normals()
-                print("[FixByRemoval] Normals fixed")
+                log.info("Normals fixed")
             except Exception as e:
-                print(f"[FixByRemoval] Warning: Could not fix normals: {e}")
+                log.warning("Could not fix normals: %s", e)
 
         # Re-detect intersections if requested
         new_intersecting_faces = 0
         redetection_status = ""
         if re_detect_after_fix and len(result_mesh.faces) > 0:
-            print("[FixByRemoval] Re-detecting self-intersections...")
+            log.info("Re-detecting self-intersections...")
             try:
                 import igl.copyleft.cgal as cgal
 
@@ -173,13 +177,13 @@ Returning mesh unchanged.
                     result_mesh.vertex_attributes['intersection_flag'] = vertex_field
                     result_mesh.vertex_attributes['intersection_count'] = vertex_count
 
-                    print(f"[FixByRemoval] After fix: {new_intersecting_faces} intersecting faces remain")
+                    log.info("After fix: %d intersecting faces remain", new_intersecting_faces)
                 else:
                     new_intersecting_faces = 0
                     result_mesh.face_attributes['self_intersecting'] = np.zeros(len(F), dtype=np.float32)
                     result_mesh.vertex_attributes['intersection_flag'] = np.zeros(len(V), dtype=np.float32)
                     result_mesh.vertex_attributes['intersection_count'] = np.zeros(len(V), dtype=np.float32)
-                    print("[FixByRemoval] [OK] No self-intersections remaining!")
+                    log.info("No self-intersections remaining!")
 
                 # Generate status message
                 if num_intersecting > 0:
@@ -191,7 +195,7 @@ Returning mesh unchanged.
                     redetection_status = f"  After fix: {new_intersecting_faces} intersecting faces"
 
             except Exception as e:
-                print(f"[FixByRemoval] Re-detection failed: {e}")
+                log.error("Re-detection failed: %s", e)
                 redetection_status = f"  [WARN] Re-detection failed: {e}"
                 # Clear old data since we couldn't update it
                 if 'self_intersecting' in result_mesh.face_attributes:
@@ -246,7 +250,7 @@ Status:
 {'  perturbation or remeshing methods for better results.' if num_intersecting > initial_faces * 0.1 else ''}
 """
 
-        print(f"[FixByRemoval] Complete: {final_vertices} vertices, {final_faces} faces")
+        log.info("Complete: %d vertices, %d faces", final_vertices, final_faces)
         return {"ui": {"text": [report]}, "result": (result_mesh, report)}
 
 

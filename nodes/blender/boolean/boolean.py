@@ -6,8 +6,12 @@ Boolean Blender Node - CSG operations using bpy
 Requires bpy (Blender Python module).
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 def _bpy_boolean_operation(vertices_a, faces_a, vertices_b, faces_b, operation):
@@ -96,12 +100,12 @@ class BooleanBlenderNode:
         Returns:
             tuple: (result_mesh, info_string)
         """
-        print(f"[Boolean Blender] Mesh A: {len(mesh_a.vertices)} vertices, {len(mesh_a.faces)} faces")
-        print(f"[Boolean Blender] Mesh B: {len(mesh_b.vertices)} vertices, {len(mesh_b.faces)} faces")
-        print(f"[Boolean Blender] Operation: {operation}")
+        log.info("Mesh A: %d vertices, %d faces", len(mesh_a.vertices), len(mesh_a.faces))
+        log.info("Mesh B: %d vertices, %d faces", len(mesh_b.vertices), len(mesh_b.faces))
+        log.info("Operation: %s", operation)
 
         try:
-            print(f"[Boolean Blender] Using Blender bpy backend...")
+            log.info("Using Blender bpy backend...")
 
             # Map operation to Blender modifier type
             blender_op = {
@@ -157,7 +161,7 @@ Result:
 Watertight: {result.is_watertight}
 """
 
-            print(f"[Boolean Blender] Success: {len(result.vertices)} vertices, {len(result.faces)} faces")
+            log.info("Success: %d vertices, %d faces", len(result.vertices), len(result.faces))
             return {"ui": {"text": [info]}, "result": (result, info)}
 
         except Exception as e:

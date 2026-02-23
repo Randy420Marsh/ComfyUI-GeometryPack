@@ -5,9 +5,12 @@
 Remesh Node - Main backends (pymeshlab, instant_meshes, quadriflow)
 """
 
+import logging
 import numpy as np
 import trimesh as trimesh_module
 from typing import Tuple, Optional
+
+log = logging.getLogger("geometrypack")
 
 
 def _pymeshlab_isotropic_remesh(
@@ -18,13 +21,10 @@ def _pymeshlab_isotropic_remesh(
     feature_angle: float = 30.0
 ) -> Tuple[Optional[trimesh_module.Trimesh], str]:
     """Apply isotropic remeshing using PyMeshLab."""
-    print(f"[pymeshlab_isotropic_remesh] ===== Starting Isotropic Remeshing =====")
-    print(f"[pymeshlab_isotropic_remesh] Input mesh: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
-    print(f"[pymeshlab_isotropic_remesh] Parameters:")
-    print(f"[pymeshlab_isotropic_remesh]   target_edge_length: {target_edge_length}")
-    print(f"[pymeshlab_isotropic_remesh]   iterations: {iterations}")
-    print(f"[pymeshlab_isotropic_remesh]   adaptive: {adaptive}")
-    print(f"[pymeshlab_isotropic_remesh]   feature_angle: {feature_angle}")
+    log.info("Starting Isotropic Remeshing")
+    log.info("Input mesh: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
+    log.info("Parameters: target_edge_length=%s, iterations=%s, adaptive=%s, feature_angle=%s",
+             target_edge_length, iterations, adaptive, feature_angle)
 
     try:
         import pymeshlab
@@ -44,7 +44,7 @@ def _pymeshlab_isotropic_remesh(
         return None, f"Iterations must be at least 1, got {iterations}"
 
     try:
-        print(f"[pymeshlab_isotropic_remesh] Converting to PyMeshLab format...")
+        log.info("Converting to PyMeshLab format...")
         ms = pymeshlab.MeshSet()
 
         pml_mesh = pymeshlab.Mesh(
@@ -53,7 +53,7 @@ def _pymeshlab_isotropic_remesh(
         )
         ms.add_mesh(pml_mesh)
 
-        print(f"[pymeshlab_isotropic_remesh] Applying isotropic remeshing...")
+        log.info("Applying isotropic remeshing...")
         bbox_diag = np.linalg.norm(mesh.bounds[1] - mesh.bounds[0])
         target_pct = (target_edge_length / bbox_diag) * 100.0
 
@@ -79,7 +79,7 @@ def _pymeshlab_isotropic_remesh(
                     "On Linux, install OpenGL libraries: sudo apt-get install libgl1-mesa-glx libglu1-mesa"
                 )
 
-        print(f"[pymeshlab_isotropic_remesh] Converting back to trimesh...")
+        log.info("Converting back to trimesh...")
         remeshed_pml = ms.current_mesh()
         remeshed_mesh = trimesh_module.Trimesh(
             vertices=remeshed_pml.vertex_matrix(),
@@ -105,16 +105,14 @@ def _pymeshlab_isotropic_remesh(
         vertex_pct = (vertex_change / len(mesh.vertices)) * 100 if len(mesh.vertices) > 0 else 0
         face_pct = (face_change / len(mesh.faces)) * 100 if len(mesh.faces) > 0 else 0
 
-        print(f"[pymeshlab_isotropic_remesh] ===== Remeshing Complete =====")
-        print(f"[pymeshlab_isotropic_remesh] Results:")
-        print(f"[pymeshlab_isotropic_remesh]   Vertices: {len(mesh.vertices)} -> {len(remeshed_mesh.vertices)} ({vertex_change:+d}, {vertex_pct:+.1f}%)")
-        print(f"[pymeshlab_isotropic_remesh]   Faces:    {len(mesh.faces)} -> {len(remeshed_mesh.faces)} ({face_change:+d}, {face_pct:+.1f}%)")
+        log.info("Remeshing Complete")
+        log.info("Vertices: %d -> %d (%+d, %+.1f%%)", len(mesh.vertices), len(remeshed_mesh.vertices), vertex_change, vertex_pct)
+        log.info("Faces: %d -> %d (%+d, %+.1f%%)", len(mesh.faces), len(remeshed_mesh.faces), face_change, face_pct)
 
         return remeshed_mesh, ""
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        log.error("Error during remeshing", exc_info=True)
         return None, f"Error during remeshing: {str(e)}"
 
 
@@ -245,35 +243,35 @@ class RemeshNode:
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        print(f"\n{'='*60}")
-        print(f"[Remesh] Backend: {backend}")
-        print(f"[Remesh] Input: {initial_vertices:,} vertices, {initial_faces:,} faces")
+        log.info("Backend: %s", backend)
+        log.info("Input: %s vertices, %s faces", f"{initial_vertices:,}", f"{initial_faces:,}")
 
         if backend == "pymeshlab_isotropic":
-            print(f"[Remesh] Parameters: target_edge_length={target_edge_length}, iterations={iterations}, feature_angle={feature_angle}, adaptive={adaptive}")
+            log.info("Parameters: target_edge_length=%s, iterations=%s, feature_angle=%s, adaptive=%s",
+                     target_edge_length, iterations, feature_angle, adaptive)
             remeshed_mesh, info = self._pymeshlab_isotropic(
                 trimesh, target_edge_length, iterations, feature_angle, adaptive
             )
         elif backend == "instant_meshes":
-            print(f"[Remesh] Parameters: target_vertex_count={target_vertex_count:,}, deterministic={deterministic}, crease_angle={crease_angle}")
+            log.info("Parameters: target_vertex_count=%s, deterministic=%s, crease_angle=%s",
+                     f"{target_vertex_count:,}", deterministic, crease_angle)
             remeshed_mesh, info = self._instant_meshes(
                 trimesh, target_vertex_count, deterministic, crease_angle
             )
         elif backend == "quadriflow":
-            print(f"[Remesh] Parameters: target_face_count={target_face_count:,}, preserve_sharp={preserve_sharp}, preserve_boundary={preserve_boundary}")
+            log.info("Parameters: target_face_count=%s, preserve_sharp=%s, preserve_boundary=%s",
+                     f"{target_face_count:,}", preserve_sharp, preserve_boundary)
             remeshed_mesh, info = self._quadriflow(
                 trimesh, target_face_count, preserve_sharp, preserve_boundary
             )
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-        print(f"{'='*60}\n")
-
         vertex_change = len(remeshed_mesh.vertices) - initial_vertices
         face_change = len(remeshed_mesh.faces) - initial_faces
 
-        print(f"[Remesh] Output: {len(remeshed_mesh.vertices)} vertices ({vertex_change:+d}), "
-              f"{len(remeshed_mesh.faces)} faces ({face_change:+d})")
+        log.info("Output: %d vertices (%+d), %d faces (%+d)",
+                 len(remeshed_mesh.vertices), vertex_change, len(remeshed_mesh.faces), face_change)
 
         return {"ui": {"text": [info]}, "result": (remeshed_mesh, info)}
 
@@ -369,7 +367,7 @@ Instant Meshes creates flow-aligned quad meshes.
         V = np.asarray(trimesh.vertices, dtype=np.float64).tolist()
         F = np.asarray(trimesh.faces, dtype=np.int32).tolist()
 
-        print(f"[Remesh] Running QuadriFlow (target_faces={target_face_count})...")
+        log.info("Running QuadriFlow (target_faces=%d)...", target_face_count)
         result = pyquadriflow(
             target_face_count,
             0,  # seed

@@ -5,8 +5,12 @@
 Subsample Point Cloud Node - Reduce point cloud density while preserving attributes
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class SubsamplePointCloudNode:
@@ -111,7 +115,7 @@ class SubsamplePointCloudNode:
 
             # Progress logging for slow operations
             if len(indices) % 10000 == 0:
-                print(f"[SubsamplePointCloud] FPS progress: {len(indices):,}/{target_count:,}")
+                log.info("FPS progress: %s/%s", f"{len(indices):,}", f"{target_count:,}")
 
         return np.array(sorted(indices))
 
@@ -131,11 +135,11 @@ class SubsamplePointCloudNode:
         vertices = np.asarray(point_cloud.vertices)
         n_points = len(vertices)
 
-        print(f"[SubsamplePointCloud] Input: {n_points:,} points, target: {target_count:,}")
+        log.info("Input: %s points, target: %s", f"{n_points:,}", f"{target_count:,}")
 
         # If already at or below target, return as-is
         if n_points <= target_count:
-            print(f"[SubsamplePointCloud] Point count already at or below target, returning unchanged")
+            log.info("Point count already at or below target, returning unchanged")
             return (point_cloud,)
 
         # Get indices based on method
@@ -146,12 +150,12 @@ class SubsamplePointCloudNode:
         elif method == "farthest_point":
             # Warn if using FPS on large clouds
             if n_points > 100000:
-                print(f"[SubsamplePointCloud] WARNING: Farthest point sampling on {n_points:,} points will be slow. Consider 'random' or 'uniform_grid'.")
+                log.warning("Farthest point sampling on %s points will be slow. Consider 'random' or 'uniform_grid'.", f"{n_points:,}")
             indices = self._farthest_point_subsample(vertices, target_count)
         else:
             raise ValueError(f"Unknown method: {method}")
 
-        print(f"[SubsamplePointCloud] Selected {len(indices):,} points using {method} method")
+        log.info("Selected %s points using %s method", f"{len(indices):,}", method)
 
         # Extract subsampled vertices
         new_vertices = vertices[indices]
@@ -164,21 +168,21 @@ class SubsamplePointCloudNode:
             colors = np.asarray(point_cloud.colors)
             if len(colors) == n_points:
                 new_cloud.colors = colors[indices]
-                print(f"[SubsamplePointCloud] Preserved vertex colors")
+                log.debug("Preserved vertex colors")
 
         # Also check visual.vertex_colors (trimesh stores colors here sometimes)
         if hasattr(point_cloud, 'visual') and hasattr(point_cloud.visual, 'vertex_colors'):
             vc = point_cloud.visual.vertex_colors
             if vc is not None and len(vc) == n_points:
                 new_cloud.colors = vc[indices]
-                print(f"[SubsamplePointCloud] Preserved visual.vertex_colors")
+                log.debug("Preserved visual.vertex_colors")
 
         # Preserve vertex normals if present
         if hasattr(point_cloud, 'vertex_normals'):
             normals = point_cloud.vertex_normals
             if normals is not None and len(normals) == n_points:
                 new_cloud.vertex_normals = normals[indices]
-                print(f"[SubsamplePointCloud] Preserved vertex normals")
+                log.debug("Preserved vertex normals")
 
         # Preserve metadata
         if hasattr(point_cloud, 'metadata') and point_cloud.metadata:
@@ -195,7 +199,7 @@ class SubsamplePointCloudNode:
                 'sample_count': len(indices)
             }
 
-        print(f"[SubsamplePointCloud] Output: {len(new_vertices):,} points")
+        log.info("Output: %s points", f"{len(new_vertices):,}")
 
         return (new_cloud,)
 

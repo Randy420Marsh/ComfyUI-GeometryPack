@@ -14,8 +14,12 @@ Supports:
 - apply_matrix: Apply custom 4x4 transformation matrix
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 class TransformMeshNode:
@@ -172,8 +176,8 @@ class TransformMeshNode:
         Returns:
             tuple: (transformed_mesh, info_string)
         """
-        print(f"[Transform] Input: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
-        print(f"[Transform] Operation: {operation}")
+        log.info("Input: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
+        log.info("Operation: %s", operation)
 
         # Create copy to avoid modifying original
         result = trimesh.copy()
@@ -203,7 +207,7 @@ class TransformMeshNode:
             'new_bounds': result.bounds.tolist()
         }
 
-        print(f"[Transform] Complete")
+        log.info("Complete")
         return {"ui": {"text": [info]}, "result": (result, info)}
 
     def _translate(self, mesh, tx, ty, tz):

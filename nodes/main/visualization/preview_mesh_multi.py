@@ -13,6 +13,8 @@ Grid layouts:
 Supports scalar field visualization with synchronized cameras across viewports.
 """
 
+import logging
+
 import trimesh as trimesh_module
 import numpy as np
 import os
@@ -22,6 +24,8 @@ import uuid
 from .mesh_helpers import is_point_cloud, get_face_count, get_geometry_type
 
 from ._vtp_export import export_mesh_with_scalars_vtp
+
+log = logging.getLogger("geometrypack")
 
 try:
     import folder_paths
@@ -117,7 +121,7 @@ class PreviewMeshMultiNode:
             meshes.append(mesh_4)
 
         num_meshes = len(meshes)
-        print(f"[PreviewMeshMulti] Mode: {mode}, Meshes: {num_meshes}")
+        log.info("Mode: %s, Meshes: %d", mode, num_meshes)
 
         # Generate unique ID for this preview
         preview_id = uuid.uuid4().hex[:8]
@@ -133,7 +137,7 @@ class PreviewMeshMultiNode:
         texture_info_list = []
 
         for i, mesh in enumerate(meshes):
-            print(f"[PreviewMeshMulti] Mesh {i+1}: {get_geometry_type(mesh)} - {len(mesh.vertices)} vertices, {get_face_count(mesh)} faces")
+            log.info("Mesh %d: %s - %d vertices, %d faces", i + 1, get_geometry_type(mesh), len(mesh.vertices), get_face_count(mesh))
 
             # Check for field data and texture info
             mesh_has_fields = has_fields(mesh)
@@ -156,15 +160,15 @@ class PreviewMeshMultiNode:
             try:
                 if mode == "texture":
                     mesh.export(filepath, file_type='glb', include_normals=True)
-                    print(f"[PreviewMeshMulti] Exported GLB: {filepath}")
+                    log.info("Exported GLB: %s", filepath)
                 elif mesh_has_fields or mesh_is_pc:
                     export_mesh_with_scalars_vtp(mesh, filepath)
-                    print(f"[PreviewMeshMulti] Exported VTP: {filepath}")
+                    log.info("Exported VTP: %s", filepath)
                 else:
                     mesh.export(filepath, file_type='stl')
-                    print(f"[PreviewMeshMulti] Exported STL: {filepath}")
+                    log.info("Exported STL: %s", filepath)
             except Exception as e:
-                print(f"[PreviewMeshMulti] Export failed: {e}, trying OBJ fallback")
+                log.error("Export failed: %s, trying OBJ fallback", e)
                 filename = f"preview_multi_{i+1}_{preview_id}.obj"
                 filepath = os.path.join(COMFYUI_OUTPUT_FOLDER or tempfile.gettempdir(), filename)
                 mesh.export(filepath, file_type='obj')
@@ -213,7 +217,7 @@ class PreviewMeshMultiNode:
         else:
             ui_data["field_names_list"] = [field_names_list]
 
-        print(f"[PreviewMeshMulti] Grid: {grid_cols}x{grid_rows}, Preview ready")
+        log.info("Grid: %dx%d, Preview ready", grid_cols, grid_rows)
         return {"ui": ui_data}
 
 

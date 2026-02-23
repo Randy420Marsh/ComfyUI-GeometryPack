@@ -5,8 +5,12 @@
 Recompute mesh normals with custom settings.
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class ComputeNormalsNode:
@@ -44,7 +48,7 @@ class ComputeNormalsNode:
         Returns:
             tuple: (mesh_with_normals,)
         """
-        print(f"[ComputeNormals] Processing mesh with {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        log.info("Processing mesh with %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
 
         # Create a copy
         result_mesh = trimesh.copy()
@@ -75,7 +79,7 @@ class ComputeNormalsNode:
             result_mesh.vertex_attributes['normal_z'] = vertex_normals[:, 2]
             result_mesh.vertex_attributes['normal_magnitude'] = np.linalg.norm(vertex_normals, axis=1)
 
-            print(f"[ComputeNormals] Computed faceted (non-smooth) normals")
+            log.info("Computed faceted (non-smooth) normals")
         else:
             # Trimesh automatically computes smooth vertex normals
             # Just access them to ensure they're computed
@@ -88,7 +92,7 @@ class ComputeNormalsNode:
             result_mesh.vertex_attributes['normal_z'] = vertex_normals[:, 2]
             result_mesh.vertex_attributes['normal_magnitude'] = np.linalg.norm(vertex_normals, axis=1)
 
-            print(f"[ComputeNormals] Computed smooth vertex normals")
+            log.info("Computed smooth vertex normals")
 
         return (result_mesh,)
 

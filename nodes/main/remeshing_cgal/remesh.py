@@ -6,8 +6,11 @@ Remesh CGAL Node - CGAL isotropic remeshing
 Requires CGAL Python bindings.
 """
 
+import logging
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 def _cgal_isotropic_remesh(vertices, faces, target_edge_length, iterations, protect_boundaries):
@@ -128,14 +131,13 @@ class RemeshCGALNode:
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        print(f"\n{'='*60}")
-        print(f"[Remesh CGAL] Backend: cgal_isotropic")
-        print(f"[Remesh CGAL] Input: {initial_vertices:,} vertices, {initial_faces:,} faces")
-        print(f"[Remesh CGAL] Parameters: target_edge_length={target_edge_length}, iterations={iterations}, protect_boundaries={protect_boundaries}")
-        print(f"{'='*60}\n")
+        log.info("Backend: cgal_isotropic")
+        log.info("Input: %s vertices, %s faces", f"{initial_vertices:,}", f"{initial_faces:,}")
+        log.info("Parameters: target_edge_length=%s, iterations=%s, protect_boundaries=%s",
+                 target_edge_length, iterations, protect_boundaries)
 
         protect = (protect_boundaries == "true")
-        print(f"[Remesh CGAL] Running CGAL isotropic remesh (target_edge_length={target_edge_length})...")
+        log.info("Running CGAL isotropic remesh (target_edge_length=%s)...", target_edge_length)
 
         result = _cgal_isotropic_remesh(
             vertices=np.asarray(trimesh.vertices, dtype=np.float64),
@@ -157,8 +159,8 @@ class RemeshCGALNode:
         vertex_change = len(remeshed_mesh.vertices) - initial_vertices
         face_change = len(remeshed_mesh.faces) - initial_faces
 
-        print(f"[Remesh CGAL] Output: {len(remeshed_mesh.vertices)} vertices ({vertex_change:+d}), "
-              f"{len(remeshed_mesh.faces)} faces ({face_change:+d})")
+        log.info("Output: %d vertices (%+d), %d faces (%+d)",
+                 len(remeshed_mesh.vertices), vertex_change, len(remeshed_mesh.faces), face_change)
 
         info = f"""Remesh Results (CGAL Isotropic):
 

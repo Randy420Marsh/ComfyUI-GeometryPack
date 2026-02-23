@@ -10,11 +10,15 @@ which can be visualized in VTK.js with color mapping.
 Supports both meshes (with faces) and point clouds (without faces).
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
 import xml.etree.ElementTree as ET
 
 from .mesh_helpers import is_point_cloud, get_face_count
+
+log = logging.getLogger("geometrypack")
 
 
 def export_mesh_with_scalars_vtp(trimesh: trimesh_module.Trimesh, filepath: str):
@@ -34,7 +38,7 @@ def export_mesh_with_scalars_vtp(trimesh: trimesh_module.Trimesh, filepath: str)
     is_pc = is_point_cloud(trimesh)
     geometry_type = "point cloud" if is_pc else "mesh"
 
-    print(f"[_export_mesh_with_scalars_vtp] Exporting {geometry_type} to VTP: {filepath}")
+    log.info("Exporting %s to VTP: %s", geometry_type, filepath)
 
     # Create VTK PolyData XML structure
     vtk_file = ET.Element('VTKFile', type='PolyData', version='1.0', byte_order='LittleEndian')
@@ -70,7 +74,7 @@ def export_mesh_with_scalars_vtp(trimesh: trimesh_module.Trimesh, filepath: str)
     # Add vertex attributes as scalar arrays
     if hasattr(trimesh, 'vertex_attributes') and trimesh.vertex_attributes:
         for attr_name, attr_values in trimesh.vertex_attributes.items():
-            print(f"[_export_mesh_with_scalars_vtp]   Adding scalar field: {attr_name}")
+            log.info("Adding scalar field: %s", attr_name)
             scalar_array = ET.SubElement(point_data, 'DataArray',
                                           type='Float32',
                                           Name=attr_name,
@@ -87,9 +91,9 @@ def export_mesh_with_scalars_vtp(trimesh: trimesh_module.Trimesh, filepath: str)
                 attr_arr = np.asarray(attr_values)
                 # Skip high-dimensional arrays (e.g., 448-dim feature vectors)
                 if attr_arr.ndim > 1 and attr_arr.shape[1] > 4:
-                    print(f"[_export_mesh_with_scalars_vtp]   Skipping high-dim field: {attr_name} (shape {attr_arr.shape})")
+                    log.info("Skipping high-dim field: %s (shape %s)", attr_name, attr_arr.shape)
                     continue
-                print(f"[_export_mesh_with_scalars_vtp]   Adding face field: {attr_name}")
+                log.info("Adding face field: %s", attr_name)
                 num_components = attr_arr.shape[1] if attr_arr.ndim > 1 else 1
                 scalar_array = ET.SubElement(cell_data, 'DataArray',
                                               type='Float32',
@@ -142,6 +146,6 @@ def export_mesh_with_scalars_vtp(trimesh: trimesh_module.Trimesh, filepath: str)
     tree.write(filepath, encoding='utf-8', xml_declaration=True)
 
     if is_pc:
-        print(f"[_export_mesh_with_scalars_vtp] Export complete: {num_verts} points")
+        log.info("Export complete: %d points", num_verts)
     else:
-        print(f"[_export_mesh_with_scalars_vtp] Export complete: {num_verts} vertices, {num_faces} faces")
+        log.info("Export complete: %d vertices, %d faces", num_verts, num_faces)

@@ -5,8 +5,11 @@
 Surface Reconstruction Node - Point cloud to mesh conversion
 """
 
+import logging
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 class ReconstructSurfaceNode:
@@ -109,7 +112,7 @@ class ReconstructSurfaceNode:
         # Extract normals if available
         if hasattr(points, 'vertex_normals') and len(points.vertex_normals) > 0:
             normals = points.vertex_normals
-            print(f"[Reconstruct] Using normals from input")
+            log.info("Using normals from input")
 
         # Check if this is a point cloud
         is_point_cloud = False
@@ -117,11 +120,11 @@ class ReconstructSurfaceNode:
 
         if face_count == 0 or (hasattr(points, 'metadata') and points.metadata.get('is_point_cloud', False)):
             is_point_cloud = True
-            print(f"[Reconstruct] Input type: Point cloud ({len(vertices)} points)")
+            log.info("Input type: Point cloud (%d points)", len(vertices))
         else:
-            print(f"[Reconstruct] Input type: TRIMESH ({len(vertices)} vertices, {face_count} faces)")
+            log.info("Input type: TRIMESH (%d vertices, %d faces)", len(vertices), face_count)
 
-        print(f"[Reconstruct] Method: {method}")
+        log.info("Method: %s", method)
 
         if method == "poisson":
             result, info = self._poisson(vertices, normals, poisson_depth, poisson_scale,
@@ -153,7 +156,7 @@ class ReconstructSurfaceNode:
             'output_faces': len(result.faces)
         }
 
-        print(f"[Reconstruct] Output: {len(result.vertices)} vertices, {len(result.faces)} faces")
+        log.info("Output: %d vertices, %d faces", len(result.vertices), len(result.faces))
         return {
             "result": (result, info),
             "ui": {"text": [info]}
@@ -165,8 +168,8 @@ class ReconstructSurfaceNode:
         try:
             import open3d as o3d
 
-            print(f"[Reconstruct] Using Open3D Poisson reconstruction...")
-            print(f"[Reconstruct] Step 1/5: Creating point cloud...")
+            log.info("Using Open3D Poisson reconstruction...")
+            log.info("Step 1/5: Creating point cloud...")
 
             # Create point cloud
             pcd = o3d.geometry.PointCloud()
@@ -174,28 +177,28 @@ class ReconstructSurfaceNode:
 
 
             # Estimate normals if needed
-            print(f"[Reconstruct] Step 2/5: Estimating normals...")
+            log.info("Step 2/5: Estimating normals...")
             if normals is None or estimate_normals:
                 pcd.estimate_normals(
                     search_param=o3d.geometry.KDTreeSearchParamHybrid(
                         radius=normal_radius, max_nn=30
                     )
                 )
-                print(f"[Reconstruct] Step 3/5: Orienting normals...")
+                log.info("Step 3/5: Orienting normals...")
                 pcd.orient_normals_consistent_tangent_plane(k=10)
             else:
                 pcd.normals = o3d.utility.Vector3dVector(normals)
 
 
             # Poisson reconstruction
-            print(f"[Reconstruct] Step 4/5: Running Poisson reconstruction (depth={depth})... This may take a while.")
+            log.info("Step 4/5: Running Poisson reconstruction (depth=%d)... This may take a while.", depth)
             mesh_o3d, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
                 pcd, depth=depth, scale=scale, linear_fit=False
             )
 
 
             # Remove low density vertices (noise)
-            print(f"[Reconstruct] Step 5/5: Cleaning up mesh...")
+            log.info("Step 5/5: Cleaning up mesh...")
             densities = np.asarray(densities)
             density_threshold = np.quantile(densities, 0.01)
             vertices_to_remove = densities < density_threshold
@@ -210,7 +213,7 @@ class ReconstructSurfaceNode:
             )
 
 
-            print(f"[Reconstruct] Done! Output: {len(result.vertices):,} vertices, {len(result.faces):,} faces")
+            log.info("Done! Output: %s vertices, %s faces", f"{len(result.vertices):,}", f"{len(result.faces):,}")
 
             info = f"""Reconstruct Surface Results (Poisson):
 
@@ -235,7 +238,7 @@ Poisson reconstruction creates smooth, watertight surfaces.
         try:
             import pymeshlab
 
-            print(f"[Reconstruct] Using PyMeshLab Poisson reconstruction...")
+            log.info("Using PyMeshLab Poisson reconstruction...")
 
             ms = pymeshlab.MeshSet()
 
@@ -293,7 +296,7 @@ Watertight: {result.is_watertight}
         try:
             import pymeshlab
 
-            print(f"[Reconstruct] Using PyMeshLab Ball Pivoting...")
+            log.info("Using PyMeshLab Ball Pivoting...")
 
             ms = pymeshlab.MeshSet()
 
@@ -349,13 +352,13 @@ Ball pivoting preserves fine details but may have holes.
 
     def _alpha_shape(self, vertices, alpha_value):
         """Alpha shape reconstruction."""
-        print(f"[Reconstruct] Computing alpha shape...")
+        log.info("Computing alpha shape...")
 
         if alpha_value == 0.0:
             # Auto alpha: use 10% of bounding box diagonal
             bbox_diag = np.linalg.norm(vertices.max(axis=0) - vertices.min(axis=0))
             alpha_value = bbox_diag * 0.1
-            print(f"[Reconstruct] Auto alpha: {alpha_value:.4f}")
+            log.info("Auto alpha: %.4f", alpha_value)
 
         # Use trimesh's alpha shape
         try:
@@ -415,7 +418,7 @@ Alpha shapes capture the overall shape with controllable detail level.
 
     def _convex_hull(self, vertices):
         """Simple convex hull reconstruction."""
-        print(f"[Reconstruct] Computing convex hull...")
+        log.info("Computing convex hull...")
 
         # Use trimesh's convex hull
         result = trimesh_module.Trimesh(vertices=vertices).convex_hull
@@ -435,7 +438,7 @@ Convex hull is fast but loses all concave features.
 
     def _delaunay_2d(self, vertices):
         """2D Delaunay triangulation (for height fields)."""
-        print(f"[Reconstruct] Computing 2D Delaunay triangulation...")
+        log.info("Computing 2D Delaunay triangulation...")
 
         try:
             from scipy.spatial import Delaunay

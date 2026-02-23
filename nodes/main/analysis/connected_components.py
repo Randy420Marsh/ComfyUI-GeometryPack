@@ -10,8 +10,12 @@ and assigns a unique part_id to each face based on which component it belongs to
 Supports batch processing: input a list of meshes, get a list of results.
 """
 
+import logging
 import os
+
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 
 class ConnectedComponentsNode:
@@ -116,11 +120,11 @@ class ConnectedComponentsNode:
             })
 
             # Print to console
-            print(f"[ConnectedComponents] {mesh_name_short}: {num_components} component(s)")
+            log.info("%s: %d component(s)", mesh_name_short, num_components)
             for comp in component_details[:10]:  # Limit console output
-                print(f"[ConnectedComponents]   #{comp['id']}: {comp['faces']:,} faces, {comp['vertices']:,} vertices")
+                log.info("  #%d: %s faces, %s vertices", comp['id'], f"{comp['faces']:,}", f"{comp['vertices']:,}")
             if len(component_details) > 10:
-                print(f"[ConnectedComponents]   ... and {len(component_details) - 10} more components")
+                log.info("  ... and %d more components", len(component_details) - 10)
 
             # Store as face attribute
             result_mesh = mesh.copy()
@@ -138,7 +142,7 @@ class ConnectedComponentsNode:
         # Create summary string
         summary = "\n\n".join(summary_lines)
 
-        print(f"[ConnectedComponents] Processed {len(meshes)} mesh(es)")
+        log.info("Processed %d mesh(es)", len(meshes))
 
         # Return both outputs and UI data
         return {

@@ -5,7 +5,10 @@
 Refine Mesh Node - Non-destructive mesh refinement operations
 """
 
+import logging
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 class RefineMeshNode:
@@ -87,8 +90,8 @@ class RefineMeshNode:
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        print(f"[RefineMesh] Input: {initial_vertices} vertices, {initial_faces} faces")
-        print(f"[RefineMesh] Operation: {operation}")
+        log.info("Input: %d vertices, %d faces", initial_vertices, initial_faces)
+        log.info("Operation: %s", operation)
 
         if operation == "decimation":
             refined_mesh, info = self._decimate(trimesh, target_face_count, decimation_method)
@@ -104,8 +107,8 @@ class RefineMeshNode:
         vertex_change = len(refined_mesh.vertices) - initial_vertices
         face_change = len(refined_mesh.faces) - initial_faces
 
-        print(f"[RefineMesh] Output: {len(refined_mesh.vertices)} vertices ({vertex_change:+d}), "
-              f"{len(refined_mesh.faces)} faces ({face_change:+d})")
+        log.info("Output: %d vertices (%+d), %d faces (%+d)",
+                 len(refined_mesh.vertices), vertex_change, len(refined_mesh.faces), face_change)
 
         return {
             "result": (refined_mesh, info),
@@ -191,8 +194,8 @@ Reduction: {reduction_pct:.1f}%
             else:
                 raise ValueError(f"Unknown subdivision method: {method}")
 
-            print(f"[RefineMesh] Subdivision iteration {i+1}/{iterations}: "
-                  f"{len(subdivided.vertices)} vertices, {len(subdivided.faces)} faces")
+            log.info("Subdivision iteration %d/%d: %d vertices, %d faces",
+                     i+1, iterations, len(subdivided.vertices), len(subdivided.faces))
 
         # Preserve metadata
         subdivided.metadata = trimesh.metadata.copy()

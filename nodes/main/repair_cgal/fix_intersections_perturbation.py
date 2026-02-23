@@ -5,8 +5,12 @@
 Fix self-intersections by slightly moving vertices apart.
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class FixSelfIntersectionsByPerturbationNode:
@@ -56,12 +60,12 @@ class FixSelfIntersectionsByPerturbationNode:
         Returns:
             tuple: (fixed_mesh, report_string)
         """
-        print(f"[FixByPerturbation] Processing mesh: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
-        print(f"[FixByPerturbation] Params: epsilon={epsilon}, max_iter={max_iterations}, direction={direction}, re_detect={re_detect_after_fix}")
+        log.info("Processing mesh: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
+        log.info("Params: epsilon=%s, max_iter=%d, direction=%s, re_detect=%s", epsilon, max_iterations, direction, re_detect_after_fix)
 
         # Check if mesh has self-intersection data
         if 'intersection_flag' not in trimesh.vertex_attributes:
-            print("[FixByPerturbation] No intersection data found. Please run DetectSelfIntersections first.")
+            log.warning("No intersection data found. Please run DetectSelfIntersections first.")
 
             warning_msg = """Warning: No self-intersection data found!
 
@@ -81,7 +85,7 @@ Workflow suggestion:
         num_affected = len(affected_vertices)
 
         if num_affected == 0:
-            print("[FixByPerturbation] No affected vertices found")
+            log.info("No affected vertices found")
             report = """No Vertices to Perturb:
 
 The mesh has no vertices marked as adjacent to self-intersections.
@@ -92,7 +96,7 @@ Returning mesh unchanged.
 """
             return {"ui": {"text": [report]}, "result": (trimesh, report)}
 
-        print(f"[FixByPerturbation] Found {num_affected} vertices to perturb")
+        log.info("Found %d vertices to perturb", num_affected)
 
         # Get intersection counts if available (for scaling)
         if scale_by_intersection_count and 'intersection_count' in trimesh.vertex_attributes:
@@ -151,7 +155,7 @@ Returning mesh unchanged.
             result_mesh.vertex_normals  # Force recomputation
             vertex_normals = result_mesh.vertex_normals
 
-            print(f"[FixByPerturbation] Iteration {iteration + 1}: avg displacement = {np.linalg.norm(displacement[affected_vertices], axis=1).mean():.6f}")
+            log.info("Iteration %d: avg displacement = %.6f", iteration + 1, np.linalg.norm(displacement[affected_vertices], axis=1).mean())
 
         # Get original intersection count for comparison
         original_intersecting_faces = np.sum(trimesh.face_attributes.get('self_intersecting', np.array([])) > 0.5)
@@ -160,7 +164,7 @@ Returning mesh unchanged.
         new_intersecting_faces = 0
         redetection_status = ""
         if re_detect_after_fix:
-            print("[FixByPerturbation] Re-detecting self-intersections...")
+            log.info("Re-detecting self-intersections...")
             try:
                 import igl.copyleft.cgal as cgal
 
@@ -193,13 +197,13 @@ Returning mesh unchanged.
                     result_mesh.vertex_attributes['intersection_flag'] = vertex_field
                     result_mesh.vertex_attributes['intersection_count'] = vertex_count
 
-                    print(f"[FixByPerturbation] After fix: {new_intersecting_faces} intersecting faces remain")
+                    log.info("After fix: %d intersecting faces remain", new_intersecting_faces)
                 else:
                     new_intersecting_faces = 0
                     result_mesh.face_attributes['self_intersecting'] = np.zeros(len(F), dtype=np.float32)
                     result_mesh.vertex_attributes['intersection_flag'] = np.zeros(len(V), dtype=np.float32)
                     result_mesh.vertex_attributes['intersection_count'] = np.zeros(len(V), dtype=np.float32)
-                    print("[FixByPerturbation] [OK] No self-intersections remaining!")
+                    log.info("No self-intersections remaining!")
 
                 # Generate status message
                 if original_intersecting_faces > 0:
@@ -215,7 +219,7 @@ Returning mesh unchanged.
                     redetection_status = f"  After fix: {new_intersecting_faces} intersecting faces"
 
             except Exception as e:
-                print(f"[FixByPerturbation] Re-detection failed: {e}")
+                log.error("Re-detection failed: %s", e)
                 redetection_status = f"  [WARN] Re-detection failed: {e}"
                 # Clear old data since we couldn't update it
                 if 'self_intersecting' in result_mesh.face_attributes:
@@ -279,7 +283,7 @@ Important Notes:
   • For severe intersections, consider 'Fix By Removal' instead
 """
 
-        print(f"[FixByPerturbation] Complete: perturbed {num_affected} vertices over {iterations_used} iterations")
+        log.info("Complete: perturbed %d vertices over %d iterations", num_affected, iterations_used)
         return {"ui": {"text": [report]}, "result": (result_mesh, report)}
 
 

@@ -14,8 +14,12 @@ Useful for:
 - Ensuring normals are estimated in the correct coordinate space
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 class NormalizeMeshToBBox:
@@ -63,8 +67,8 @@ class NormalizeMeshToBBox:
         Returns:
             Tuple of (normalized_mesh, info_string)
         """
-        print(f"[NormalizeToBBox] Input: {len(trimesh.vertices)} vertices")
-        print(f"[NormalizeToBBox] Target size: {target_size} (bbox: [{-target_size/2:.2f}, {target_size/2:.2f}])")
+        log.info("Input: %d vertices", len(trimesh.vertices))
+        log.info("Target size: %s (bbox: [%.2f, %.2f])", target_size, -target_size / 2, target_size / 2)
 
         # Get input bounds
         input_bounds = trimesh.bounds
@@ -82,9 +86,9 @@ class NormalizeMeshToBBox:
         center = (input_bounds[0] + input_bounds[1]) / 2
         max_extent = max(input_extents)
 
-        print(f"[NormalizeToBBox] Original center: [{center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f}]")
-        print(f"[NormalizeToBBox] Original extents: [{input_extents[0]:.3f}, {input_extents[1]:.3f}, {input_extents[2]:.3f}]")
-        print(f"[NormalizeToBBox] Max extent: {max_extent:.3f}")
+        log.info("Original center: [%.3f, %.3f, %.3f]", center[0], center[1], center[2])
+        log.info("Original extents: [%.3f, %.3f, %.3f]", input_extents[0], input_extents[1], input_extents[2])
+        log.info("Max extent: %.3f", max_extent)
 
         # Copy to avoid modifying original
         result = trimesh.copy()
@@ -96,8 +100,8 @@ class NormalizeMeshToBBox:
         scale_factor = target_size / max_extent
         result.apply_scale(scale_factor)
 
-        print(f"[NormalizeToBBox] Scale factor: {scale_factor:.6f}")
-        print(f"[NormalizeToBBox] [OK] Normalized to [{-target_size/2:.2f}, {target_size/2:.2f}] bbox")
+        log.info("Scale factor: %.6f", scale_factor)
+        log.info("[OK] Normalized to [%.2f, %.2f] bbox", -target_size / 2, target_size / 2)
 
         # Preserve existing metadata
         if hasattr(trimesh, 'metadata'):

@@ -5,8 +5,12 @@
 Analyze mesh normal consistency and quality.
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class CheckNormalsNode:
@@ -41,7 +45,7 @@ class CheckNormalsNode:
         Returns:
             tuple: (report_string,)
         """
-        print(f"[CheckNormals] Analyzing mesh with {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        log.info("Analyzing mesh with %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
 
         # Check winding consistency
         is_winding_consistent = trimesh.is_winding_consistent
@@ -97,7 +101,7 @@ Recommendations:
         if is_winding_consistent and is_watertight and degenerate_faces == 0:
             report += "  [OK] Mesh normals are in excellent condition!\n"
 
-        print(f"[CheckNormals] Winding: {is_winding_consistent}, Watertight: {is_watertight}, Degenerate: {degenerate_faces}")
+        log.info("Winding: %s, Watertight: %s, Degenerate: %d", is_winding_consistent, is_watertight, degenerate_faces)
 
         return {"ui": {"text": [report]}, "result": (report,)}
 

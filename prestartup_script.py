@@ -1,7 +1,10 @@
 """ComfyUI-GeometryPack Prestartup Script."""
 
+import logging
 import os
 import sys
+
+log = logging.getLogger("geometrypack")
 
 from pathlib import Path
 from comfy_env import setup_env, copy_files
@@ -25,7 +28,7 @@ for viewer in viewers:
     try:
         copy_viewer(viewer, SCRIPT_DIR / "web")
     except Exception as e:
-        print(e)
+        log.warning("Failed to copy viewer %s: %s", viewer, e)
 
 # Copy dynamic widgets
 try:

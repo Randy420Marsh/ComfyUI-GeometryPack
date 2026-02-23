@@ -5,8 +5,12 @@
 Combine Meshes Node - Concatenate multiple meshes into one
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 class CombineMeshesNode:
@@ -56,7 +60,7 @@ class CombineMeshesNode:
         if mesh_d is not None:
             meshes.append(mesh_d)
 
-        print(f"[CombineMeshes] Combining {len(meshes)} meshes")
+        log.info("Combining %d meshes", len(meshes))
 
         # Track input stats
         input_stats = []
@@ -71,7 +75,7 @@ class CombineMeshesNode:
             })
             total_vertices += len(mesh.vertices)
             total_faces += len(mesh.faces)
-            print(f"[CombineMeshes] Mesh {i+1}: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+            log.info("Mesh %d: %d vertices, %d faces", i+1, len(mesh.vertices), len(mesh.faces))
 
         # Concatenate meshes
         if len(meshes) == 1:
@@ -109,7 +113,7 @@ Note: Meshes are concatenated without boolean operations.
 Components remain separate within the combined mesh.
 """
 
-        print(f"[CombineMeshes] Result: {len(result.vertices)} vertices, {len(result.faces)} faces")
+        log.info("Result: %d vertices, %d faces", len(result.vertices), len(result.faces))
         return {"ui": {"text": [info]}, "result": (result, info)}
 
 

@@ -5,8 +5,12 @@
 Create normal field visualization for VTK viewer.
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class VisualizNormalFieldNode:
@@ -42,7 +46,7 @@ class VisualizNormalFieldNode:
         Returns:
             tuple: (mesh_with_normal_fields, info_string)
         """
-        print(f"[VisualizeNormals] Processing mesh with {len(trimesh.vertices)} vertices")
+        log.info("Processing mesh with %d vertices", len(trimesh.vertices))
 
         # Create a copy
         result_mesh = trimesh.copy()
@@ -75,7 +79,7 @@ Expected Values:
   • Magnitude: ~1.0 (unit normals)
 """
 
-        print(f"[VisualizeNormals] Added 4 scalar fields to mesh")
+        log.info("Added 4 scalar fields to mesh")
 
         return {"ui": {"text": [info]}, "result": (result_mesh, info)}
 

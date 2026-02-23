@@ -6,8 +6,12 @@ Texture to Geometry Node - Convert texture heightmap to 3D geometry
 Supports multiple backends: grid, Poisson (PyMeshLab/Open3D), Delaunay
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 def _to_numpy(x):
@@ -119,11 +123,11 @@ class TextureToGeometryNode:
         if mask is None and depth_image is None:
             raise ValueError("Either 'mask' or 'depth_image' must be provided")
 
-        print(f"[TextureToGeometry] Converting to geometry using backend: {backend}")
+        log.info("Converting to geometry using backend: %s", backend)
 
         # Use depth_image if provided, otherwise use mask
         if depth_image is not None:
-            print(f"[TextureToGeometry] Using depth_image input (averaging RGB channels)")
+            log.info("Using depth_image input (averaging RGB channels)")
             img_arr = _to_numpy(depth_image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]
@@ -136,7 +140,7 @@ class TextureToGeometryNode:
             else:
                 heightmap = img_arr
         else:
-            print(f"[TextureToGeometry] Using mask input")
+            log.info("Using mask input")
             # Extract mask from ComfyUI tensor format (B, H, W)
             heightmap = _to_numpy(mask)
             if heightmap.ndim == 3:
@@ -148,7 +152,7 @@ class TextureToGeometryNode:
 
         # Use native resolution
         height, width = heightmap.shape
-        print(f"[TextureToGeometry] Using native resolution: {width}x{height}, range: [{heightmap.min():.3f}, {heightmap.max():.3f}]")
+        log.info("Using native resolution: %dx%d, range: [%.3f, %.3f]", width, height, heightmap.min(), heightmap.max())
 
         # Ensure float in [0, 1] range
         heightmap = heightmap.astype(np.float32)
@@ -165,7 +169,7 @@ class TextureToGeometryNode:
             skip_black == "true", black_threshold
         )
 
-        print(f"[TextureToGeometry] Generated {len(points)} points")
+        log.info("Generated %d points", len(points))
 
         # Dispatch to appropriate backend
         if backend == "grid":
@@ -188,7 +192,7 @@ class TextureToGeometryNode:
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-        print(f"[TextureToGeometry] Created mesh: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        log.info("Created mesh: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
 
         # Compute statistics
         height_min = mesh.vertices[:, 2].min()
@@ -298,9 +302,9 @@ Output Mesh:
                 # Sample field at each vertex position (same order as vertices)
                 field_values = field_arr.flatten()
                 mesh.vertex_attributes[field_name] = field_values.astype(np.float32)
-                print(f"[TextureToGeometry] Added vertex attribute '{field_name}' with {len(field_values)} values, range: [{field_values.min():.3f}, {field_values.max():.3f}]")
+                log.info("Added vertex attribute '%s' with %d values, range: [%.3f, %.3f]", field_name, len(field_values), field_values.min(), field_values.max())
             else:
-                print(f"[TextureToGeometry] Warning: field shape {field_arr.shape} doesn't match heightmap ({height}, {width}), skipping")
+                log.warning("Warning: field shape %s doesn't match heightmap (%d, %d), skipping", field_arr.shape, height, width)
 
         if smooth_normals:
             mesh.fix_normals()
@@ -317,7 +321,7 @@ Output Mesh:
                 "Install with: pip install open3d"
             )
 
-        print(f"[TextureToGeometry] Using Open3D Poisson reconstruction...")
+        log.info("Using Open3D Poisson reconstruction...")
 
         # Create point cloud
         pcd = o3d.geometry.PointCloud()
@@ -366,7 +370,7 @@ Output Mesh:
                 "Install with: pip install pymeshlab"
             )
 
-        print(f"[TextureToGeometry] Using PyMeshLab Screened Poisson reconstruction...")
+        log.info("Using PyMeshLab Screened Poisson reconstruction...")
 
         # Create MeshSet and add point cloud
         ms = pymeshlab.MeshSet()
@@ -374,7 +378,7 @@ Output Mesh:
         ms.add_mesh(pml_mesh)
 
         # Estimate normals for point cloud
-        print(f"[TextureToGeometry] Estimating normals...")
+        log.info("Estimating normals...")
         ms.compute_normal_for_point_clouds(k=10)
 
         # For depth maps, normals should point "up" (positive Z)
@@ -385,7 +389,7 @@ Output Mesh:
             ms.meshing_invert_face_orientation()
 
         # Screened Poisson reconstruction
-        print(f"[TextureToGeometry] Running Screened Poisson reconstruction (depth={depth})...")
+        log.info("Running Screened Poisson reconstruction (depth=%d)...", depth)
         ms.generate_surface_reconstruction_screened_poisson(
             depth=depth,
             scale=1.1
@@ -414,7 +418,7 @@ Output Mesh:
                 "Install with: pip install scipy"
             )
 
-        print(f"[TextureToGeometry] Using 2D Delaunay triangulation...")
+        log.info("Using 2D Delaunay triangulation...")
 
         # Project to XY plane for triangulation
         points_2d = points[:, :2]

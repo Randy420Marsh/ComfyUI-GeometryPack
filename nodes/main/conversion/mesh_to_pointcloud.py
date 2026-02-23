@@ -5,8 +5,12 @@
 Mesh to Point Cloud Node - Sample points from mesh surface
 """
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class MeshToPointCloudNode:
@@ -72,14 +76,14 @@ class MeshToPointCloudNode:
         if mode == "strip_adjacency":
             # Simply use mesh vertices directly (strip face adjacency)
             points = np.asarray(trimesh.vertices, dtype=np.float32)
-            print(f"[MeshToPointCloud] Strip adjacency: extracted {len(points):,} vertices")
+            log.info("Strip adjacency: extracted %s vertices", f"{len(points):,}")
 
             # Use vertex normals if available and requested
             if include_normals == "true" and hasattr(trimesh, 'vertex_normals'):
                 normals = trimesh.vertex_normals
 
         else:  # surface_sampling
-            print(f"[MeshToPointCloud] Sampling {sample_count:,} points using {sampling_method} method")
+            log.info("Sampling %s points using %s method", f"{sample_count:,}", sampling_method)
 
             if sampling_method == "uniform":
                 # Uniform random sampling
@@ -92,7 +96,7 @@ class MeshToPointCloudNode:
                 points, face_indices = trimesh_module.sample.sample_surface_even(
                     trimesh, sample_count, radius=radius
                 )
-                print(f"[MeshToPointCloud] Even sampling produced {len(points):,} points (target: {sample_count:,})")
+                log.info("Even sampling produced %s points (target: %s)", f"{len(points):,}", f"{sample_count:,}")
 
             elif sampling_method == "face_weighted":
                 # Weight by face area (default behavior)
@@ -124,7 +128,7 @@ class MeshToPointCloudNode:
         point_cloud.metadata['sampling_method'] = sampling_method if mode == "surface_sampling" else None
         point_cloud.metadata['has_normals'] = normals is not None
 
-        print(f"[MeshToPointCloud] Generated point cloud with {len(points):,} points")
+        log.info("Generated point cloud with %s points", f"{len(points):,}")
 
         return (point_cloud,)
 

@@ -5,7 +5,11 @@
 Point to Mesh Distance Node - Compute distances from points to mesh surface
 """
 
+import logging
+
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 
 class PointToMeshDistanceNode:
@@ -66,9 +70,9 @@ class PointToMeshDistanceNode:
         is_mesh = hasattr(pointcloud, 'faces') and len(pointcloud.faces) > 0
         input_type = "Mesh" if is_mesh else "Point Cloud"
 
-        print(f"[PointToMeshDistance] Computing {distance_type} distances for {len(points):,} points")
-        print(f"[PointToMeshDistance] Input: {input_type}")
-        print(f"[PointToMeshDistance] Target Mesh: {len(target_mesh.vertices):,} vertices, {len(target_mesh.faces):,} faces")
+        log.info("Computing %s distances for %s points", distance_type, f"{len(points):,}")
+        log.info("Input: %s", input_type)
+        log.info("Target Mesh: %s vertices, %s faces", f"{len(target_mesh.vertices):,}", f"{len(target_mesh.faces):,}")
 
         # Compute distances based on selected type
         if distance_type == "signed":
@@ -87,7 +91,7 @@ class PointToMeshDistanceNode:
             }
             igl_sign_type = sign_type_map.get(sign_method, igl.SIGNED_DISTANCE_TYPE_DEFAULT)
 
-            print(f"[PointToMeshDistance] Using igl.signed_distance with sign method: {sign_method}")
+            log.info("Using igl.signed_distance with sign method: %s", sign_method)
 
             # Use igl's signed distance function
             # Returns: S (signed distances), I (closest face indices), C (closest points), N (normals)
@@ -100,7 +104,7 @@ class PointToMeshDistanceNode:
         else:
             # Use trimesh's proximity query to find closest points and distances (unsigned)
             import trimesh
-            print(f"[PointToMeshDistance] Using trimesh.proximity.closest_point (unsigned)")
+            log.info("Using trimesh.proximity.closest_point (unsigned)")
             closest_points, distances, triangle_ids = trimesh.proximity.closest_point(target_mesh, points)
 
         # Create a copy of the input to add distance field
@@ -200,8 +204,8 @@ Distance Distribution ({threshold_label}):
 Output: {input_type} with 'distance' field in vertex_attributes
 """
 
-        print(f"[PointToMeshDistance] Min: {min_dist:.6f}, Max: {max_dist:.6f}, Mean: {mean_dist:.6f}")
-        print(f"[PointToMeshDistance] Distance field added to vertex_attributes['distance']")
+        log.info("Min: %.6f, Max: %.6f, Mean: %.6f", min_dist, max_dist, mean_dist)
+        log.info("Distance field added to vertex_attributes['distance']")
 
         return {
             "result": (result, info),

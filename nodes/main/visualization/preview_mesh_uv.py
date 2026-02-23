@@ -12,6 +12,8 @@ Displays mesh in a split-pane interactive viewer:
 Useful for inspecting UV unwrapping quality, seam placement, and texture mapping.
 """
 
+import logging
+
 import trimesh as trimesh_module
 import os
 import tempfile
@@ -20,6 +22,8 @@ import json
 import numpy as np
 
 from .mesh_helpers import is_point_cloud, get_face_count, get_geometry_type
+
+log = logging.getLogger("geometrypack")
 
 try:
     import folder_paths
@@ -75,11 +79,11 @@ class PreviewMeshUVNode:
         Returns:
             dict: UI data for frontend widget
         """
-        print(f"[PreviewMeshUV] Preparing preview: {get_geometry_type(trimesh)} - {len(trimesh.vertices)} vertices, {get_face_count(trimesh)} faces")
+        log.info("Preparing preview: %s - %d vertices, %d faces", get_geometry_type(trimesh), len(trimesh.vertices), get_face_count(trimesh))
 
         # Point clouds don't have UVs or faces
         if is_point_cloud(trimesh):
-            print(f"[PreviewMeshUV] Warning: UV viewing not applicable to point clouds")
+            log.warning("UV viewing not applicable to point clouds")
             return {
                 "ui": {
                     "error": ["UV viewing requires a mesh with faces. This is a point cloud."]
@@ -100,7 +104,7 @@ class PreviewMeshUVNode:
                         "uvs": uvs.tolist(),
                         "faces": trimesh.faces.tolist(),
                     }
-                    print(f"[PreviewMeshUV] Found UV data: {len(uvs)} UV coordinates")
+                    log.info("Found UV data: %d UV coordinates", len(uvs))
 
                     # Calculate UV statistics
                     uv_min = uvs.min(axis=0)
@@ -125,13 +129,13 @@ class PreviewMeshUVNode:
                             uv_area += abs(v1[0] * v2[1] - v1[1] * v2[0]) / 2.0
                         uv_coverage = float(uv_area)
                     except Exception as e:
-                        print(f"[PreviewMeshUV] Could not calculate UV coverage: {e}")
+                        log.info("Could not calculate UV coverage: %s", e)
                         uv_coverage = 0.0
 
-                    print(f"[PreviewMeshUV] UV stats: range={uv_range}, in_unit_square={in_unit_square}, coverage={uv_coverage:.4f}")
+                    log.info("UV stats: range=%s, in_unit_square=%s, coverage=%.4f", uv_range, in_unit_square, uv_coverage)
 
         if not has_uvs:
-            print(f"[PreviewMeshUV] WARNING: No UV data found. UV layout view will be empty.")
+            log.warning("No UV data found. UV layout view will be empty.")
 
         # Generate unique filename for mesh
         mesh_filename = f"preview_uv_{uuid.uuid4().hex[:8]}.glb"
@@ -145,14 +149,14 @@ class PreviewMeshUVNode:
         # Export mesh to GLB (preserves UVs)
         try:
             trimesh.export(mesh_filepath, file_type='glb')
-            print(f"[PreviewMeshUV] Exported mesh to: {mesh_filepath}")
+            log.info("Exported mesh to: %s", mesh_filepath)
         except Exception as e:
-            print(f"[PreviewMeshUV] GLB export failed: {e}")
+            log.error("GLB export failed: %s", e)
             # Fallback to OBJ
             mesh_filename = mesh_filename.replace('.glb', '.obj')
             mesh_filepath = mesh_filepath.replace('.glb', '.obj')
             trimesh.export(mesh_filepath, file_type='obj')
-            print(f"[PreviewMeshUV] Exported to OBJ: {mesh_filepath}")
+            log.info("Exported to OBJ: %s", mesh_filepath)
 
         # Save UV data as JSON for the frontend
         uv_json_filename = None
@@ -165,7 +169,7 @@ class PreviewMeshUVNode:
 
             with open(uv_json_filepath, 'w') as f:
                 json.dump(uv_data, f)
-            print(f"[PreviewMeshUV] Exported UV data to: {uv_json_filepath}")
+            log.info("Exported UV data to: %s", uv_json_filepath)
 
         # Calculate bounding box info
         bounds = trimesh.bounds
@@ -195,7 +199,7 @@ class PreviewMeshUVNode:
             ui_data["uv_min"] = [uv_min.tolist()]
             ui_data["uv_max"] = [uv_max.tolist()]
 
-        print(f"[PreviewMeshUV] Preview ready: has_uvs={has_uvs}, checker={show_checker}, wireframe={show_wireframe}")
+        log.info("Preview ready: has_uvs=%s, checker=%s, wireframe=%s", has_uvs, show_checker, show_wireframe)
 
         return {"ui": ui_data}
 

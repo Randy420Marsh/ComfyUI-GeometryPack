@@ -5,8 +5,12 @@
 Fill holes in mesh by adding new faces.
 """
 
+import logging
+
 import trimesh
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 def _get_cumesh():
     """Lazy cumesh+torch import to avoid importing before ComfyUI startup."""
@@ -85,16 +89,14 @@ class FillHolesNode:
             tuple: (filled_trimesh, info_string)
         """
         # Log method and parameters
-        print(f"\n{'='*60}")
-        print(f"[FillHoles] Method: {method}")
-        print(f"[FillHoles] Input: {len(mesh.vertices):,} vertices, {len(mesh.faces):,} faces")
+        log.info("Method: %s", method)
+        log.info("Input: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
         if method == "cumesh":
-            print(f"[FillHoles] Parameters: perimeter={perimeter}")
+            log.info("Parameters: perimeter=%s", perimeter)
         elif method == "pymeshlab":
-            print(f"[FillHoles] Parameters: maxholesize={maxholesize}")
+            log.info("Parameters: maxholesize=%d", maxholesize)
         elif method in ["trimesh", "igl_fan"]:
-            print(f"[FillHoles] Parameters: (none)")
-        print(f"{'='*60}\n")
+            log.info("Parameters: (none)")
 
         # Check initial state
         was_watertight = mesh.is_watertight
@@ -130,11 +132,11 @@ class FillHolesNode:
                 process=False
             )
 
-            print(f"[FillHoles] CuMesh method completed (perimeter={perimeter})")
+            log.info("CuMesh method completed (perimeter=%s)", perimeter)
 
         elif method == "cumesh" and CuMesh is None:
             # Fallback to trimesh if cumesh not available
-            print(f"[FillHoles] CuMesh not available, falling back to trimesh method")
+            log.warning("CuMesh not available, falling back to trimesh method")
             filled_mesh.fill_holes()
             method_used = "trimesh (fallback)"
 
@@ -157,11 +159,11 @@ class FillHolesNode:
                 process=False
             )
 
-            print(f"[FillHoles] PyMeshLab method completed")
+            log.info("PyMeshLab method completed")
 
         elif method == "pymeshlab" and not HAS_PYMESHLAB:
             # Fallback to trimesh if pymeshlab not available
-            print(f"[FillHoles] PyMeshLab not available, falling back to trimesh method")
+            log.warning("PyMeshLab not available, falling back to trimesh method")
             filled_mesh.fill_holes()
             method_used = "trimesh (fallback)"
 
@@ -192,26 +194,26 @@ class FillHolesNode:
                                 process=False
                             )
                             num_holes_filled = 1
-                            print(f"[FillHoles] igl_fan filled boundary loop with {len(new_faces)} faces")
+                            log.info("igl_fan filled boundary loop with %d faces", len(new_faces))
                     else:
-                        print(f"[FillHoles] Boundary loop too small ({len(loop)} vertices)")
+                        log.warning("Boundary loop too small (%d vertices)", len(loop))
                 else:
-                    print(f"[FillHoles] No boundary loop found or invalid format")
+                    log.warning("No boundary loop found or invalid format")
             except Exception as e:
-                print(f"[FillHoles] igl boundary_loop failed: {e}, using trimesh fallback")
+                log.warning("igl boundary_loop failed: %s, using trimesh fallback", e)
                 filled_mesh.fill_holes()
                 method_used = "trimesh (igl error fallback)"
 
         elif method == "igl_fan" and not HAS_IGL:
             # Fallback to trimesh if igl not available
-            print(f"[FillHoles] libigl not available, falling back to trimesh method")
+            log.warning("libigl not available, falling back to trimesh method")
             filled_mesh.fill_holes()
             method_used = "trimesh (fallback)"
 
         else:
             # Use trimesh's built-in method
             filled_mesh.fill_holes()
-            print(f"[FillHoles] Trimesh method completed")
+            log.info("Trimesh method completed")
 
         # Check result
         is_watertight = filled_mesh.is_watertight
@@ -254,7 +256,7 @@ After Filling:
 {'[WARN] Some holes may remain (check mesh topology).' if not is_watertight and added_faces > 0 else ''}
 """
 
-        print(f"[FillHoles] Added {added_faces} faces, Watertight: {was_watertight} -> {is_watertight}")
+        log.info("Added %d faces, Watertight: %s -> %s", added_faces, was_watertight, is_watertight)
 
         return {
             "result": (filled_mesh, info),

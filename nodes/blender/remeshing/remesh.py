@@ -7,8 +7,12 @@ Supports: voxel, smooth, sharp, blocks.
 Requires bpy (Blender Python module).
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 def _bpy_setup_object(vertices, faces):
@@ -176,34 +180,35 @@ class RemeshBlenderNode:
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        print(f"\n{'='*60}")
-        print(f"[Remesh Blender] Backend: {backend}")
-        print(f"[Remesh Blender] Input: {initial_vertices:,} vertices, {initial_faces:,} faces")
+        log.info("Backend: %s", backend)
+        log.info("Input: %s vertices, %s faces", f"{initial_vertices:,}", f"{initial_faces:,}")
 
         if backend == "blender_voxel":
-            print(f"[Remesh Blender] Parameters: voxel_size={voxel_size}")
+            log.info("Parameters: voxel_size=%s", voxel_size)
             remeshed_mesh, info = self._blender_voxel(trimesh, voxel_size)
         elif backend in ("blender_smooth", "blender_sharp", "blender_blocks"):
             mode = backend.replace("blender_", "").upper()
-            print(f"[Remesh Blender] Parameters: mode={mode}, octree_depth={octree_depth}, scale={scale}"
-                  + (f", sharpness={sharpness}" if backend == "blender_sharp" else ""))
+            log.info("Parameters: mode=%s, octree_depth=%d, scale=%s%s",
+                     mode, octree_depth, scale,
+                     f", sharpness={sharpness}" if backend == "blender_sharp" else "")
             remeshed_mesh, info = self._blender_modifier(trimesh, mode, octree_depth, scale, sharpness)
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-        print(f"{'='*60}\n")
+        log.info("Remeshing complete")
 
         vertex_change = len(remeshed_mesh.vertices) - initial_vertices
         face_change = len(remeshed_mesh.faces) - initial_faces
 
-        print(f"[Remesh Blender] Output: {len(remeshed_mesh.vertices)} vertices ({vertex_change:+d}), "
-              f"{len(remeshed_mesh.faces)} faces ({face_change:+d})")
+        log.info("Output: %d vertices (%+d), %d faces (%+d)",
+                 len(remeshed_mesh.vertices), vertex_change,
+                 len(remeshed_mesh.faces), face_change)
 
         return {"ui": {"text": [info]}, "result": (remeshed_mesh, info)}
 
     def _blender_voxel(self, trimesh, voxel_size):
         """Blender voxel remeshing using bpy."""
-        print(f"[Remesh Blender] Running Blender voxel remesh (voxel_size={voxel_size})...")
+        log.info("Running Blender voxel remesh (voxel_size=%s)...", voxel_size)
         result = _bpy_voxel_remesh(
             vertices=np.asarray(trimesh.vertices, dtype=np.float32),
             faces=np.asarray(trimesh.faces, dtype=np.int32),
@@ -241,7 +246,7 @@ After:
 
     def _blender_modifier(self, trimesh, mode, octree_depth, scale, sharpness):
         """Blender Remesh Modifier (Smooth/Sharp/Blocks)."""
-        print(f"[Remesh Blender] Running Blender Remesh Modifier (mode={mode}, depth={octree_depth})...")
+        log.info("Running Blender Remesh Modifier (mode=%s, depth=%d)...", mode, octree_depth)
         result = _bpy_remesh_modifier(
             vertices=np.asarray(trimesh.vertices, dtype=np.float32),
             faces=np.asarray(trimesh.faces, dtype=np.int32),

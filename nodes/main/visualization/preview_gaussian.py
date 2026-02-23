@@ -7,7 +7,11 @@ Preview Gaussian Splatting PLY files with gsplat.js viewer.
 Displays 3D Gaussian Splats in an interactive WebGL viewer.
 """
 
+import logging
+
 import os
+
+log = logging.getLogger("geometrypack")
 
 try:
     import folder_paths
@@ -61,11 +65,11 @@ class PreviewGaussianNode:
             dict: UI data for frontend widget
         """
         if not ply_path:
-            print("[PreviewGaussian] No PLY path provided")
+            log.info("No PLY path provided")
             return {"ui": {"error": ["No PLY path provided"]}}
 
         if not os.path.exists(ply_path):
-            print(f"[PreviewGaussian] PLY file not found: {ply_path}")
+            log.info("PLY file not found: %s", ply_path)
             return {"ui": {"error": [f"File not found: {ply_path}"]}}
 
         # Get just the filename for the frontend
@@ -84,7 +88,7 @@ class PreviewGaussianNode:
         file_size = os.path.getsize(ply_path)
         file_size_mb = file_size / (1024 * 1024)
 
-        print(f"[PreviewGaussian] Loading PLY: {filename} ({file_size_mb:.2f} MB)")
+        log.info("Loading PLY: %s (%.2f MB)", filename, file_size_mb)
 
         # Return metadata for frontend widget
         ui_data = {

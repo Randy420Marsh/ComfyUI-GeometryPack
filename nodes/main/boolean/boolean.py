@@ -6,8 +6,12 @@ Boolean CGAL Node - CSG operations using libigl+CGAL
 Requires igl.copyleft.cgal.
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 
 class BooleanCGALNode:
@@ -51,13 +55,13 @@ class BooleanCGALNode:
         Returns:
             tuple: (result_mesh, info_string)
         """
-        print(f"[Boolean CGAL] Mesh A: {len(mesh_a.vertices)} vertices, {len(mesh_a.faces)} faces")
-        print(f"[Boolean CGAL] Mesh B: {len(mesh_b.vertices)} vertices, {len(mesh_b.faces)} faces")
-        print(f"[Boolean CGAL] Operation: {operation}")
+        log.info("Mesh A: %d vertices, %d faces", len(mesh_a.vertices), len(mesh_a.faces))
+        log.info("Mesh B: %d vertices, %d faces", len(mesh_b.vertices), len(mesh_b.faces))
+        log.info("Operation: %s", operation)
 
         try:
             import igl.copyleft.cgal as cgal
-            print(f"[Boolean CGAL] Using libigl+CGAL backend...")
+            log.info("Using libigl+CGAL backend...")
 
             # Convert trimesh to numpy arrays
             VA = np.asarray(mesh_a.vertices, dtype=np.float64)
@@ -114,7 +118,7 @@ Result:
 Watertight: {result.is_watertight}
 """
 
-            print(f"[Boolean CGAL] Success: {len(result.vertices)} vertices, {len(result.faces)} faces")
+            log.info("Success: %d vertices, %d faces", len(result.vertices), len(result.faces))
             return {"ui": {"text": [info]}, "result": (result, info)}
 
         except Exception as e:

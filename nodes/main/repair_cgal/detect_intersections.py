@@ -5,9 +5,13 @@
 Detect self-intersecting faces in a mesh.
 """
 
+import logging
 import os
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class DetectSelfIntersectionsNode:
@@ -44,7 +48,7 @@ class DetectSelfIntersectionsNode:
         Returns:
             tuple: (mesh_with_intersection_field, report_string)
         """
-        print(f"[DetectSelfIntersections] Analyzing mesh: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        log.info("Analyzing mesh: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
 
         result_mesh = trimesh.copy()
 
@@ -60,7 +64,7 @@ class DetectSelfIntersectionsNode:
                 has_cgal = False
 
             if has_cgal:
-                print("[DetectSelfIntersections] Using libigl CGAL method")
+                log.info("Using libigl CGAL method")
 
                 # Convert mesh to numpy arrays with proper dtypes
                 V = np.asarray(trimesh.vertices, dtype=np.float64)
@@ -112,7 +116,7 @@ class DetectSelfIntersectionsNode:
                                 "vertices": F[face_idx].tolist()
                             })
 
-                        print(f"[DetectSelfIntersections] Found {num_intersecting} intersecting faces ({num_pairs} intersection pairs)")
+                        log.info("Found %d intersecting faces (%d intersection pairs)", num_intersecting, num_pairs)
 
                     else:
                         # No intersections found
@@ -121,10 +125,10 @@ class DetectSelfIntersectionsNode:
                         result_mesh.face_attributes['self_intersecting'] = np.zeros(len(F), dtype=np.float32)
                         result_mesh.vertex_attributes['intersection_flag'] = np.zeros(len(V), dtype=np.float32)
                         result_mesh.vertex_attributes['intersection_count'] = np.zeros(len(V), dtype=np.float32)
-                        print("[DetectSelfIntersections] No self-intersections detected")
+                        log.info("No self-intersections detected")
 
                 except Exception as e:
-                    print(f"[DetectSelfIntersections] CGAL detection failed: {e}")
+                    log.error("CGAL detection failed: %s", e)
                     # Fallback to basic method
                     num_intersecting = 0
                     num_pairs = 0
@@ -132,11 +136,11 @@ class DetectSelfIntersectionsNode:
                     result_mesh.face_attributes['self_intersecting'] = np.zeros(len(trimesh.faces), dtype=np.float32)
                     result_mesh.vertex_attributes['intersection_flag'] = np.zeros(len(trimesh.vertices), dtype=np.float32)
                     result_mesh.vertex_attributes['intersection_count'] = np.zeros(len(trimesh.vertices), dtype=np.float32)
-                    print("[DetectSelfIntersections] Falling back to zero fields (CGAL error)")
+                    log.warning("Falling back to zero fields (CGAL error)")
 
             else:
                 # CGAL not available - use basic fallback
-                print("[DetectSelfIntersections] CGAL not available, using basic detection")
+                log.warning("CGAL not available, using basic detection")
                 num_intersecting = 0
                 num_pairs = 0
                 intersecting_faces_list = []
@@ -146,7 +150,7 @@ class DetectSelfIntersectionsNode:
                 result_mesh.vertex_attributes['intersection_flag'] = np.zeros(len(trimesh.vertices), dtype=np.float32)
                 result_mesh.vertex_attributes['intersection_count'] = np.zeros(len(trimesh.vertices), dtype=np.float32)
 
-                print("[DetectSelfIntersections] [WARN] CGAL not available - install with: pip install cgal")
+                log.warning("CGAL not available - install with: pip install cgal")
 
             # Store metadata
             result_mesh.metadata['has_intersection_field'] = True
@@ -211,19 +215,18 @@ Install with: pip install libigl cgal
 
 For now, returning mesh unchanged.
 """
-            print(f"[DetectSelfIntersections] libigl import error: {e}")
+            log.error("libigl import error: %s", e)
             return {"ui": {"text": [error_msg]}, "result": (trimesh, error_msg)}
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            log.error("Unexpected error detecting self-intersections", exc_info=True)
             error_msg = f"""Error detecting self-intersections:
 
 {str(e)}
 
 Returning mesh unchanged. Check console for details.
 """
-            print(f"[DetectSelfIntersections] Unexpected error: {e}")
+            log.error("Unexpected error: %s", e)
             return {"ui": {"text": [error_msg]}, "result": (trimesh, error_msg)}
 
 

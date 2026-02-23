@@ -1,7 +1,11 @@
 """Add normals to point clouds using various estimation methods."""
 
+import logging
+
 import numpy as np
 import trimesh
+
+log = logging.getLogger("geometrypack")
 
 
 class AddNormalsToPointCloud:
@@ -105,7 +109,7 @@ class AddNormalsToPointCloud:
         if num_points == 0:
             raise ValueError("Point cloud has no vertices")
 
-        print(f"[AddNormalsToPointCloud] Processing {num_points} points with method: {method}")
+        log.info("Processing %d points with method: %s", num_points, method)
 
         # Estimate normals based on method
         try:
@@ -159,7 +163,7 @@ class AddNormalsToPointCloud:
         if add_as_attributes:
             info += " (stored as vertex_attributes for visualization)"
 
-        print(f"[AddNormalsToPointCloud] [OK] {info}")
+        log.info("%s", info)
 
         return {"ui": {"text": [info]}, "result": (result, info)}
 

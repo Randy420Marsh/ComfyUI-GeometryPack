@@ -19,9 +19,13 @@ Supports three backends:
 - face_normals: Checks face normal Z-component consistency (detects flipped faces)
 """
 
+import logging
+
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import os
+
+log = logging.getLogger("geometrypack")
 
 
 class BackdraftViewNode:
@@ -75,14 +79,14 @@ class BackdraftViewNode:
         Returns:
             tuple: (IMAGE tensor in BHWC format)
         """
-        print(f"[BackdraftView] Processing mesh: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
-        print(f"[BackdraftView] Resolution: {resolution}x{resolution}, Backend: {backend}")
+        log.info("Processing mesh: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
+        log.info("Resolution: %dx%d, Backend: %s", resolution, resolution, backend)
 
         # Get mesh bounds
         bounds = trimesh.bounds
         xmin, ymin, zmin = bounds[0]
         xmax, ymax, zmax = bounds[1]
-        print(f"[BackdraftView] Mesh bounds: X[{xmin:.2f}, {xmax:.2f}] Y[{ymin:.2f}, {ymax:.2f}] Z[{zmin:.2f}, {zmax:.2f}]")
+        log.info("Mesh bounds: X[%.2f, %.2f] Y[%.2f, %.2f] Z[%.2f, %.2f]", xmin, xmax, ymin, ymax, zmin, zmax)
 
         # Add padding around bounds
         x_range = xmax - xmin
@@ -106,7 +110,7 @@ class BackdraftViewNode:
             nx = max(1, int(resolution * aspect))
 
         total_rays = nx * ny
-        print(f"[BackdraftView] Ray grid: {nx} x {ny} = {total_rays} rays")
+        log.info("Ray grid: %d x %d = %d rays", nx, ny, total_rays)
 
         # Create ray grid
         xs = np.linspace(xmin, xmax, nx)
@@ -139,7 +143,7 @@ class BackdraftViewNode:
         backdraft_count = np.sum(hit_counts >= 2)
         backdraft_pct = backdraft_count / max(1, hit_count) * 100
 
-        print(f"[BackdraftView] Complete: {hit_count} pixels with geometry, {backdraft_count} backdraft pixels ({backdraft_pct:.1f}%)")
+        log.info("Complete: %d pixels with geometry, %d backdraft pixels (%.1f%%)", hit_count, backdraft_count, backdraft_pct)
 
         # Draw filename on image if requested
         if show_filename:
@@ -185,7 +189,7 @@ class BackdraftViewNode:
 
     def _raytrace_trimesh(self, mesh, xs, ys, z_start, nx, ny, total_rays):
         """Batch ray casting using trimesh (embree backend) with progress display."""
-        print(f"[BackdraftView] Using trimesh backend (embree)...")
+        log.info("Using trimesh backend (embree)...")
 
         # Create batch ray origins and directions
         xx, yy = np.meshgrid(xs, ys)
@@ -215,7 +219,7 @@ class BackdraftViewNode:
         else:
             # Process in chunks with progress
             num_chunks = (total_rays + chunk_size - 1) // chunk_size
-            print(f"[BackdraftView] Processing {num_chunks} chunks of ~{chunk_size} rays...")
+            log.info("Processing %d chunks of ~%d rays...", num_chunks, chunk_size)
 
             for i in range(num_chunks):
                 start_idx = i * chunk_size
@@ -235,9 +239,9 @@ class BackdraftViewNode:
                 total_intersections += len(locations)
 
                 progress = (i + 1) / num_chunks * 100
-                print(f"[BackdraftView] Progress: {progress:.0f}% ({end_idx}/{total_rays} rays)")
+                log.info("Progress: %.0f%% (%d/%d rays)", progress, end_idx, total_rays)
 
-        print(f"[BackdraftView] Ray casting complete, {total_intersections} total intersections")
+        log.info("Ray casting complete, %d total intersections", total_intersections)
 
         hit_counts = hit_counts.reshape(ny, nx)
         return hit_counts
@@ -246,7 +250,7 @@ class BackdraftViewNode:
         """Batch ray casting using PyVista multi_ray_trace."""
         import pyvista as pv
 
-        print(f"[BackdraftView] Using pyvista backend (multi_ray_trace)...")
+        log.info("Using pyvista backend (multi_ray_trace)...")
 
         # Convert trimesh to PyVista PolyData
         faces_pv = np.hstack([
@@ -267,7 +271,7 @@ class BackdraftViewNode:
         directions = np.zeros((total_rays, 3))
         directions[:, 2] = -1.0
 
-        print(f"[BackdraftView] Casting {total_rays} rays...")
+        log.info("Casting %d rays...", total_rays)
 
         # Use multi_ray_trace with first_point=False for ALL intersections
         points, ind_ray, ind_tri = pv_mesh.multi_ray_trace(
@@ -276,7 +280,7 @@ class BackdraftViewNode:
             first_point=False
         )
 
-        print(f"[BackdraftView] Ray casting complete, {len(points)} total intersections")
+        log.info("Ray casting complete, %d total intersections", len(points))
 
         # Count hits per ray
         hit_counts = np.zeros(total_rays, dtype=np.int32)
@@ -301,7 +305,7 @@ class BackdraftViewNode:
         """
         import trimesh as trimesh_module
 
-        print(f"[BackdraftView] Using face_normals backend...")
+        log.info("Using face_normals backend...")
 
         # 1. Check for single connected component
         # Use edges_unique to build adjacency for connected component analysis
@@ -320,7 +324,7 @@ class BackdraftViewNode:
                 f"Use 'Split by Connectivity' node first to separate components."
             )
 
-        print(f"[BackdraftView] Mesh is single connected component")
+        log.info("Mesh is single connected component")
 
         # 2. Analyze face normal Z-components
         normals_z = mesh.face_normals[:, 2]
@@ -328,21 +332,21 @@ class BackdraftViewNode:
         down_count = np.sum(normals_z < 0)
         zero_count = np.sum(normals_z == 0)  # Faces pointing sideways
 
-        print(f"[BackdraftView] Face normals: {up_count} pointing up (+Z), {down_count} pointing down (-Z), {zero_count} sideways")
+        log.info("Face normals: %d pointing up (+Z), %d pointing down (-Z), %d sideways", up_count, down_count, zero_count)
 
         # Determine majority direction
         majority_up = up_count >= down_count
 
         if majority_up:
             flipped_mask = normals_z < 0  # Faces pointing down are flipped
-            print(f"[BackdraftView] Majority direction: UP (+Z), {down_count} flipped faces")
+            log.info("Majority direction: UP (+Z), %d flipped faces", down_count)
         else:
             flipped_mask = normals_z > 0  # Faces pointing up are flipped
-            print(f"[BackdraftView] Majority direction: DOWN (-Z), {up_count} flipped faces")
+            log.info("Majority direction: DOWN (-Z), %d flipped faces", up_count)
 
         flipped_count = np.sum(flipped_mask)
         flipped_pct = flipped_count / len(mesh.faces) * 100
-        print(f"[BackdraftView] Flipped faces: {flipped_count}/{len(mesh.faces)} ({flipped_pct:.1f}%)")
+        log.info("Flipped faces: %d/%d (%.1f%%)", flipped_count, len(mesh.faces), flipped_pct)
 
         # 3. Cast rays to find which face is visible at each pixel (single hit)
         total_rays = nx * ny
@@ -361,7 +365,7 @@ class BackdraftViewNode:
             multiple_hits=False  # Only get first (topmost) hit
         )
 
-        print(f"[BackdraftView] Ray casting complete, {len(index_ray)} hits")
+        log.info("Ray casting complete, %d hits", len(index_ray))
 
         # 4. Build result grid based on whether topmost face is flipped
         hit_counts = np.zeros(total_rays, dtype=np.int32)

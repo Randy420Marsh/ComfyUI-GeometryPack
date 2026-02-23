@@ -5,7 +5,11 @@
 Mesh Quality Node - Analyze mesh quality metrics
 """
 
+import logging
+
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 
 class MeshQualityNode:
@@ -52,7 +56,7 @@ class MeshQualityNode:
         Returns:
             tuple: (min_quality, mean_quality, report_string)
         """
-        print(f"[MeshQuality] Analyzing mesh: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        log.info("Analyzing mesh: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
 
         report_sections = []
 
@@ -167,7 +171,7 @@ class MeshQualityNode:
         if recommendations:
             report += "\n\nRecommendations:\n" + "\n".join(recommendations)
 
-        print(f"[MeshQuality] Analysis complete")
+        log.info("Analysis complete")
 
         return {
             "result": (min_quality, mean_quality, report),

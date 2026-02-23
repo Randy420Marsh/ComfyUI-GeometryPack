@@ -10,7 +10,10 @@ Degenerate faces can be created by:
 - Import from poorly-constructed mesh files
 """
 
+import logging
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 
 class RemoveDegenerateFacesNode:
@@ -59,7 +62,7 @@ class RemoveDegenerateFacesNode:
         Returns:
             tuple: (cleaned_mesh, info_string)
         """
-        print(f"[RemoveDegenerateFaces] Input: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        log.info("Input: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
 
         faces_before = len(mesh.faces)
         verts_before = len(mesh.vertices)
@@ -73,7 +76,7 @@ class RemoveDegenerateFacesNode:
         num_duplicate = np.sum(~duplicate_mask)
 
         if num_duplicate > 0:
-            print(f"[RemoveDegenerateFaces] Found {num_duplicate} faces with duplicate vertex indices")
+            log.info("Found %d faces with duplicate vertex indices", num_duplicate)
             cleaned_mesh.update_faces(duplicate_mask)
 
         # Method 2: Remove faces with zero/tiny area using trimesh's built-in
@@ -81,7 +84,7 @@ class RemoveDegenerateFacesNode:
             area_mask = cleaned_mesh.nondegenerate_faces()
             num_zero_area = np.sum(~area_mask)
             if num_zero_area > 0:
-                print(f"[RemoveDegenerateFaces] Found {num_zero_area} faces with zero area")
+                log.info("Found %d faces with zero area", num_zero_area)
                 cleaned_mesh.update_faces(area_mask)
 
         # Method 3: Remove faces below min_area threshold
@@ -90,7 +93,7 @@ class RemoveDegenerateFacesNode:
             area_threshold_mask = face_areas >= min_area
             num_tiny = np.sum(~area_threshold_mask)
             if num_tiny > 0:
-                print(f"[RemoveDegenerateFaces] Found {num_tiny} faces below area threshold {min_area:.2e}")
+                log.info("Found %d faces below area threshold %.2e", num_tiny, min_area)
                 cleaned_mesh.update_faces(area_threshold_mask)
 
         # Remove unreferenced vertices
@@ -115,7 +118,7 @@ After:
 {'[OK] Removed ' + str(faces_removed) + ' degenerate faces' if faces_removed > 0 else '[INFO] No degenerate faces found'}
 """
 
-        print(f"[RemoveDegenerateFaces] Removed {faces_removed} degenerate faces, {verts_removed} unreferenced vertices")
+        log.info("Removed %d degenerate faces, %d unreferenced vertices", faces_removed, verts_removed)
 
         return {"ui": {"text": [info]}, "result": (cleaned_mesh, info)}
 
