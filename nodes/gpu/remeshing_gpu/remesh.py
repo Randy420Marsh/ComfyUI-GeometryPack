@@ -35,8 +35,11 @@ def cumesh_dc_remesh(
         log.info("Grid resolution: %d, band: %s", grid_resolution, band)
 
         # Convert to GPU tensors
-        vertices = torch.tensor(mesh.vertices, dtype=torch.float32).cuda()
-        faces = torch.tensor(mesh.faces, dtype=torch.int32).cuda()
+        import comfy.model_management
+        device = comfy.model_management.get_torch_device()
+        assert device.type == "cuda", f"CuMesh requires CUDA but got device '{device}' — cumesh is GPU-only, no CPU fallback"
+        vertices = torch.tensor(mesh.vertices, dtype=torch.float32).to(device)
+        faces = torch.tensor(mesh.faces, dtype=torch.int32).to(device)
 
         # Calculate bounding box and scale
         bbox_min = vertices.min(dim=0).values
@@ -168,8 +171,11 @@ class RemeshGPUNode:
             raise ValueError(f"CuMesh remeshing failed: {error}")
 
         pre_simplify_faces = len(remeshed_mesh.faces)
-        vertices = torch.tensor(remeshed_mesh.vertices, dtype=torch.float32).cuda()
-        faces = torch.tensor(remeshed_mesh.faces, dtype=torch.int32).cuda()
+        import comfy.model_management
+        device = comfy.model_management.get_torch_device()
+        assert device.type == "cuda", f"CuMesh requires CUDA but got device '{device}' — cumesh is GPU-only, no CPU fallback"
+        vertices = torch.tensor(remeshed_mesh.vertices, dtype=torch.float32).to(device)
+        faces = torch.tensor(remeshed_mesh.faces, dtype=torch.int32).to(device)
 
         cumesh_obj = CuMesh.CuMesh()
         cumesh_obj.init(vertices, faces)
