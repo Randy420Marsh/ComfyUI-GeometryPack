@@ -6,6 +6,7 @@ numpy = "*"
 trimesh = { version = ">=4.0.0", extras = ["easy"] }
 tqdm = "*"
 psutil = "*"
+safetensors = "*"
 
 [target.win-64.pypi-dependencies]
 msvc-runtime = "*"
