@@ -424,18 +424,15 @@ Fast automatic UV unwrapping with vertex splitting at seams.
             )
 
         import comfy.model_management
-        if comfy.model_management.get_torch_device().type != "cuda":
-            raise RuntimeError(
-                "CUDA not available. CuMesh requires a CUDA-capable GPU.\n"
-                "Use 'xatlas' method for CPU-based UV unwrapping."
-            )
+        device = comfy.model_management.get_torch_device()
+        assert device.type == "cuda", f"CuMesh requires CUDA but got device '{device}' — cumesh is GPU-only, no CPU fallback"
 
         log.info("CuMesh: chart_cone_angle=%s, refine_iter=%s, global_iter=%s, smooth=%s",
                  chart_cone_angle, chart_refine_iterations, chart_global_iterations, chart_smooth_strength)
 
         # Convert to torch tensors on GPU
-        vertices = torch.tensor(trimesh.vertices, dtype=torch.float32).cuda()
-        faces = torch.tensor(trimesh.faces, dtype=torch.int32).cuda()
+        vertices = torch.tensor(trimesh.vertices, dtype=torch.float32).to(device)
+        faces = torch.tensor(trimesh.faces, dtype=torch.int32).to(device)
 
         # Convert cone angle to radians
         chart_cone_angle_rad = np.radians(chart_cone_angle)

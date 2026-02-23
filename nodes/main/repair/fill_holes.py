@@ -114,8 +114,11 @@ class FillHolesNode:
         CuMesh, torch = _get_cumesh()
         if method == "cumesh" and CuMesh is not None:
             # GPU-accelerated hole filling (same as TRELLIS2)
-            vertices = torch.tensor(filled_mesh.vertices, dtype=torch.float32).cuda()
-            faces = torch.tensor(filled_mesh.faces, dtype=torch.int32).cuda()
+            import comfy.model_management
+            device = comfy.model_management.get_torch_device()
+            assert device.type == "cuda", f"CuMesh requires CUDA but got device '{device}' — cumesh is GPU-only, no CPU fallback"
+            vertices = torch.tensor(filled_mesh.vertices, dtype=torch.float32).to(device)
+            faces = torch.tensor(filled_mesh.faces, dtype=torch.int32).to(device)
 
             # Initialize CuMesh
             cumesh_obj = CuMesh.CuMesh()
