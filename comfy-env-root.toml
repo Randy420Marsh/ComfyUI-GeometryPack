@@ -8,5 +8,5 @@ OMP_NUM_THREADS = 1
 # libopengl0 provides libOpenGL.so.0 (required by pymeshlab)
 packages = ["libgl1-mesa-glx", "libgl1", "libopengl0", "libglu1-mesa"]
 
-[nodes]
+[node_reqs]
 ComfyUI-Env-Manager = "PozzettiAndrea/ComfyUI-Env-Manager"
