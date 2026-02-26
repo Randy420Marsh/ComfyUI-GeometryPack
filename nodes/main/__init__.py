@@ -20,6 +20,8 @@ from . import repair
 from . import remeshing
 from . import reconstruction
 from . import texture_remeshing
+from . import smoothing
+from . import decimation
 
 # ParaView/VTK filter nodes
 from . import paraview
@@ -51,6 +53,8 @@ NODE_CLASS_MAPPINGS.update(boolean.NODE_CLASS_MAPPINGS)
 NODE_CLASS_MAPPINGS.update(reconstruction_cgal.NODE_CLASS_MAPPINGS)
 NODE_CLASS_MAPPINGS.update(remeshing_cgal.NODE_CLASS_MAPPINGS)
 NODE_CLASS_MAPPINGS.update(repair_cgal.NODE_CLASS_MAPPINGS)
+NODE_CLASS_MAPPINGS.update(smoothing.NODE_CLASS_MAPPINGS)
+NODE_CLASS_MAPPINGS.update(decimation.NODE_CLASS_MAPPINGS)
 
 # Collect all display name mappings
 NODE_DISPLAY_NAME_MAPPINGS = {}
@@ -73,5 +77,7 @@ NODE_DISPLAY_NAME_MAPPINGS.update(boolean.NODE_DISPLAY_NAME_MAPPINGS)
 NODE_DISPLAY_NAME_MAPPINGS.update(reconstruction_cgal.NODE_DISPLAY_NAME_MAPPINGS)
 NODE_DISPLAY_NAME_MAPPINGS.update(remeshing_cgal.NODE_DISPLAY_NAME_MAPPINGS)
 NODE_DISPLAY_NAME_MAPPINGS.update(repair_cgal.NODE_DISPLAY_NAME_MAPPINGS)
+NODE_DISPLAY_NAME_MAPPINGS.update(smoothing.NODE_DISPLAY_NAME_MAPPINGS)
+NODE_DISPLAY_NAME_MAPPINGS.update(decimation.NODE_DISPLAY_NAME_MAPPINGS)
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
