@@ -59,18 +59,20 @@ class LoadMesh:
 
     @classmethod
     def get_mesh_files(cls):
-        """Get list of available mesh files in input/3d and input folders."""
+        """Get list of available mesh files in input/3d (recursively) and input folders."""
         mesh_files = []
 
         if COMFYUI_INPUT_FOLDER is not None:
-            # Scan input/3d first
+            # Scan input/3d recursively
             input_3d = os.path.join(COMFYUI_INPUT_FOLDER, "3d")
             if os.path.exists(input_3d):
-                for file in os.listdir(input_3d):
-                    if any(file.lower().endswith(ext) for ext in cls.SUPPORTED_EXTENSIONS):
-                        mesh_files.append(f"3d/{file}")
+                for root, _dirs, files in os.walk(input_3d):
+                    for file in files:
+                        if any(file.lower().endswith(ext) for ext in cls.SUPPORTED_EXTENSIONS):
+                            rel = os.path.relpath(os.path.join(root, file), COMFYUI_INPUT_FOLDER)
+                            mesh_files.append(rel)
 
-            # Then scan input root
+            # Then scan input root (non-recursive, top-level files only)
             for file in os.listdir(COMFYUI_INPUT_FOLDER):
                 file_path = os.path.join(COMFYUI_INPUT_FOLDER, file)
                 if os.path.isfile(file_path):
