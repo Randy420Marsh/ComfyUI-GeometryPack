@@ -116,6 +116,99 @@ def _pymeshlab_isotropic_remesh(
         return None, f"Error during remeshing: {str(e)}"
 
 
+def _mmg_adaptive_remesh(
+    mesh: trimesh_module.Trimesh,
+    hausd: float = 0.01,
+    hmin: float = 0.0,
+    hmax: float = 0.0,
+    hgrad: float = 1.3,
+) -> Tuple[Optional[trimesh_module.Trimesh], str]:
+    """Apply adaptive surface remeshing using mmgpy (MMG mmgs)."""
+    log.info("Starting MMG Adaptive Surface Remeshing")
+    log.info("Input mesh: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
+    log.info("Parameters: hausd=%s, hmin=%s, hmax=%s, hgrad=%s",
+             hausd, hmin, hmax, hgrad)
+
+    try:
+        import mmgpy
+    except (ImportError, OSError):
+        return None, "mmgpy is not installed. Install with: pip install mmgpy"
+
+    if not isinstance(mesh, trimesh_module.Trimesh):
+        return None, "Input must be a trimesh.Trimesh object"
+
+    if len(mesh.vertices) == 0 or len(mesh.faces) == 0:
+        return None, "Mesh is empty"
+
+    if hausd <= 0:
+        return None, f"Hausdorff distance must be positive, got {hausd}"
+
+    try:
+        log.info("Converting to mmgpy format...")
+        vertices = np.array(mesh.vertices, dtype=np.float64)
+        faces = np.array(mesh.faces, dtype=np.int32)
+        mmg_mesh = mmgpy.Mesh(vertices, faces)
+
+        opts_kwargs = {
+            "hausd": hausd,
+            "hgrad": hgrad,
+            "verbose": -1,
+        }
+        if hmin > 0:
+            opts_kwargs["hmin"] = hmin
+        if hmax > 0:
+            opts_kwargs["hmax"] = hmax
+
+        opts = mmgpy.MmgSOptions(**opts_kwargs)
+
+        log.info("Running mmgs surface remeshing...")
+        result = mmg_mesh.remesh(opts)
+
+        if not result.success:
+            return None, f"MMG remeshing failed (return code {result.return_code})"
+
+        log.info("Converting back to trimesh...")
+        out_vertices = mmg_mesh.get_vertices()
+        out_faces = mmg_mesh.get_triangles()
+
+        remeshed_mesh = trimesh_module.Trimesh(
+            vertices=out_vertices,
+            faces=out_faces,
+            process=False
+        )
+
+        remeshed_mesh.metadata = mesh.metadata.copy()
+        remeshed_mesh.metadata['remeshing'] = {
+            'algorithm': 'mmg_adaptive',
+            'hausd': hausd,
+            'hmin': hmin,
+            'hmax': hmax,
+            'hgrad': hgrad,
+            'quality_mean_before': result.quality_mean_before,
+            'quality_mean_after': result.quality_mean_after,
+            'original_vertices': len(mesh.vertices),
+            'original_faces': len(mesh.faces),
+            'remeshed_vertices': len(remeshed_mesh.vertices),
+            'remeshed_faces': len(remeshed_mesh.faces)
+        }
+
+        vertex_change = len(remeshed_mesh.vertices) - len(mesh.vertices)
+        face_change = len(remeshed_mesh.faces) - len(mesh.faces)
+        vertex_pct = (vertex_change / len(mesh.vertices)) * 100 if len(mesh.vertices) > 0 else 0
+        face_pct = (face_change / len(mesh.faces)) * 100 if len(mesh.faces) > 0 else 0
+
+        log.info("Remeshing Complete")
+        log.info("Vertices: %d -> %d (%+d, %+.1f%%)", len(mesh.vertices), len(remeshed_mesh.vertices), vertex_change, vertex_pct)
+        log.info("Faces: %d -> %d (%+d, %+.1f%%)", len(mesh.faces), len(remeshed_mesh.faces), face_change, face_pct)
+        log.info("Quality: %.3f -> %.3f", result.quality_mean_before, result.quality_mean_after)
+
+        return remeshed_mesh, ""
+
+    except Exception as e:
+        log.error("Error during mmg remeshing", exc_info=True)
+        return None, f"Error during mmg remeshing: {str(e)}"
+
+
 class RemeshNode:
     """
     Remesh - Topology-changing remeshing operations (main backends).
@@ -124,6 +217,7 @@ class RemeshNode:
     - pymeshlab_isotropic: PyMeshLab isotropic remeshing (fast)
     - instant_meshes: Field-aligned quad remeshing
     - quadriflow: QuadriFlow quad remeshing (good topology)
+    - mmg_adaptive: MMG curvature-adaptive surface remeshing
 
     For CGAL isotropic remeshing, use "Remesh CGAL" node.
     For Blender voxel/modifier remeshing, use "Remesh Blender" node.
@@ -139,9 +233,10 @@ class RemeshNode:
                     "pymeshlab_isotropic",
                     "instant_meshes",
                     "quadriflow",
+                    "mmg_adaptive",
                 ], {
                     "default": "pymeshlab_isotropic",
-                    "tooltip": "Remeshing algorithm. pymeshlab=fast isotropic, instant_meshes=field-aligned quads, quadriflow=quad remesh with good topology"
+                    "tooltip": "Remeshing algorithm. pymeshlab=fast isotropic, instant_meshes=field-aligned quads, quadriflow=quad remesh with good topology, mmg_adaptive=curvature-adaptive surface remeshing"
                 }),
             },
             "optional": {
@@ -218,6 +313,43 @@ class RemeshNode:
                     "tooltip": "Preserve mesh boundary edges during QuadriFlow remeshing.",
                     "visible_when": {"backend": ["quadriflow"]},
                 }),
+                # MMG adaptive surface remeshing
+                "hausd": ("FLOAT", {
+                    "default": 0.01,
+                    "min": 0.0001,
+                    "max": 10.0,
+                    "step": 0.001,
+                    "display": "number",
+                    "tooltip": "Hausdorff distance: maximum geometric deviation from original surface. Smaller values preserve detail better but produce more triangles.",
+                    "visible_when": {"backend": ["mmg_adaptive"]},
+                }),
+                "hmin": ("FLOAT", {
+                    "default": 0.0,
+                    "min": 0.0,
+                    "max": 10.0,
+                    "step": 0.001,
+                    "display": "number",
+                    "tooltip": "Minimum edge length. 0 = auto (MMG computes from mesh geometry). Setting this prevents overly small triangles.",
+                    "visible_when": {"backend": ["mmg_adaptive"]},
+                }),
+                "hmax": ("FLOAT", {
+                    "default": 0.0,
+                    "min": 0.0,
+                    "max": 100.0,
+                    "step": 0.01,
+                    "display": "number",
+                    "tooltip": "Maximum edge length. 0 = auto (MMG computes from mesh geometry). Setting this prevents overly large triangles in flat areas.",
+                    "visible_when": {"backend": ["mmg_adaptive"]},
+                }),
+                "hgrad": ("FLOAT", {
+                    "default": 1.3,
+                    "min": 1.0,
+                    "max": 5.0,
+                    "step": 0.1,
+                    "display": "number",
+                    "tooltip": "Gradation: controls how fast element sizes change across the mesh. 1.3 = smooth transitions (default). Lower = more uniform, higher = faster size changes.",
+                    "visible_when": {"backend": ["mmg_adaptive"]},
+                }),
             }
         }
 
@@ -230,7 +362,8 @@ class RemeshNode:
     def remesh(self, trimesh, backend, target_edge_length=1.0, iterations=3,
                feature_angle=30.0, adaptive="false",
                target_vertex_count=5000, deterministic="true", crease_angle=0.0,
-               target_face_count=5000, preserve_sharp="false", preserve_boundary="true"):
+               target_face_count=5000, preserve_sharp="false", preserve_boundary="true",
+               hausd=0.01, hmin=0.0, hmax=0.0, hgrad=1.3):
         """Apply remeshing based on selected backend."""
         # Sanitize hidden widget values (ComfyUI sends '' for hidden visible_when widgets)
         target_edge_length = float(target_edge_length) if target_edge_length not in (None, '') else 1.0
@@ -239,6 +372,10 @@ class RemeshNode:
         target_vertex_count = int(target_vertex_count) if target_vertex_count not in (None, '') else 5000
         crease_angle = float(crease_angle) if crease_angle not in (None, '') else 0.0
         target_face_count = int(target_face_count) if target_face_count not in (None, '') else 5000
+        hausd = float(hausd) if hausd not in (None, '') else 0.01
+        hmin = float(hmin) if hmin not in (None, '') else 0.0
+        hmax = float(hmax) if hmax not in (None, '') else 0.0
+        hgrad = float(hgrad) if hgrad not in (None, '') else 1.3
 
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
@@ -263,6 +400,12 @@ class RemeshNode:
                      f"{target_face_count:,}", preserve_sharp, preserve_boundary)
             remeshed_mesh, info = self._quadriflow(
                 trimesh, target_face_count, preserve_sharp, preserve_boundary
+            )
+        elif backend == "mmg_adaptive":
+            log.info("Parameters: hausd=%s, hmin=%s, hmax=%s, hgrad=%s",
+                     hausd, hmin, hmax, hgrad)
+            remeshed_mesh, info = self._mmg_adaptive(
+                trimesh, hausd, hmin, hmax, hgrad
             )
         else:
             raise ValueError(f"Unknown backend: {backend}")
@@ -413,6 +556,36 @@ After:
   Faces: {len(remeshed_mesh.faces):,}
 
 QuadriFlow creates quad-dominant meshes with good topology.
+"""
+        return remeshed_mesh, info
+
+    def _mmg_adaptive(self, trimesh, hausd, hmin, hmax, hgrad):
+        """MMG adaptive surface remeshing."""
+        remeshed_mesh, error = _mmg_adaptive_remesh(
+            trimesh, hausd=hausd, hmin=hmin, hmax=hmax, hgrad=hgrad
+        )
+        if remeshed_mesh is None:
+            raise ValueError(f"MMG remeshing failed: {error}")
+
+        hmin_str = f"{hmin}" if hmin > 0 else "auto"
+        hmax_str = f"{hmax}" if hmax > 0 else "auto"
+
+        info = f"""Remesh Results (MMG Adaptive):
+
+Hausdorff Distance: {hausd}
+Min Edge Length: {hmin_str}
+Max Edge Length: {hmax_str}
+Gradation: {hgrad}
+
+Before:
+  Vertices: {len(trimesh.vertices):,}
+  Faces: {len(trimesh.faces):,}
+
+After:
+  Vertices: {len(remeshed_mesh.vertices):,}
+  Faces: {len(remeshed_mesh.faces):,}
+
+MMG creates curvature-adaptive surface meshes.
 """
         return remeshed_mesh, info
 

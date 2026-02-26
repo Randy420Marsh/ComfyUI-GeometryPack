@@ -22,6 +22,7 @@ skeletor = ">=1.2.0"
 pynanoinstantmeshes = "*"
 pyquadriflow = { url = "https://github.com/PozzettiAndrea/pyQuadriFlow/releases/download/v0.0.6/pyquadriflow-0.0.6-py3-none-any.whl" }
 matplotlib = ">=3.5.0"
+mmgpy = ">=0.5.2"
 pillow = ">=9.0.0"
 pyvista = ">=0.43.0"
 

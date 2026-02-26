@@ -40,20 +40,13 @@ We hope to also wrap the following outstanding libraries in future releases:
 
 | Library | License | Description | Homepage |
 |---------|---------|-------------|----------|
-| [geometry-central](https://github.com/nmwsharp/geometry-central) | MIT | Surface mesh processing — geodesics, vector fields, operators, intrinsic triangulations | https://geometry-central.net |
-| [potpourri3d](https://github.com/nmwsharp/potpourri3d) | MIT | Heat-method geodesics, mesh/point cloud utilities, vector field computation | https://github.com/nmwsharp/potpourri3d |
 | [pmp-library](https://github.com/pmp-library/pmp-library) | MIT | Polygon Mesh Processing Library — halfedge data structure, smoothing, curvature, remeshing | https://www.pmp-library.org |
-| [cinolib](https://github.com/mlivesu/cinolib) | MIT | Header-only C++ library for polygonal/polyhedral mesh processing (SGP 2024 Software Award) | https://github.com/mlivesu/cinolib |
-| [Atom3d](https://github.com/Luo-Yihao/Atom3d) | MIT | Learned mesh operations for geometry processing | https://github.com/Luo-Yihao/Atom3d |
 | [manifold3d](https://github.com/elalish/manifold) | Apache-2.0 | Robust, GPU-friendly CSG/boolean operations on manifold meshes | https://github.com/elalish/manifold |
 | [geogram](https://github.com/BrunoLevy/geogram) | BSD-3-Clause | Voronoi diagrams, centroidal Voronoi tessellation, parameterization, remeshing (INRIA) | https://github.com/BrunoLevy/geogram |
-| [OpenMesh](https://www.graphics.rwth-aachen.de/software/openmesh/) | BSD-3-Clause | Generic halfedge-based polygon mesh data structure and processing (RWTH Aachen) | https://www.openmesh.org |
 | [PyMesh](https://github.com/PyMesh/PyMesh) | MPL-2.0 | Rapid prototyping platform for geometry processing — booleans, winding number, mesh repair | https://pymesh.readthedocs.io |
 | [mmg](https://github.com/MmgTools/mmg) | LGPL-3.0 | Adaptive surface and volume remeshing for 2D, surface, and 3D tetrahedral meshes | https://www.mmgtools.org |
-| [QRemeshify](https://github.com/ksami/QRemeshify) | GPL-3.0 | Blender addon for easy quad-topology remeshing | https://github.com/ksami/QRemeshify |
 | [quadwild](https://github.com/nicopietroni/quadwild) | GPL-3.0 | Feature-line driven quad remeshing for producing pure-quad meshes | https://github.com/nicopietroni/quadwild |
 | [gmsh](https://gmsh.info) | GPL-2.0+ | 3D finite element mesh generator with built-in CAD engine; linking exception available | https://gmsh.info |
-| [MeshLib](https://github.com/MeshInspector/MeshLib) | Custom | High-performance mesh processing (C++/Python/C#); free for non-commercial use, commercial license required for production | https://meshlib.io |
 
 ## License Notes
 
@@ -61,8 +54,7 @@ We hope to also wrap the following outstanding libraries in future releases:
 - **PyMesh** license situation is ambiguous — `setup.py` references MPL-2.0 but no formal LICENSE file is present in the repository.
 - **MeshLib** is source-available but not OSI-approved open source. Free for evaluation and non-commercial use; commercial use requires a paid license.
 - **gmsh** is GPL-2.0-or-later but includes a linking exception that allows use as a library without triggering GPL obligations on the calling code.
-- **OpenMesh** v4.0+ uses BSD-3-Clause. Earlier versions (v3.3 and below) were LGPL-3.0.
 - **GeometryPack itself** is licensed under GPL-3.0-or-later, which is compatible with all of the above.
 
 
-Directional? Draco? Meshoptimizer. Polyscope?
+Directional? Draco? Meshoptimizer? Polyscope?
