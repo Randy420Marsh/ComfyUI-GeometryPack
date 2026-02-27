@@ -9,11 +9,12 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class FixSelfIntersectionsByPerturbationNode:
+class FixSelfIntersectionsByPerturbationNode(io.ComfyNode):
     """
     Fix self-intersections by slightly moving vertices apart.
 
@@ -22,28 +23,30 @@ class FixSelfIntersectionsByPerturbationNode:
     mesh topology but may not resolve all intersection types.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-            "optional": {
-                "epsilon": ("FLOAT", {"default": 0.001, "min": 1e-8, "max": 1.0, "step": 0.0001}),
-                "max_iterations": ("INT", {"default": 10, "min": 1, "max": 100}),
-                "direction": (["outward", "inward", "adaptive"], {"default": "outward"}),
-                "scale_by_intersection_count": ("BOOLEAN", {"default": True}),
-                "re_detect_after_fix": ("BOOLEAN", {"default": True}),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackFixSelfIntersectionsByPerturbation",
+            display_name="Fix Self Intersections (Perturbation)",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Float.Input("epsilon", default=0.001, min=1e-8, max=1.0, step=0.0001, optional=True),
+                io.Int.Input("max_iterations", default=10, min=1, max=100, optional=True),
+                io.Combo.Input("direction", options=["outward", "inward", "adaptive"], default="outward", optional=True),
+                io.Boolean.Input("scale_by_intersection_count", default=True, optional=True),
+                io.Boolean.Input("re_detect_after_fix", default=True, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="fixed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("fixed_mesh", "info")
-    FUNCTION = "fix_by_perturbation"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def fix_by_perturbation(self, trimesh, epsilon=0.001, max_iterations=10,
+    @classmethod
+    def execute(cls, trimesh, epsilon=0.001, max_iterations=10,
                             direction="outward", scale_by_intersection_count=True,
                             re_detect_after_fix=True):
         """
@@ -77,7 +80,7 @@ Returning mesh unchanged.
 Workflow suggestion:
 1. Load Mesh -> Detect Self Intersections -> Fix Self Intersections By Perturbation
 """
-            return {"ui": {"text": [warning_msg]}, "result": (trimesh, warning_msg)}
+            return io.NodeOutput(trimesh, warning_msg, ui={"text": [warning_msg]})
 
         # Get vertices to perturb
         vertex_flags = trimesh.vertex_attributes['intersection_flag']
@@ -94,7 +97,7 @@ Either the mesh is already clean, or you need to run
 
 Returning mesh unchanged.
 """
-            return {"ui": {"text": [report]}, "result": (trimesh, report)}
+            return io.NodeOutput(trimesh, report, ui={"text": [report]})
 
         log.info("Found %d vertices to perturb", num_affected)
 
@@ -284,7 +287,7 @@ Important Notes:
 """
 
         log.info("Complete: perturbed %d vertices over %d iterations", num_affected, iterations_used)
-        return {"ui": {"text": [report]}, "result": (result_mesh, report)}
+        return io.NodeOutput(result_mesh, report, ui={"text": [report]})
 
 
 NODE_CLASS_MAPPINGS = {

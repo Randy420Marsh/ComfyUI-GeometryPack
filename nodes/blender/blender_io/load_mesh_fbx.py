@@ -20,6 +20,7 @@ try:
 except (ImportError, AttributeError):
     # Fallback if folder_paths not available (e.g., during testing)
     COMFYUI_INPUT_FOLDER = None
+from comfy_api.latest import io
 
 
 def _bpy_import_fbx(fbx_path):
@@ -73,32 +74,32 @@ def _bpy_import_fbx(fbx_path):
     }
 
 
-class LoadMeshFBX:
+class LoadMeshFBX(io.ComfyNode):
     """
     Load FBX files using bpy.
 
     Uses the bpy Python module to directly import FBX files and extract mesh data.
     """
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        # Get list of FBX files only
-        fbx_files = cls.get_fbx_files()
 
+    @classmethod
+    def define_schema(cls):
+        fbx_files = cls.get_fbx_files()
         if not fbx_files:
             fbx_files = ["No FBX files found in input/3d or input folders"]
-
-        return {
-            "required": {
-                "file_path": (fbx_files, ),
-            },
-        }
-
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("mesh", "info")
-    FUNCTION = "load_fbx"
-    CATEGORY = "geompack/io"
-    OUTPUT_NODE = True
+        return io.Schema(
+            node_id="GeomPackLoadMeshFBX",
+            display_name="Load Mesh (FBX)",
+            category="geompack/io",
+            is_output_node=True,
+            inputs=[
+                io.Combo.Input("file_path", options=fbx_files),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
     @classmethod
     def get_fbx_files(cls):
@@ -122,7 +123,7 @@ class LoadMeshFBX:
         return sorted(fbx_files)
 
     @classmethod
-    def IS_CHANGED(cls, file_path):
+    def fingerprint_inputs(cls, file_path):
         """Force re-execution when file changes."""
         if COMFYUI_INPUT_FOLDER is not None:
             # Check file modification time
@@ -140,7 +141,8 @@ class LoadMeshFBX:
 
         return file_path
 
-    def load_fbx(self, file_path):
+    @classmethod
+    def execute(cls, file_path):
         """
         Load FBX file using bpy.
 
@@ -217,7 +219,7 @@ class LoadMeshFBX:
 
         log.info("Loaded: %d vertices, %d faces", len(loaded_mesh.vertices), len(loaded_mesh.faces))
 
-        return {"ui": {"text": [info]}, "result": (loaded_mesh, info)}
+        return io.NodeOutput(loaded_mesh, info, ui={"text": [info]})
 
 
 # Node mappings

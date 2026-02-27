@@ -26,36 +26,37 @@ try:
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
+from comfy_api.latest import io
 
 
-class LoadMesh:
+class LoadMesh(io.ComfyNode):
     """
     Load a mesh from file (OBJ, PLY, STL, OFF, etc.)
     Now returns trimesh.Trimesh objects for better mesh handling.
     """
 
+
+    @classmethod
+    def define_schema(cls):
+        mesh_files = cls.get_mesh_files()
+        if not mesh_files:
+            mesh_files = ["No mesh files found in input/3d or input folders"]
+        return io.Schema(
+            node_id="GeomPackLoadMesh",
+            display_name="Load Mesh",
+            category="geompack/io",
+            inputs=[
+                io.Combo.Input("file_path", options=mesh_files),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+                io.Image.Output(display_name="texture"),
+            ],
+        )
+
     # Supported mesh extensions for file browser
     SUPPORTED_EXTENSIONS = ['.obj', '.ply', '.stl', '.off', '.gltf', '.glb', '.fbx', '.dae', '.3ds', '.vtp']
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        # Get list of available mesh files (like LoadImage does)
-        mesh_files = cls.get_mesh_files()
-
-        # If no files found, provide a default empty list
-        if not mesh_files:
-            mesh_files = ["No mesh files found in input/3d or input folders"]
-
-        return {
-            "required": {
-                "file_path": (mesh_files, ),
-            },
-        }
-
-    RETURN_TYPES = ("TRIMESH", "IMAGE")
-    RETURN_NAMES = ("mesh", "texture")
-    FUNCTION = "load_mesh"
-    CATEGORY = "geompack/io"
 
     @classmethod
     def get_mesh_files(cls):
@@ -82,7 +83,7 @@ class LoadMesh:
         return sorted(mesh_files)
 
     @classmethod
-    def IS_CHANGED(cls, file_path):
+    def fingerprint_inputs(cls, file_path):
         """Force re-execution when file changes."""
         if COMFYUI_INPUT_FOLDER is not None:
             # Check file modification time
@@ -100,7 +101,8 @@ class LoadMesh:
 
         return file_path
 
-    def _extract_texture_image(self, mesh):
+    @staticmethod
+    def _extract_texture_image(mesh):
         """Extract texture from mesh and convert to ComfyUI IMAGE format."""
         if not PIL_AVAILABLE:
             return None
@@ -140,7 +142,8 @@ class LoadMesh:
         img_array = np.array(texture_image.convert("RGB")).astype(np.float32) / 255.0
         return img_array[np.newaxis, ...]
 
-    def load_mesh(self, file_path):
+    @classmethod
+    def execute(cls, file_path):
         """
         Load mesh from file.
 
@@ -201,9 +204,9 @@ class LoadMesh:
             log.info("Loaded pointcloud: %d points", len(loaded_mesh.vertices))
 
         # Extract texture
-        texture = self._extract_texture_image(loaded_mesh)
+        texture = cls._extract_texture_image(loaded_mesh)
 
-        return (loaded_mesh, texture)
+        return io.NodeOutput(loaded_mesh, texture)
 
 
 # Node mappings

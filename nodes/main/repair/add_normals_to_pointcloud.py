@@ -4,74 +4,39 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
-
-class AddNormalsToPointCloud:
+class AddNormalsToPointCloud(io.ComfyNode):
     """Estimate and add normals to a point cloud using various methods."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "pointcloud": ("TRIMESH", {
-                    "tooltip": "Input point cloud (will reject meshes with faces)"
-                }),
-                "method": (["open3d_knn", "open3d_radius", "pymeshlab_mls"], {
-                    "default": "open3d_knn",
-                    "tooltip": "Normal estimation method"
-                }),
-            },
-            "optional": {
-                # For open3d_knn method
-                "k_neighbors": ("INT", {
-                    "default": 30,
-                    "min": 3,
-                    "max": 100,
-                    "step": 1,
-                    "tooltip": "[open3d_knn] Number of nearest neighbors for PCA"
-                }),
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackAddNormalsToPointCloud",
+            display_name="Add Normals to PointCloud",
+            category="geompack/repair",
+            description='Estimate and add normals to a point cloud using Open3D or PyMeshLab methods.',
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("pointcloud", tooltip="Input point cloud (will reject meshes with faces)"),
+                io.Combo.Input("method", options=["open3d_knn", "open3d_radius", "pymeshlab_mls"], default="open3d_knn", tooltip="Normal estimation method"),
+                io.Int.Input("k_neighbors", default=30, min=3, max=100, step=1, tooltip="[open3d_knn] Number of nearest neighbors for PCA", optional=True),
+                io.Float.Input("search_radius", default=0.05, min=0.001, max=1.0, step=0.001, tooltip="[open3d_radius] Search radius for neighborhood (in normalized space)", optional=True),
+                io.Int.Input("mls_smoothing", default=5, min=1, max=20, tooltip="[pymeshlab_mls] MLS smoothing iterations", optional=True),
+                io.Boolean.Input("orient_normals", default=True, tooltip="Orient normals consistently across surface", optional=True),
+                io.Boolean.Input("add_as_attributes", default=True, tooltip="Also store normals as vertex_attributes (normal_x/y/z) for VTK visualization", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="pointcloud_with_normals"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-                # For open3d_radius method
-                "search_radius": ("FLOAT", {
-                    "default": 0.05,
-                    "min": 0.001,
-                    "max": 1.0,
-                    "step": 0.001,
-                    "tooltip": "[open3d_radius] Search radius for neighborhood (in normalized space)"
-                }),
-
-                # For pymeshlab_mls
-                "mls_smoothing": ("INT", {
-                    "default": 5,
-                    "min": 1,
-                    "max": 20,
-                    "tooltip": "[pymeshlab_mls] MLS smoothing iterations"
-                }),
-
-                # Common parameters
-                "orient_normals": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Orient normals consistently across surface"
-                }),
-
-                "add_as_attributes": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Also store normals as vertex_attributes (normal_x/y/z) for VTK visualization"
-                }),
-            }
-        }
-
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("pointcloud_with_normals", "info")
-    FUNCTION = "add_normals"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-    DESCRIPTION = "Estimate and add normals to a point cloud using Open3D or PyMeshLab methods."
-
-    def add_normals(
-        self,
+    @classmethod
+    def execute(
+        cls,
         pointcloud,
         method,
         k_neighbors=30,
@@ -114,11 +79,11 @@ class AddNormalsToPointCloud:
         # Estimate normals based on method
         try:
             if method == "open3d_knn":
-                normals = self._estimate_normals_open3d_knn(vertices, k_neighbors, orient_normals)
+                normals = cls._estimate_normals_open3d_knn(vertices, k_neighbors, orient_normals)
             elif method == "open3d_radius":
-                normals = self._estimate_normals_open3d_radius(vertices, search_radius, orient_normals)
+                normals = cls._estimate_normals_open3d_radius(vertices, search_radius, orient_normals)
             elif method == "pymeshlab_mls":
-                normals = self._estimate_normals_pymeshlab_mls(vertices, mls_smoothing, orient_normals)
+                normals = cls._estimate_normals_pymeshlab_mls(vertices, mls_smoothing, orient_normals)
             else:
                 raise ValueError(f"Unknown method: {method}")
         except ImportError as e:
@@ -165,9 +130,10 @@ class AddNormalsToPointCloud:
 
         log.info("%s", info)
 
-        return {"ui": {"text": [info]}, "result": (result, info)}
+        return io.NodeOutput(result, info, ui={"text": [info]})
 
-    def _estimate_normals_open3d_knn(self, points, k_neighbors, orient_normals):
+    @staticmethod
+    def _estimate_normals_open3d_knn(points, k_neighbors, orient_normals):
         """
         Estimate normals using Open3D k-nearest neighbors PCA.
 
@@ -194,7 +160,8 @@ class AddNormalsToPointCloud:
         normals = np.asarray(pcd.normals).astype(np.float32)
         return normals
 
-    def _estimate_normals_open3d_radius(self, points, search_radius, orient_normals):
+    @staticmethod
+    def _estimate_normals_open3d_radius(points, search_radius, orient_normals):
         """
         Estimate normals using Open3D radius-based search PCA.
 
@@ -222,7 +189,8 @@ class AddNormalsToPointCloud:
         normals = np.asarray(pcd.normals).astype(np.float32)
         return normals
 
-    def _estimate_normals_pymeshlab_mls(self, points, mls_smoothing, orient_normals):
+    @staticmethod
+    def _estimate_normals_pymeshlab_mls(points, mls_smoothing, orient_normals):
         """
         Estimate normals using PyMeshLab Moving Least Squares.
 
@@ -256,7 +224,6 @@ class AddNormalsToPointCloud:
         normals = current_mesh.vertex_normal_matrix().astype(np.float32)
 
         return normals
-
 
 # Node registration
 NODE_CLASS_MAPPINGS = {

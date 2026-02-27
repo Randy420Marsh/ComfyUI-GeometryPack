@@ -10,6 +10,7 @@ import logging
 
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -59,7 +60,7 @@ def _bpy_boolean_operation(vertices_a, faces_a, vertices_b, faces_b, operation):
     return {'vertices': result_vertices, 'faces': result_faces}
 
 
-class BooleanBlenderNode:
+class BooleanBlenderNode(io.ComfyNode):
     """
     Boolean Blender - Union, Difference, and Intersection using Blender's EXACT solver.
 
@@ -72,23 +73,27 @@ class BooleanBlenderNode:
     For CGAL-based booleans, use "Boolean CGAL" node.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh_a": ("TRIMESH",),
-                "mesh_b": ("TRIMESH",),
-                "operation": (["union", "difference", "intersection"],),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackBooleanBlender",
+            display_name="Boolean Blender",
+            category="geompack/boolean",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh_a"),
+                io.Custom("TRIMESH").Input("mesh_b"),
+                io.Combo.Input("operation", options=["union", "difference", "intersection"]),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="result_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("result_mesh", "info")
-    FUNCTION = "boolean_op"
-    CATEGORY = "geompack/boolean"
-    OUTPUT_NODE = True
-
-    def boolean_op(self, mesh_a, mesh_b, operation):
+    @classmethod
+    def execute(cls, mesh_a, mesh_b, operation):
         """
         Perform boolean operation on two meshes using Blender.
 
@@ -162,7 +167,7 @@ Watertight: {result.is_watertight}
 """
 
             log.info("Success: %d vertices, %d faces", len(result.vertices), len(result.faces))
-            return {"ui": {"text": [info]}, "result": (result, info)}
+            return io.NodeOutput(result, info, ui={"text": [info]})
 
         except Exception as e:
             raise RuntimeError(f"Boolean Blender operation failed: {e}")

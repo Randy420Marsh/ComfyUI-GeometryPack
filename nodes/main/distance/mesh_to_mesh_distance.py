@@ -8,11 +8,11 @@ Mesh Distance Node - Compare two meshes using various metrics
 import logging
 
 import numpy as np
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
-
-class MeshDistanceNode:
+class MeshDistanceNode(io.ComfyNode):
     """
     Unified Mesh Distance - Compare two meshes using various metrics.
 
@@ -24,31 +24,27 @@ class MeshDistanceNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh_a": ("TRIMESH",),
-                "mesh_b": ("TRIMESH",),
-                "metric": (["hausdorff", "chamfer"], {"default": "hausdorff"}),
-            },
-            "optional": {
-                "sample_count": ("INT", {
-                    "default": 10000,
-                    "min": 1000,
-                    "max": 1000000,
-                    "step": 1000
-                }),
-                "symmetric": (["true", "false"], {"default": "true"}),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackMeshToMeshDistance",
+            display_name="Mesh to Mesh Distance",
+            category="geompack/distance",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh_a"),
+                io.Custom("TRIMESH").Input("mesh_b"),
+                io.Combo.Input("metric", options=["hausdorff", "chamfer"], default="hausdorff"),
+                io.Int.Input("sample_count", default=10000, min=1000, max=1000000, step=1000, optional=True),
+                io.Combo.Input("symmetric", options=["true", "false"], default="true", optional=True),
+            ],
+            outputs=[
+                io.Float.Output(display_name="distance"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("FLOAT", "STRING")
-    RETURN_NAMES = ("distance", "info")
-    OUTPUT_NODE = True
-    FUNCTION = "compute_distance"
-    CATEGORY = "geompack/distance"
-
-    def compute_distance(self, mesh_a, mesh_b, metric,
+    @classmethod
+    def execute(cls, mesh_a, mesh_b, metric,
                          sample_count=10000, symmetric="true"):
         """
         Compute distance metric between two meshes.
@@ -134,11 +130,7 @@ Chamfer distance measures average nearest-neighbor distance (overall similarity)
             raise ValueError(f"Unknown metric: {metric}")
 
         log.info("Result: %.6f", dist)
-        return {
-            "result": (float(dist), info),
-            "ui": {"text": [info]}
-        }
-
+        return io.NodeOutput(float(dist), info, ui={"text": [info]})
 
 # Node mappings
 NODE_CLASS_MAPPINGS = {

@@ -11,6 +11,7 @@ for visualization in the Preview Mesh (VTK) viewer.
 import logging
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -82,59 +83,42 @@ def _pyvista_to_trimesh(pv_mesh):
     return result
 
 
-class ParaViewFilterNode:
+class ParaViewFilterNode(io.ComfyNode):
     """
     Apply VTK/ParaView analysis filters to meshes using PyVista.
 
     Produces scalar fields for visualization in Preview Mesh (fields mode).
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "filter_type": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackParaViewFilter",
+            display_name="ParaView Filter",
+            category="geompack/paraview",
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("filter_type", options=[
                     "curvature_gaussian",
                     "curvature_mean",
                     "cell_sizes",
                     "elevation",
                     "feature_edges",
                     "warp_by_scalar",
-                ], {"default": "curvature_gaussian"}),
-            },
-            "optional": {
-                "axis": (["X", "Y", "Z"], {
-                    "default": "Z",
-                    "tooltip": "Axis for elevation or warp direction"
-                }),
-                "factor": ("FLOAT", {
-                    "default": 1.0,
-                    "min": -100.0,
-                    "max": 100.0,
-                    "step": 0.1,
-                    "tooltip": "Scale factor for warp_by_scalar"
-                }),
-                "scalar_field": ("STRING", {
-                    "default": "",
-                    "tooltip": "Vertex attribute name for warp_by_scalar"
-                }),
-                "angle": ("FLOAT", {
-                    "default": 30.0,
-                    "min": 0.0,
-                    "max": 180.0,
-                    "step": 1.0,
-                    "tooltip": "Feature edge angle threshold (degrees)"
-                }),
-            },
-        }
+                ], default="curvature_gaussian"),
+                io.Combo.Input("axis", options=["X", "Y", "Z"], default="Z", tooltip="Axis for elevation or warp direction", optional=True),
+                io.Float.Input("factor", default=1.0, min=-100.0, max=100.0, step=0.1, tooltip="Scale factor for warp_by_scalar", optional=True),
+                io.String.Input("scalar_field", default="", tooltip="Vertex attribute name for warp_by_scalar", optional=True),
+                io.Float.Input("angle", default=30.0, min=0.0, max=180.0, step=1.0, tooltip="Feature edge angle threshold (degrees)", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="filtered_mesh"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("filtered_mesh",)
-    FUNCTION = "apply_filter"
-    CATEGORY = "geompack/paraview"
-
-    def apply_filter(self, trimesh, filter_type, axis="Z", factor=1.0, scalar_field="", angle=30.0):
+    @classmethod
+    def execute(cls, trimesh, filter_type, axis="Z", factor=1.0, scalar_field="", angle=30.0):
         """
         Apply a VTK filter via PyVista.
 
@@ -253,7 +237,7 @@ class ParaViewFilterNode:
         if f_attrs:
             log.info("Face attributes: %s", f_attrs)
 
-        return (result,)
+        return io.NodeOutput(result)
 
 
 NODE_CLASS_MAPPINGS = {

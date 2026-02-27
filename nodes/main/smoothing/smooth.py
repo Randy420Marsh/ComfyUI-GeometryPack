@@ -13,9 +13,9 @@ Available backends:
 import logging
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
-
 
 def _pymeshlab_laplacian_smooth(mesh, iterations, cotangent_weight, selected_only):
     """Laplacian smoothing via PyMeshLab."""
@@ -57,7 +57,6 @@ def _pymeshlab_laplacian_smooth(mesh, iterations, cotangent_weight, selected_onl
         process=False,
     )
     return result, ""
-
 
 def _pymeshlab_taubin_smooth(mesh, iterations, lambda_val, mu_val, selected_only):
     """Taubin smoothing via PyMeshLab (shrinkage-free)."""
@@ -102,7 +101,6 @@ def _pymeshlab_taubin_smooth(mesh, iterations, lambda_val, mu_val, selected_only
     )
     return result, ""
 
-
 def _pymeshlab_hc_laplacian_smooth(mesh, selected_only):
     """HC Laplacian smoothing via PyMeshLab (low shrinkage)."""
     try:
@@ -136,7 +134,6 @@ def _pymeshlab_hc_laplacian_smooth(mesh, selected_only):
     )
     return result, ""
 
-
 def _trimesh_laplacian_smooth(mesh, iterations, lamb):
     """Laplacian smoothing via trimesh (uniform weights)."""
     result = mesh.copy()
@@ -148,7 +145,6 @@ def _trimesh_laplacian_smooth(mesh, iterations, lamb):
         return None, "trimesh smoothing module not available."
 
     return result, ""
-
 
 def _trimesh_taubin_smooth(mesh, iterations, lamb, mu):
     """Taubin smoothing via trimesh."""
@@ -162,8 +158,7 @@ def _trimesh_taubin_smooth(mesh, iterations, lamb, mu):
 
     return result, ""
 
-
-class SmoothMeshNode:
+class SmoothMeshNode(io.ComfyNode):
     """
     Smooth Mesh - Various mesh smoothing algorithms.
 
@@ -179,83 +174,56 @@ class SmoothMeshNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "backend": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackSmoothMesh",
+            display_name="Smooth Mesh",
+            category="geompack/smoothing",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("backend", options=[
                     "taubin",
                     "laplacian",
                     "hc_laplacian",
                     "trimesh_laplacian",
                     "trimesh_taubin",
-                ], {
-                    "default": "taubin",
-                    "tooltip": (
+                ], default="taubin", tooltip=(
                         "Smoothing algorithm. "
                         "taubin=shrinkage-free (recommended), "
                         "laplacian=fast but shrinks, "
                         "hc_laplacian=low shrinkage, "
                         "trimesh_*=lightweight alternatives"
-                    ),
-                }),
-            },
-            "optional": {
-                "iterations": ("INT", {
-                    "default": 5,
-                    "min": 1,
-                    "max": 200,
-                    "step": 1,
-                    "tooltip": "Number of smoothing passes. More = smoother but slower.",
-                    "visible_when": {"backend": [
+                    )),
+                io.Int.Input("iterations", default=5, min=1, max=200, step=1, tooltip="Number of smoothing passes. More = smoother but slower.", visible_when={"backend": [
                         "laplacian", "taubin", "trimesh_laplacian", "trimesh_taubin",
-                    ]},
-                }),
-                "lambda_": ("FLOAT", {
-                    "default": 0.5,
-                    "min": 0.01,
-                    "max": 1.0,
-                    "step": 0.01,
-                    "tooltip": (
+                    ]}, optional=True),
+                io.Float.Input("lambda_", default=0.5, min=0.01, max=1.0, step=0.01, tooltip=(
                         "Smoothing strength per step. "
                         "Higher = more aggressive smoothing per iteration."
-                    ),
-                    "visible_when": {"backend": [
+                    ), visible_when={"backend": [
                         "taubin", "trimesh_laplacian", "trimesh_taubin",
-                    ]},
-                }),
-                "mu": ("FLOAT", {
-                    "default": -0.53,
-                    "min": -1.0,
-                    "max": -0.01,
-                    "step": 0.01,
-                    "tooltip": (
+                    ]}, optional=True),
+                io.Float.Input("mu", default=-0.53, min=-1.0, max=-0.01, step=0.01, tooltip=(
                         "Inflation factor (negative). Counteracts shrinkage from lambda. "
                         "Must satisfy |mu| > lambda for stability. "
                         "Typical: -0.53 for lambda=0.5."
-                    ),
-                    "visible_when": {"backend": ["taubin", "trimesh_taubin"]},
-                }),
-                "cotangent_weight": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": (
+                    ), visible_when={"backend": ["taubin", "trimesh_taubin"]}, optional=True),
+                io.Combo.Input("cotangent_weight", options=["true", "false"], default="true", tooltip=(
                         "Use cotangent weights instead of uniform weights. "
                         "Cotangent weights respect mesh geometry better "
                         "but may be unstable on degenerate meshes."
-                    ),
-                    "visible_when": {"backend": ["laplacian"]},
-                }),
-            },
-        }
+                    ), visible_when={"backend": ["laplacian"]}, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="smoothed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("smoothed_mesh", "info")
-    FUNCTION = "smooth"
-    CATEGORY = "geompack/smoothing"
-    OUTPUT_NODE = True
-
-    def smooth(
-        self,
+    @classmethod
+    def execute(
+        cls,
         trimesh,
         backend,
         iterations=5,
@@ -362,8 +330,7 @@ Displacement:
   Average: {avg_disp:.6f}
   Maximum: {max_disp:.6f}
 """
-        return {"ui": {"text": [info]}, "result": (smoothed, info)}
-
+        return io.NodeOutput(smoothed, info, ui={"text": [info]})
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackSmoothMesh": SmoothMeshNode,

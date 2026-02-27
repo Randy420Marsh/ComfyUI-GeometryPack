@@ -9,11 +9,12 @@ import logging
 
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class CombineMeshesBatchNode:
+class CombineMeshesBatchNode(io.ComfyNode):
     """
     Combine Meshes from Batch - Concatenate a list of meshes into one.
 
@@ -25,22 +26,26 @@ class CombineMeshesBatchNode:
 
     INPUT_IS_LIST = True
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "meshes": ("TRIMESH", {"tooltip": "List of meshes to combine"}),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackCombineMeshesBatch",
+            display_name="Combine Meshes (Batch)",
+            category="geompack/combine",
+            description='Combine a batch of meshes into a single mesh.',
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("meshes", tooltip="List of meshes to combine"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="combined_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("combined_mesh", "info")
-    FUNCTION = "combine"
-    CATEGORY = "geompack/combine"
-    OUTPUT_NODE = True
-    DESCRIPTION = "Combine a batch of meshes into a single mesh."
-
-    def combine(self, meshes):
+    @classmethod
+    def execute(cls, meshes):
         """
         Combine a list of meshes into one.
 
@@ -126,7 +131,7 @@ Components remain separate within the combined mesh.
 """
 
         log.info("Result: %d vertices, %d faces", len(result.vertices), len(result.faces))
-        return {"ui": {"text": [info]}, "result": (result, info)}
+        return io.NodeOutput(result, info, ui={"text": [info]})
 
 
 # Node mappings

@@ -24,9 +24,9 @@ try:
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
 except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
+from comfy_api.latest import io
 
-
-class PreviewMeshNode:
+class PreviewMeshNode(io.ComfyNode):
     """
     Preview mesh with interactive 3D viewer.
 
@@ -35,19 +35,19 @@ class PreviewMeshNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPreviewMesh",
+            display_name="Preview Mesh (Three.js)",
+            category="geompack/visualization",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+        )
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "preview_mesh"
-    CATEGORY = "geompack/visualization"
-
-    def preview_mesh(self, trimesh):
+    @classmethod
+    def execute(cls, trimesh):
         """
         Export mesh to GLB and prepare for 3D preview.
 
@@ -86,18 +86,7 @@ class PreviewMeshNode:
         max_extent = max(extents)
 
         # Return metadata for frontend widget
-        return {
-            "ui": {
-                "mesh_file": [filename],
-                "vertex_count": [len(trimesh.vertices)],
-                "face_count": [get_face_count(trimesh)],
-                "bounds_min": [bounds[0].tolist()],
-                "bounds_max": [bounds[1].tolist()],
-                "extents": [extents.tolist()],
-                "max_extent": [float(max_extent)],
-            }
-        }
-
+        return io.NodeOutput(ui={ "mesh_file": [filename], "vertex_count": [len(trimesh.vertices)], "face_count": [get_face_count(trimesh)], "bounds_min": [bounds[0].tolist()], "bounds_max": [bounds[1].tolist()], "extents": [extents.tolist()], "max_extent": [float(max_extent)], })
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackPreviewMesh": PreviewMeshNode,

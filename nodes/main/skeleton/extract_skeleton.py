@@ -9,6 +9,7 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -39,7 +40,7 @@ def normalize_skeleton(vertices: np.ndarray) -> np.ndarray:
     return vertices
 
 
-class ExtractSkeleton:
+class ExtractSkeleton(io.ComfyNode):
     """
     Extract skeleton from 3D mesh using Skeletor library.
 
@@ -47,51 +48,34 @@ class ExtractSkeleton:
     By default, preserves the original mesh scale.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "algorithm": (["wavefront", "vertex_clusters", "edge_collapse", "teasar"],
-                             {"default": "wavefront"}),
-                "fix_mesh": ("BOOLEAN", {"default": True,
-                                        "tooltip": "Fix mesh issues before skeletonization"}),
-                "normalize": ("BOOLEAN", {"default": False,
-                                         "tooltip": "Normalize skeleton to [-1, 1] range (False preserves original mesh scale)"}),
-            },
-            "optional": {
-                # Wavefront parameters
-                "waves": ("INT", {"default": 1, "min": 1, "max": 20,
-                                 "tooltip": "Wavefront: number of waves"}),
-                "step_size": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 20.0,
-                                       "tooltip": "Wavefront: step size (higher = coarser)"}),
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackExtractSkeleton",
+            display_name="Extract Skeleton",
+            category="geompack/skeleton",
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("algorithm", options=["wavefront", "vertex_clusters", "edge_collapse", "teasar"], default="wavefront"),
+                io.Boolean.Input("fix_mesh", default=True, tooltip="Fix mesh issues before skeletonization"),
+                io.Boolean.Input("normalize", default=False, tooltip="Normalize skeleton to [-1, 1] range (False preserves original mesh scale)"),
+                io.Int.Input("waves", default=1, min=1, max=20, tooltip="Wavefront: number of waves", optional=True),
+                io.Float.Input("step_size", default=1.0, min=0.1, max=20.0, tooltip="Wavefront: step size (higher = coarser)", optional=True),
+                io.Float.Input("sampling_dist", default=1.0, min=0.1, max=50.0, tooltip="Vertex clusters: max distance for clustering", optional=True),
+                io.Combo.Input("cluster_pos", options=["median", "center"], default="median", tooltip="Vertex clusters: cluster position method", optional=True),
+                io.Float.Input("shape_weight", default=1.0, min=0.0, max=10.0, tooltip="Edge collapse: shape preservation weight", optional=True),
+                io.Float.Input("sample_weight", default=0.1, min=0.0, max=10.0, tooltip="Edge collapse: sampling quality weight", optional=True),
+                io.Float.Input("inv_dist", default=10.0, min=1.0, max=100.0, tooltip="TEASAR: invalidation distance (lower = more detail)", optional=True),
+                io.Float.Input("min_length", default=0.0, min=0.0, max=100.0, tooltip="TEASAR: minimum branch length to keep", optional=True),
+            ],
+            outputs=[
+                io.Custom("SKELETON").Output(display_name="skeleton"),
+            ],
+        )
 
-                # Vertex clusters parameters
-                "sampling_dist": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 50.0,
-                                           "tooltip": "Vertex clusters: max distance for clustering"}),
-                "cluster_pos": (["median", "center"], {"default": "median",
-                                                       "tooltip": "Vertex clusters: cluster position method"}),
-
-                # Edge collapse parameters
-                "shape_weight": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0,
-                                          "tooltip": "Edge collapse: shape preservation weight"}),
-                "sample_weight": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 10.0,
-                                           "tooltip": "Edge collapse: sampling quality weight"}),
-
-                # TEASAR parameters
-                "inv_dist": ("FLOAT", {"default": 10.0, "min": 1.0, "max": 100.0,
-                                      "tooltip": "TEASAR: invalidation distance (lower = more detail)"}),
-                "min_length": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 100.0,
-                                        "tooltip": "TEASAR: minimum branch length to keep"}),
-            }
-        }
-
-    RETURN_TYPES = ("SKELETON",)
-    RETURN_NAMES = ("skeleton",)
-    FUNCTION = "extract"
-    CATEGORY = "geompack/skeleton"
-
-    def extract(self, trimesh, algorithm, fix_mesh, normalize,
+    @classmethod
+    def execute(cls, trimesh, algorithm, fix_mesh, normalize,
                 waves=1, step_size=1.0,
                 sampling_dist=1.0, cluster_pos="median",
                 shape_weight=1.0, sample_weight=0.1,
@@ -215,7 +199,7 @@ class ExtractSkeleton:
             "normalized": normalize,  # Whether this skeleton was normalized
         }
 
-        return (skeleton,)
+        return io.NodeOutput(skeleton)
 
 
 # Node mappings

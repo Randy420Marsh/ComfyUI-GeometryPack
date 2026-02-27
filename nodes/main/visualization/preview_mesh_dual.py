@@ -31,6 +31,7 @@ try:
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
 except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
+from comfy_api.latest import io
 
 
 def extract_field_names(mesh):
@@ -66,7 +67,7 @@ def get_texture_info(mesh):
     }
 
 
-class PreviewMeshDualNode:
+class PreviewMeshDualNode(io.ComfyNode):
     """
     Unified dual mesh preview with VTK.js - supports both side-by-side and overlay layouts.
 
@@ -74,27 +75,26 @@ class PreviewMeshDualNode:
     Choose between synchronized side-by-side viewports or single overlaid viewport.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh_1": ("TRIMESH",),
-                "mesh_2": ("TRIMESH",),
-            },
-            "optional": {
-                "layout": (["side_by_side", "overlay", "slider"], {"default": "side_by_side"}),
-                "mode": (["fields", "texture"], {"default": "fields"}),
-                "opacity_1": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
-                "opacity_2": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.1}),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPreviewMeshDual",
+            display_name="Preview Mesh Dual",
+            category="geompack/visualization",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh_1"),
+                io.Custom("TRIMESH").Input("mesh_2"),
+                io.Combo.Input("layout", options=["side_by_side", "overlay", "slider"], default="side_by_side", optional=True),
+                io.Combo.Input("mode", options=["fields", "texture"], default="fields", optional=True),
+                io.Float.Input("opacity_1", default=1.0, min=0.0, max=1.0, step=0.1, optional=True),
+                io.Float.Input("opacity_2", default=1.0, min=0.0, max=1.0, step=0.1, optional=True),
+            ],
+        )
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "preview_dual"
-    CATEGORY = "geompack/visualization"
-
-    def preview_dual(self, mesh_1, mesh_2, layout="side_by_side", mode="fields", opacity_1=1.0, opacity_2=1.0):
+    @classmethod
+    def execute(cls, mesh_1, mesh_2, layout="side_by_side", mode="fields", opacity_1=1.0, opacity_2=1.0):
         """
         Preview two meshes with chosen layout and visualization mode.
 
@@ -142,12 +142,12 @@ class PreviewMeshDualNode:
             # Export meshes separately based on mode
             if mode == "texture":
                 # Texture mode: export as GLB
-                filename_1, filepath_1 = self._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", use_vtp=False, use_glb=True)
-                filename_2, filepath_2 = self._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", use_vtp=False, use_glb=True)
+                filename_1, filepath_1 = cls._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", use_vtp=False, use_glb=True)
+                filename_2, filepath_2 = cls._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", use_vtp=False, use_glb=True)
             else:
                 # Fields mode: use VTP for fields OR point clouds
-                filename_1, filepath_1 = self._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", use_vtp=(mesh_1_has_fields or mesh_1_is_pc), use_glb=False)
-                filename_2, filepath_2 = self._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", use_vtp=(mesh_2_has_fields or mesh_2_is_pc), use_glb=False)
+                filename_1, filepath_1 = cls._export_mesh(mesh_1, f"preview_dual_1_{preview_id}", use_vtp=(mesh_1_has_fields or mesh_1_is_pc), use_glb=False)
+                filename_2, filepath_2 = cls._export_mesh(mesh_2, f"preview_dual_2_{preview_id}", use_vtp=(mesh_2_has_fields or mesh_2_is_pc), use_glb=False)
 
             # Compute bounds from vertices (works for both meshes and point clouds)
             bounds_1 = np.array([mesh_1.vertices.min(axis=0), mesh_1.vertices.max(axis=0)])
@@ -203,13 +203,13 @@ class PreviewMeshDualNode:
             # Combine meshes with color coding
             if mode == "texture":
                 # Texture mode: export combined mesh as GLB
-                filename, filepath = self._export_combined_mesh(
+                filename, filepath = cls._export_combined_mesh(
                     mesh_1, mesh_2, preview_id, opacity_1, opacity_2,
                     mesh_1_has_fields, mesh_2_has_fields, use_glb=True
                 )
             else:
                 # Fields mode: export combined mesh as VTP
-                filename, filepath = self._export_combined_mesh(
+                filename, filepath = cls._export_combined_mesh(
                     mesh_1, mesh_2, preview_id, opacity_1, opacity_2,
                     mesh_1_has_fields, mesh_2_has_fields, use_glb=False
                 )
@@ -264,9 +264,10 @@ class PreviewMeshDualNode:
                 })
 
         log.info("Preview ready")
-        return {"ui": ui_data}
+        return io.NodeOutput(ui=ui_data)
 
-    def _export_mesh(self, mesh, base_filename, use_vtp, use_glb):
+    @staticmethod
+    def _export_mesh(mesh, base_filename, use_vtp, use_glb):
         """Export a single mesh to appropriate format."""
         if use_glb:
             filename = f"{base_filename}.glb"
@@ -300,7 +301,8 @@ class PreviewMeshDualNode:
 
         return filename, filepath
 
-    def _export_combined_mesh(self, mesh_1, mesh_2, preview_id, opacity_1, opacity_2,
+    @staticmethod
+    def _export_combined_mesh(mesh_1, mesh_2, preview_id, opacity_1, opacity_2,
                               mesh_1_has_fields, mesh_2_has_fields, use_glb):
         """Export combined mesh for overlay mode as VTP or GLB.
 

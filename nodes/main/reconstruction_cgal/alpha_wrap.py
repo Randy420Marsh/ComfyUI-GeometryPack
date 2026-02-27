@@ -11,11 +11,12 @@ Useful for point clouds, non-manifold meshes, or polygon soups.
 import logging
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class AlphaWrapNode:
+class AlphaWrapNode(io.ComfyNode):
     """
     Alpha Wrap - Generate a watertight shrink-wrapped mesh.
 
@@ -35,37 +36,27 @@ class AlphaWrapNode:
               Relative to bounding box diagonal.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "input_mesh": ("TRIMESH",),
-            },
-            "optional": {
-                "alpha_percent": ("FLOAT", {
-                    "default": 0.04,
-                    "min": 0.001,
-                    "max": 50.0,
-                    "step": 0.01,
-                    "tooltip": "Wrap tightness as % of bounding box diagonal. Smaller = tighter wrap with more detail, but slower."
-                }),
-                "offset_percent": ("FLOAT", {
-                    "default": 1.1,
-                    "min": 0.01,
-                    "max": 10.0,
-                    "step": 0.01,
-                    "tooltip": "Surface offset as % of bounding box diagonal. Smaller = closer to original surface."
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackAlphaWrap",
+            display_name="Alpha Wrap (Shrink Wrap)",
+            category="geompack/reconstruction",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("input_mesh"),
+                io.Float.Input("alpha_percent", default=0.04, min=0.001, max=50.0, step=0.01, tooltip="Wrap tightness as % of bounding box diagonal. Smaller = tighter wrap with more detail, but slower.", optional=True),
+                io.Float.Input("offset_percent", default=1.1, min=0.01, max=10.0, step=0.01, tooltip="Surface offset as % of bounding box diagonal. Smaller = closer to original surface.", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="wrapped_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("wrapped_mesh", "info")
-    FUNCTION = "alpha_wrap"
-    CATEGORY = "geompack/reconstruction"
-    OUTPUT_NODE = True
-
-    def alpha_wrap(self, input_mesh, alpha_percent=0.04, offset_percent=1.1):
+    @classmethod
+    def execute(cls, input_mesh, alpha_percent=0.04, offset_percent=1.1):
         """
         Generate alpha-wrapped mesh.
 
@@ -199,7 +190,7 @@ Tips:
   - Lower values = slower computation
 """
 
-        return {"ui": {"text": [report]}, "result": (result_mesh, report)}
+        return io.NodeOutput(result_mesh, report, ui={"text": [report]})
 
 
 NODE_CLASS_MAPPINGS = {

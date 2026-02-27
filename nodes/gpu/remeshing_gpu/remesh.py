@@ -11,6 +11,7 @@ from typing import Tuple, Optional
 
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -111,7 +112,7 @@ def cumesh_dc_remesh(
         return None, f"Error during CuMesh remesh: {str(e)}"
 
 
-class RemeshGPUNode:
+class RemeshGPUNode(io.ComfyNode):
     """
     Remesh GPU - GPU-accelerated dual-contouring remeshing using CuMesh.
 
@@ -119,37 +120,27 @@ class RemeshGPUNode:
     Requires CUDA-capable GPU, torch, and cumesh package.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-            "optional": {
-                "target_face_count": ("INT", {
-                    "default": 500000,
-                    "min": 1000,
-                    "max": 5000000,
-                    "step": 1000,
-                    "tooltip": "Target number of output faces after simplification.",
-                }),
-                "remesh_band": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 5.0,
-                    "step": 0.1,
-                    "tooltip": "Band width for dual-contouring. Affects surface detail capture. Higher = smoother but may lose fine details.",
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackRemeshGPU",
+            display_name="Remesh GPU",
+            category="geompack/remeshing",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Int.Input("target_face_count", default=500000, min=1000, max=5000000, step=1000, tooltip="Target number of output faces after simplification.", optional=True),
+                io.Float.Input("remesh_band", default=1.0, min=0.1, max=5.0, step=0.1, tooltip="Band width for dual-contouring. Affects surface detail capture. Higher = smoother but may lose fine details.", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="remeshed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("remeshed_mesh", "info")
-    FUNCTION = "remesh"
-    CATEGORY = "geompack/remeshing"
-    OUTPUT_NODE = True
-
-    def remesh(self, trimesh, target_face_count=500000, remesh_band=1.0):
+    @classmethod
+    def execute(cls, trimesh, target_face_count=500000, remesh_band=1.0):
         """Apply GPU-accelerated CuMesh remeshing."""
         import torch
         import cumesh as CuMesh
@@ -233,7 +224,7 @@ After Simplify: {len(remeshed_mesh.faces):,} faces
 
 GPU-accelerated dual contouring (same algorithm as TRELLIS2).
 """
-        return {"ui": {"text": [info]}, "result": (remeshed_mesh, info)}
+        return io.NodeOutput(remeshed_mesh, info, ui={"text": [info]})
 
 
 NODE_CLASS_MAPPINGS = {

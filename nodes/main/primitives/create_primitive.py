@@ -8,6 +8,7 @@ Create Primitive Node - Create basic geometric shapes
 import logging
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -57,42 +58,31 @@ def _create_plane(size: float = 1.0, subdivisions: int = 1) -> trimesh.Trimesh:
     return mesh
 
 
-class CreatePrimitive:
+class CreatePrimitive(io.ComfyNode):
     """
     Create primitive geometry (cube, sphere, plane)
     Uses trimesh creation functions for high-quality primitives.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "shape": (["cube", "sphere", "plane"], {
-                    "default": "cube"
-                }),
-                "size": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.01,
-                    "max": 100.0,
-                    "step": 0.1
-                }),
-            },
-            "optional": {
-                "subdivisions": ("INT", {
-                    "default": 2,
-                    "min": 0,
-                    "max": 5,
-                    "step": 1
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackCreatePrimitive",
+            display_name="Create Primitive",
+            category="geompack/primitives",
+            inputs=[
+                io.Combo.Input("shape", options=["cube", "sphere", "plane"], default="cube"),
+                io.Float.Input("size", default=1.0, min=0.01, max=100.0, step=0.1),
+                io.Int.Input("subdivisions", default=2, min=0, max=5, step=1, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("mesh",)
-    FUNCTION = "create_primitive"
-    CATEGORY = "geompack/primitives"
-
-    def create_primitive(self, shape, size, subdivisions=2):
+    @classmethod
+    def execute(cls, shape, size, subdivisions=2):
         """
         Create a primitive mesh.
 
@@ -115,7 +105,7 @@ class CreatePrimitive:
 
         log.info("Created %s: %d vertices, %d faces", shape, len(mesh.vertices), len(mesh.faces))
 
-        return (mesh,)
+        return io.NodeOutput(mesh)
 
 
 # Node mappings

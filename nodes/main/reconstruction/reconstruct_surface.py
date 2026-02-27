@@ -8,11 +8,11 @@ Surface Reconstruction Node - Point cloud to mesh conversion
 import logging
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
-
-class ReconstructSurfaceNode:
+class ReconstructSurfaceNode(io.ComfyNode):
     """
     Reconstruct Surface - Convert point cloud to mesh.
 
@@ -30,64 +30,36 @@ class ReconstructSurfaceNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "points": ("TRIMESH",),  # Accepts TRIMESH (including point clouds as TRIMESH)
-                "method": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackReconstructSurface",
+            display_name="Reconstruct Surface",
+            category="geompack/reconstruction",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("points"),
+                io.Combo.Input("method", options=[
                     "poisson",
                     "ball_pivoting",
                     "alpha_shape",
                     "convex_hull",
                     "delaunay_2d"
-                ], {"default": "poisson"}),
-            },
-            "optional": {
-                # Poisson parameters
-                "poisson_depth": ("INT", {
-                    "default": 8,
-                    "min": 1,
-                    "max": 12,
-                    "step": 1
-                }),
-                "poisson_scale": ("FLOAT", {
-                    "default": 1.1,
-                    "min": 1.0,
-                    "max": 2.0,
-                    "step": 0.1
-                }),
-                # Ball pivoting parameters
-                "ball_radius": ("FLOAT", {
-                    "default": 0.0,  # 0 = auto
-                    "min": 0.0,
-                    "max": 100.0,
-                    "step": 0.01
-                }),
-                # Alpha shape parameters
-                "alpha": ("FLOAT", {
-                    "default": 0.0,  # 0 = auto
-                    "min": 0.0,
-                    "max": 100.0,
-                    "step": 0.01
-                }),
-                # General
-                "estimate_normals": (["true", "false"], {"default": "true"}),
-                "normal_radius": ("FLOAT", {
-                    "default": 0.1,
-                    "min": 0.001,
-                    "max": 10.0,
-                    "step": 0.01
-                }),
-            }
-        }
+                ], default="poisson"),
+                io.Int.Input("poisson_depth", default=8, min=1, max=12, step=1, optional=True),
+                io.Float.Input("poisson_scale", default=1.1, min=1.0, max=2.0, step=0.1, optional=True),
+                io.Float.Input("ball_radius", default=0.0, min=0.0, max=100.0, step=0.01, optional=True),
+                io.Float.Input("alpha", default=0.0, min=0.0, max=100.0, step=0.01, optional=True),
+                io.Combo.Input("estimate_normals", options=["true", "false"], default="true", optional=True),
+                io.Float.Input("normal_radius", default=0.1, min=0.001, max=10.0, step=0.01, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="reconstructed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("reconstructed_mesh", "info")
-    OUTPUT_NODE = True
-    FUNCTION = "reconstruct"
-    CATEGORY = "geompack/reconstruction"
-
-    def reconstruct(self, points, method,
+    @classmethod
+    def execute(cls, points, method,
                     poisson_depth=8, poisson_scale=1.1,
                     ball_radius=0.0, alpha=0.0,
                     estimate_normals="true", normal_radius=0.1):
@@ -127,17 +99,17 @@ class ReconstructSurfaceNode:
         log.info("Method: %s", method)
 
         if method == "poisson":
-            result, info = self._poisson(vertices, normals, poisson_depth, poisson_scale,
+            result, info = cls._poisson(vertices, normals, poisson_depth, poisson_scale,
                                          estimate_normals == "true", normal_radius)
         elif method == "ball_pivoting":
-            result, info = self._ball_pivoting(vertices, normals, ball_radius,
+            result, info = cls._ball_pivoting(vertices, normals, ball_radius,
                                                estimate_normals == "true", normal_radius)
         elif method == "alpha_shape":
-            result, info = self._alpha_shape(vertices, alpha)
+            result, info = cls._alpha_shape(vertices, alpha)
         elif method == "convex_hull":
-            result, info = self._convex_hull(vertices)
+            result, info = cls._convex_hull(vertices)
         elif method == "delaunay_2d":
-            result, info = self._delaunay_2d(vertices)
+            result, info = cls._delaunay_2d(vertices)
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -157,12 +129,10 @@ class ReconstructSurfaceNode:
         }
 
         log.info("Output: %d vertices, %d faces", len(result.vertices), len(result.faces))
-        return {
-            "result": (result, info),
-            "ui": {"text": [info]}
-        }
+        return io.NodeOutput(result, info, ui={"text": [info]})
 
-    def _poisson(self, vertices, normals, depth, scale, estimate_normals, normal_radius):
+    @staticmethod
+    def _poisson(vertices, normals, depth, scale, estimate_normals, normal_radius):
         """Poisson surface reconstruction using Open3D or PyMeshLab."""
         # Try Open3D first
         try:
@@ -174,7 +144,6 @@ class ReconstructSurfaceNode:
             # Create point cloud
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(vertices)
-
 
             # Estimate normals if needed
             log.info("Step 2/5: Estimating normals...")
@@ -189,13 +158,11 @@ class ReconstructSurfaceNode:
             else:
                 pcd.normals = o3d.utility.Vector3dVector(normals)
 
-
             # Poisson reconstruction
             log.info("Step 4/5: Running Poisson reconstruction (depth=%d)... This may take a while.", depth)
             mesh_o3d, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
                 pcd, depth=depth, scale=scale, linear_fit=False
             )
-
 
             # Remove low density vertices (noise)
             log.info("Step 5/5: Cleaning up mesh...")
@@ -204,14 +171,12 @@ class ReconstructSurfaceNode:
             vertices_to_remove = densities < density_threshold
             mesh_o3d.remove_vertices_by_mask(vertices_to_remove)
 
-
             # Convert to trimesh
             result = trimesh_module.Trimesh(
                 vertices=np.asarray(mesh_o3d.vertices),
                 faces=np.asarray(mesh_o3d.triangles),
                 process=False
             )
-
 
             log.info("Done! Output: %s vertices, %s faces", f"{len(result.vertices):,}", f"{len(result.faces):,}")
 
@@ -291,7 +256,8 @@ Watertight: {result.is_watertight}
                 "Install with: pip install open3d  or  pip install pymeshlab"
             )
 
-    def _ball_pivoting(self, vertices, normals, ball_radius, estimate_normals, normal_radius):
+    @staticmethod
+    def _ball_pivoting(vertices, normals, ball_radius, estimate_normals, normal_radius):
         """Ball pivoting algorithm using PyMeshLab."""
         try:
             import pymeshlab
@@ -350,7 +316,8 @@ Ball pivoting preserves fine details but may have holes.
                 "Install with: pip install pymeshlab"
             )
 
-    def _alpha_shape(self, vertices, alpha_value):
+    @staticmethod
+    def _alpha_shape(vertices, alpha_value):
         """Alpha shape reconstruction."""
         log.info("Computing alpha shape...")
 
@@ -416,7 +383,8 @@ Alpha shapes capture the overall shape with controllable detail level.
         except ImportError:
             raise ImportError("Alpha shape requires scipy. Install with: pip install scipy")
 
-    def _convex_hull(self, vertices):
+    @staticmethod
+    def _convex_hull(vertices):
         """Simple convex hull reconstruction."""
         log.info("Computing convex hull...")
 
@@ -436,7 +404,8 @@ Convex hull is fast but loses all concave features.
 """
         return result, info
 
-    def _delaunay_2d(self, vertices):
+    @staticmethod
+    def _delaunay_2d(vertices):
         """2D Delaunay triangulation (for height fields)."""
         log.info("Computing 2D Delaunay triangulation...")
 
@@ -467,7 +436,6 @@ Best for height fields and terrain data.
 
         except ImportError:
             raise ImportError("2D Delaunay requires scipy. Install with: pip install scipy")
-
 
 # Node mappings
 NODE_CLASS_MAPPINGS = {

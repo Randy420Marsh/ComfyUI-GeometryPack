@@ -20,6 +20,7 @@ try:
 except (ImportError, AttributeError):
     # Fallback if folder_paths not available (e.g., during testing)
     COMFYUI_INPUT_FOLDER = None
+from comfy_api.latest import io
 
 
 def _bpy_import_blend(blend_path):
@@ -73,32 +74,32 @@ def _bpy_import_blend(blend_path):
     }
 
 
-class LoadMeshBlend:
+class LoadMeshBlend(io.ComfyNode):
     """
     Load Blender .blend files using bpy.
 
     Uses the bpy Python module to directly extract mesh data from .blend files.
     """
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        # Get list of .blend files only
-        blend_files = cls.get_blend_files()
 
+    @classmethod
+    def define_schema(cls):
+        blend_files = cls.get_blend_files()
         if not blend_files:
             blend_files = ["No .blend files found in input/3d or input folders"]
-
-        return {
-            "required": {
-                "file_path": (blend_files, ),
-            },
-        }
-
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("mesh", "info")
-    FUNCTION = "load_blend"
-    CATEGORY = "geompack/io"
-    OUTPUT_NODE = True
+        return io.Schema(
+            node_id="GeomPackLoadMeshBlend",
+            display_name="Load Mesh (Blender)",
+            category="geompack/io",
+            is_output_node=True,
+            inputs=[
+                io.Combo.Input("file_path", options=blend_files),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
     @classmethod
     def get_blend_files(cls):
@@ -122,7 +123,7 @@ class LoadMeshBlend:
         return sorted(blend_files)
 
     @classmethod
-    def IS_CHANGED(cls, file_path):
+    def fingerprint_inputs(cls, file_path):
         """Force re-execution when file changes."""
         if COMFYUI_INPUT_FOLDER is not None:
             # Check file modification time
@@ -140,7 +141,8 @@ class LoadMeshBlend:
 
         return file_path
 
-    def load_blend(self, file_path):
+    @classmethod
+    def execute(cls, file_path):
         """
         Load .blend file using bpy.
 
@@ -217,7 +219,7 @@ class LoadMeshBlend:
 
         log.info("Loaded: %d vertices, %d faces", len(loaded_mesh.vertices), len(loaded_mesh.faces))
 
-        return {"ui": {"text": [info]}, "result": (loaded_mesh, info)}
+        return io.NodeOutput(loaded_mesh, info, ui={"text": [info]})
 
 
 # Node mappings

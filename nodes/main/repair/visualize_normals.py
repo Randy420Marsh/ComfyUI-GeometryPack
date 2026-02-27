@@ -9,11 +9,12 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class VisualizNormalFieldNode:
+class VisualizNormalFieldNode(io.ComfyNode):
     """
     Create normal field visualization for VTK viewer.
 
@@ -22,21 +23,25 @@ class VisualizNormalFieldNode:
     normal orientation issues or understanding surface geometry.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackVisualizeNormalField",
+            display_name="Visualize Normal Field",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh_with_fields"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("mesh_with_fields", "info")
-    FUNCTION = "visualize_normals"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def visualize_normals(self, trimesh):
+    @classmethod
+    def execute(cls, trimesh):
         """
         Add normal components as vertex scalar fields.
 
@@ -81,7 +86,7 @@ Expected Values:
 
         log.info("Added 4 scalar fields to mesh")
 
-        return {"ui": {"text": [info]}, "result": (result_mesh, info)}
+        return io.NodeOutput(result_mesh, info, ui={"text": [info]})
 
 
 NODE_CLASS_MAPPINGS = {

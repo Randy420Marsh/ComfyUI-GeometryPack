@@ -9,11 +9,12 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class MeshToPointCloudNode:
+class MeshToPointCloudNode(io.ComfyNode):
     """
     Convert mesh to point cloud by sampling surface points.
 
@@ -21,40 +22,27 @@ class MeshToPointCloudNode:
     Can optionally include normals and colors.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "mode": (["strip_adjacency", "surface_sampling"], {
-                    "default": "strip_adjacency",
-                    "tooltip": "strip_adjacency: use mesh vertices directly. surface_sampling: sample points from surface."
-                }),
-            },
-            "optional": {
-                "sample_count": ("INT", {
-                    "default": 10000,
-                    "min": 100,
-                    "max": 10000000,
-                    "step": 100,
-                    "tooltip": "Number of points to sample (only for surface_sampling mode)"
-                }),
-                "sampling_method": (["uniform", "even", "face_weighted"], {
-                    "default": "uniform",
-                    "tooltip": "Sampling strategy (only for surface_sampling mode)"
-                }),
-                "include_normals": (["true", "false"], {
-                    "default": "true"
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackMeshToPointCloud",
+            display_name="Mesh to Point Cloud",
+            category="geompack/conversion",
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("mode", options=["strip_adjacency", "surface_sampling"], default="strip_adjacency", tooltip="strip_adjacency: use mesh vertices directly. surface_sampling: sample points from surface."),
+                io.Int.Input("sample_count", default=10000, min=100, max=10000000, step=100, tooltip="Number of points to sample (only for surface_sampling mode)", optional=True),
+                io.Combo.Input("sampling_method", options=["uniform", "even", "face_weighted"], default="uniform", tooltip="Sampling strategy (only for surface_sampling mode)", optional=True),
+                io.Combo.Input("include_normals", options=["true", "false"], default="true", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="point_cloud"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)  # Changed from POINT_CLOUD to TRIMESH for compatibility
-    RETURN_NAMES = ("point_cloud",)
-    FUNCTION = "mesh_to_pointcloud"
-    CATEGORY = "geompack/conversion"
-
-    def mesh_to_pointcloud(self, trimesh, mode, sample_count=10000, sampling_method="uniform", include_normals="true"):
+    @classmethod
+    def execute(cls, trimesh, mode, sample_count=10000, sampling_method="uniform", include_normals="true"):
         """
         Convert mesh to point cloud.
 
@@ -130,7 +118,7 @@ class MeshToPointCloudNode:
 
         log.info("Generated point cloud with %s points", f"{len(points):,}")
 
-        return (point_cloud,)
+        return io.NodeOutput(point_cloud)
 
 
 # Node mappings

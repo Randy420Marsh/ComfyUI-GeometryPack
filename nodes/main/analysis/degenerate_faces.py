@@ -15,11 +15,11 @@ import logging
 import os
 
 import numpy as np
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
-
-class DegenerateFacesNode:
+class DegenerateFacesNode(io.ComfyNode):
     """
     Detect degenerate faces and show smallest faces by area.
 
@@ -33,21 +33,24 @@ class DegenerateFacesNode:
     INPUT_IS_LIST = True
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackDegenerateFaces",
+            display_name="Degenerate Faces",
+            category="geompack/analysis",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="trimesh"),
+                io.String.Output(display_name="info"),
+            ],
+            output_is_list=(True, False),
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("trimesh", "info")
-    OUTPUT_IS_LIST = (True, False)
-    OUTPUT_NODE = True
-    FUNCTION = "find_degenerate_faces"
-    CATEGORY = "geompack/analysis"
-
-    def find_degenerate_faces(self, trimesh):
+    @classmethod
+    def execute(cls, trimesh):
         """
         Find truly degenerate faces and smallest faces by area.
 
@@ -187,14 +190,7 @@ class DegenerateFacesNode:
 
         log.info("Processed %d mesh(es)", len(meshes))
 
-        return {
-            "result": (result_meshes, summary),
-            "ui": {
-                "text": [summary],
-                "degenerate_data": ui_data
-            }
-        }
-
+        return io.NodeOutput(result_meshes, summary, ui={ "text": [summary], "degenerate_data": ui_data })
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackDegenerateFaces": DegenerateFacesNode,

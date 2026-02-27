@@ -7,7 +7,7 @@ Mesh Info Node - Display detailed mesh information
 
 import numpy as np
 import trimesh
-
+from comfy_api.latest import io
 
 def _extract_visual_info(mesh: trimesh.Trimesh) -> dict:
     info = {
@@ -69,7 +69,6 @@ def _extract_visual_info(mesh: trimesh.Trimesh) -> dict:
 
     return info
 
-
 def _extract_pbr_properties(material) -> dict:
     props = {
         'has_base_color_texture': False,
@@ -116,7 +115,6 @@ def _extract_pbr_properties(material) -> dict:
 
     return props
 
-
 def _extract_custom_attributes(mesh: trimesh.Trimesh) -> dict:
     attrs = {
         'vertex_attributes': {},
@@ -148,7 +146,6 @@ def _extract_custom_attributes(mesh: trimesh.Trimesh) -> dict:
             attrs['face_attributes'][name] = attr_info
 
     return attrs
-
 
 def _compute_mesh_info(mesh: trimesh.Trimesh) -> str:
     if not isinstance(mesh, trimesh.Trimesh):
@@ -270,32 +267,31 @@ def _compute_mesh_info(mesh: trimesh.Trimesh) -> str:
 
     return info
 
-
-class MeshInfoNode:
+class MeshInfoNode(io.ComfyNode):
     """
     Display detailed mesh information and statistics.
     Now using trimesh for enhanced mesh analysis.
     """
 
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("info",)
-    OUTPUT_NODE = True
-    FUNCTION = "get_mesh_info"
-    CATEGORY = "geompack/analysis"
     INPUT_IS_LIST = True
 
-    def get_mesh_info(self, trimesh):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackMeshInfo",
+            display_name="Mesh Info",
+            category="geompack/analysis",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+            outputs=[
+                io.String.Output(display_name="info"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, trimesh):
         """
         Get information about the trimesh(es).
 
@@ -315,11 +311,7 @@ class MeshInfoNode:
         # Join all info with separators
         combined_info = "\n\n".join(all_info)
 
-        return {
-            "result": (combined_info,),
-            "ui": {"text": [combined_info]}
-        }
-
+        return io.NodeOutput(combined_info, ui={"text": [combined_info]})
 
 # Node mappings
 NODE_CLASS_MAPPINGS = {

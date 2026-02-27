@@ -9,6 +9,7 @@ import logging
 
 import trimesh
 import numpy as np
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -33,8 +34,7 @@ try:
 except ImportError:
     HAS_IGL = False
 
-
-class FillHolesNode:
+class FillHolesNode(io.ComfyNode):
     """
     Fill holes in mesh by adding new faces.
 
@@ -44,39 +44,26 @@ class FillHolesNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh": ("TRIMESH",),
-                "method": (["cumesh", "trimesh", "pymeshlab", "igl_fan"], {"default": "cumesh"}),
-            },
-            "optional": {
-                # CuMesh parameter (same as TRELLIS2 fill_holes_perimeter)
-                "perimeter": ("FLOAT", {
-                    "default": 0.03,
-                    "min": 0.001,
-                    "max": 1.0,
-                    "step": 0.001,
-                    "visible_when": {"method": ["cumesh"]},
-                }),
-                # PyMeshLab parameter
-                "maxholesize": ("INT", {
-                    "default": 1000,
-                    "min": 1,
-                    "max": 100000,
-                    "step": 100,
-                    "visible_when": {"method": ["pymeshlab"]},
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackFillHoles",
+            display_name="Fill Holes",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh"),
+                io.Combo.Input("method", options=["cumesh", "trimesh", "pymeshlab", "igl_fan"], default="cumesh"),
+                io.Float.Input("perimeter", default=0.03, min=0.001, max=1.0, step=0.001, visible_when={"method": ["cumesh"]}, optional=True),
+                io.Int.Input("maxholesize", default=1000, min=1, max=100000, step=100, visible_when={"method": ["pymeshlab"]}, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="filled_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("filled_mesh", "info")
-    OUTPUT_NODE = True
-    FUNCTION = "fill_holes"
-    CATEGORY = "geompack/repair"
-
-    def fill_holes(self, mesh, method="cumesh", perimeter=0.03, maxholesize=1000):
+    @classmethod
+    def execute(cls, mesh, method="cumesh", perimeter=0.03, maxholesize=1000):
         """
         Fill holes in the mesh.
 
@@ -261,11 +248,7 @@ After Filling:
 
         log.info("Added %d faces, Watertight: %s -> %s", added_faces, was_watertight, is_watertight)
 
-        return {
-            "result": (filled_mesh, info),
-            "ui": {"text": [info]}
-        }
-
+        return io.NodeOutput(filled_mesh, info, ui={"text": [info]})
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackFillHoles": FillHolesNode,

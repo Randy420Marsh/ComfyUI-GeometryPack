@@ -17,6 +17,7 @@ try:
     HAS_IGL = True
 except ImportError:
     HAS_IGL = False
+from comfy_api.latest import io
 
 
 def _orient_outward_winding(V, F, face_normals):
@@ -145,7 +146,7 @@ def _orient_outward_signed_dist(V, F, face_normals):
     return F_out, flip_mask, np.sum(flip_mask)
 
 
-class FixNormalsNode:
+class FixNormalsNode(io.ComfyNode):
     """
     Fix inconsistent normal orientations.
 
@@ -154,28 +155,26 @@ class FixNormalsNode:
     Essential for proper rendering and boolean operations.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        # Methods:
-        # - trimesh: Basic trimesh fix_normals
-        # - igl_bfs: BFS-based consistent orientation (best for thin/open surfaces)
-        # - igl_winding: Fast winding number (best for closed volumes)
-        # - igl_raycast: Ray-mesh intersection odd/even test (closed volumes)
-        # - igl_signed_dist: Signed distance pseudonormal (closed volumes)
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "method": (["trimesh", "igl_bfs", "igl_winding", "igl_raycast", "igl_signed_dist"], {"default": "trimesh"}),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackFixNormals",
+            display_name="Fix Normals",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("method", options=["trimesh", "igl_bfs", "igl_winding", "igl_raycast", "igl_signed_dist"], default="trimesh"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="fixed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("fixed_mesh", "info")
-    FUNCTION = "fix_normals"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def fix_normals(self, trimesh, method="trimesh"):
+    @classmethod
+    def execute(cls, trimesh, method="trimesh"):
         """
         Fix inconsistent face normal orientations.
 
@@ -300,7 +299,7 @@ Faces: {len(fixed_mesh.faces):,}
 
         log.info("Normal orientation: %s -> %s", was_consistent, is_consistent)
 
-        return {"ui": {"text": [info]}, "result": (fixed_mesh, info)}
+        return io.NodeOutput(fixed_mesh, info, ui={"text": [info]})
 
 
 # Node mappings

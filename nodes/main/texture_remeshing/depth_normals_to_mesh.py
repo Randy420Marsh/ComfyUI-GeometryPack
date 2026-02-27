@@ -10,6 +10,7 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -23,7 +24,7 @@ def _to_numpy(x):
     return np.array(x)
 
 
-class DepthNormalsToMeshNode:
+class DepthNormalsToMeshNode(io.ComfyNode):
     """
     Depth + Normals to Mesh - Convert depth map and normal map to smooth 3D mesh.
 
@@ -37,72 +38,38 @@ class DepthNormalsToMeshNode:
     Designed for CAD raytracing workflows where depth and normals are available.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "normal_map": ("IMAGE",),
-                "resolution": ("INT", {
-                    "default": 512,
-                    "min": 64,
-                    "max": 2048,
-                    "step": 64,
-                    "tooltip": "Resolution for point cloud sampling (higher = more detail, slower)"
-                }),
-                "depth_scale": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.01,
-                    "max": 10.0,
-                    "step": 0.1,
-                    "tooltip": "Scale factor for depth values"
-                }),
-            },
-            "optional": {
-                "depth": ("MASK",),
-                "depth_image": ("IMAGE",),
-                "method": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackDepthNormalsToMesh",
+            display_name="Depth + Normals to Mesh",
+            category="geompack/texture_remeshing",
+            is_output_node=True,
+            inputs=[
+                io.Image.Input("normal_map"),
+                io.Int.Input("resolution", default=512, min=64, max=2048, step=64, tooltip="Resolution for point cloud sampling (higher = more detail, slower)"),
+                io.Float.Input("depth_scale", default=1.0, min=0.01, max=10.0, step=0.1, tooltip="Scale factor for depth values"),
+                io.Mask.Input("depth", optional=True),
+                io.Image.Input("depth_image", optional=True),
+                io.Combo.Input("method", options=[
                     "poisson",
                     "ball_pivoting",
-                ], {"default": "poisson"}),
-                "poisson_depth": ("INT", {
-                    "default": 8,
-                    "min": 4,
-                    "max": 12,
-                    "step": 1,
-                    "tooltip": "Octree depth for Poisson reconstruction (higher = more detail)"
-                }),
-                "poisson_scale": ("FLOAT", {
-                    "default": 1.1,
-                    "min": 1.0,
-                    "max": 2.0,
-                    "step": 0.1,
-                    "tooltip": "Scale factor for Poisson bounding box"
-                }),
-                "skip_background": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Skip pixels with depth below threshold (background removal)"
-                }),
-                "background_threshold": ("FLOAT", {
-                    "default": 0.01,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.01,
-                    "tooltip": "Depth threshold for background pixels"
-                }),
-                "invert_depth": (["false", "true"], {
-                    "default": "false",
-                    "tooltip": "Invert depth values (for depth maps where white = far)"
-                }),
-            }
-        }
+                ], default="poisson", optional=True),
+                io.Int.Input("poisson_depth", default=8, min=4, max=12, step=1, tooltip="Octree depth for Poisson reconstruction (higher = more detail)", optional=True),
+                io.Float.Input("poisson_scale", default=1.1, min=1.0, max=2.0, step=0.1, tooltip="Scale factor for Poisson bounding box", optional=True),
+                io.Combo.Input("skip_background", options=["true", "false"], default="true", tooltip="Skip pixels with depth below threshold (background removal)", optional=True),
+                io.Float.Input("background_threshold", default=0.01, min=0.0, max=1.0, step=0.01, tooltip="Depth threshold for background pixels", optional=True),
+                io.Combo.Input("invert_depth", options=["false", "true"], default="false", tooltip="Invert depth values (for depth maps where white = far)", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("mesh", "info")
-    FUNCTION = "depth_normals_to_mesh"
-    CATEGORY = "geompack/texture_remeshing"
-    OUTPUT_NODE = True
-
-    def depth_normals_to_mesh(self, normal_map, resolution, depth_scale,
+    @classmethod
+    def execute(cls, normal_map, resolution, depth_scale,
                                depth=None, depth_image=None,
                                method="poisson", poisson_depth=8, poisson_scale=1.1,
                                skip_background="true", background_threshold=0.01,
@@ -240,9 +207,9 @@ class DepthNormalsToMeshNode:
 
         # Reconstruct surface
         if method == "poisson":
-            mesh, method_info = self._poisson_reconstruct(points, normals, poisson_depth, poisson_scale)
+            mesh, method_info = cls._poisson_reconstruct(points, normals, poisson_depth, poisson_scale)
         elif method == "ball_pivoting":
-            mesh, method_info = self._ball_pivoting_reconstruct(points, normals)
+            mesh, method_info = cls._ball_pivoting_reconstruct(points, normals)
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -270,9 +237,10 @@ Output Mesh:
 
 {method_info}
 """
-        return {"ui": {"text": [info]}, "result": (mesh, info)}
+        return io.NodeOutput(mesh, info, ui={"text": [info]})
 
-    def _poisson_reconstruct(self, points, normals, depth, scale):
+    @staticmethod
+    def _poisson_reconstruct(points, normals, depth, scale):
         """Poisson surface reconstruction using Open3D or PyMeshLab."""
         # Try Open3D first
         try:
@@ -351,7 +319,8 @@ Output Mesh:
                 "Install with: pip install open3d  or  pip install pymeshlab"
             )
 
-    def _ball_pivoting_reconstruct(self, points, normals):
+    @staticmethod
+    def _ball_pivoting_reconstruct(points, normals):
         """Ball pivoting algorithm using PyMeshLab."""
         try:
             import pymeshlab

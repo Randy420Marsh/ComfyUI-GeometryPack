@@ -28,9 +28,10 @@ try:
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
 except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
+from comfy_api.latest import io
 
 
-class PreviewMeshVTKNode:
+class PreviewMeshVTKNode(io.ComfyNode):
     """
     Preview mesh with VTK.js scientific visualization viewer.
 
@@ -38,24 +39,23 @@ class PreviewMeshVTKNode:
     Better for scientific visualization, mesh analysis, and large datasets.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mode": (["fields", "texture", "texture (PBR)"], {"default": "fields"}),
-            },
-            "optional": {
-                "trimesh": ("TRIMESH",),
-                "voxelgrid": ("VOXELGRID",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPreviewMeshVTK",
+            display_name="Preview Mesh",
+            category="geompack/visualization",
+            is_output_node=True,
+            inputs=[
+                io.Combo.Input("mode", options=["fields", "texture", "texture (PBR)"], default="fields"),
+                io.Custom("TRIMESH").Input("trimesh", optional=True),
+                io.Custom("VOXELGRID").Input("voxelgrid", optional=True),
+            ],
+        )
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "preview_mesh_vtk"
-    CATEGORY = "geompack/visualization"
-
-    def preview_mesh_vtk(self, mode="fields", trimesh=None, voxelgrid=None):
+    @classmethod
+    def execute(cls, mode="fields", trimesh=None, voxelgrid=None):
         """
         Export mesh and prepare for VTK.js preview.
 
@@ -265,7 +265,7 @@ class PreviewMeshVTKNode:
         else:
             log.info("Fields mode info: watertight=%s, volume=%s, area=%s, no fields", is_watertight, volume, area)
 
-        return {"ui": ui_data}
+        return io.NodeOutput(ui=ui_data)
 
 
 NODE_CLASS_MAPPINGS = {

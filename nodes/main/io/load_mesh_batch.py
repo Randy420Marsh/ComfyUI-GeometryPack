@@ -24,45 +24,39 @@ except (ImportError, AttributeError):
     COMFYUI_ROOT = None
 
 from . import mesh_io
+from comfy_api.latest import io
 
 
-class LoadMeshBatch:
+class LoadMeshBatch(io.ComfyNode):
     """
     Load multiple meshes from a folder (batch loading).
     Similar to ComfyUI's image batch loading, with start_index and max_meshes controls.
     """
 
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackLoadMeshBatch",
+            display_name="Load Mesh Batch",
+            category="geompack/io",
+            inputs=[
+                io.String.Input("folder_path", default="3d", multiline=False),
+                io.Int.Input("start_index", default=0, min=0, max=100000),
+                io.Int.Input("max_meshes", default=-1, min=-1, max=100000),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="meshes"),
+            ],
+            output_is_list=(True,),
+        )
+
     # Supported mesh file extensions
     SUPPORTED_EXTENSIONS = ['.obj', '.ply', '.stl', '.off', '.gltf', '.glb', '.fbx', '.dae', '.3ds', '.vtp']
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "folder_path": ("STRING", {
-                    "default": "3d",
-                    "multiline": False
-                }),
-                "start_index": ("INT", {
-                    "default": 0,
-                    "min": 0,
-                    "max": 100000
-                }),
-                "max_meshes": ("INT", {
-                    "default": -1,
-                    "min": -1,
-                    "max": 100000
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("meshes",)
-    FUNCTION = "load_mesh_batch"
-    CATEGORY = "geompack/io"
-    OUTPUT_IS_LIST = (True,)
-
-    def load_mesh_batch(self, folder_path, start_index, max_meshes):
+    def execute(cls, folder_path, start_index, max_meshes):
         """
         Load multiple meshes from a folder.
 
@@ -122,7 +116,7 @@ class LoadMeshBatch:
         mesh_files = []
         for filename in os.listdir(full_folder_path):
             file_lower = filename.lower()
-            if any(file_lower.endswith(ext) for ext in self.SUPPORTED_EXTENSIONS):
+            if any(file_lower.endswith(ext) for ext in cls.SUPPORTED_EXTENSIONS):
                 mesh_files.append(filename)
 
         # Sort files alphabetically for consistent ordering
@@ -130,7 +124,7 @@ class LoadMeshBatch:
 
         if len(mesh_files) == 0:
             raise ValueError(f"No mesh files found in folder: {full_folder_path}\n"
-                           f"Supported extensions: {', '.join(self.SUPPORTED_EXTENSIONS)}")
+                           f"Supported extensions: {', '.join(cls.SUPPORTED_EXTENSIONS)}")
 
         log.info("Found %d mesh files", len(mesh_files))
 
@@ -168,7 +162,7 @@ class LoadMeshBatch:
 
         log.info("Successfully loaded %d meshes", len(loaded_meshes))
 
-        return (loaded_meshes,)
+        return io.NodeOutput(loaded_meshes)
 
 
 # Node mappings

@@ -20,9 +20,10 @@ except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
 
 from . import mesh_io
+from comfy_api.latest import io
 
 
-class SaveMeshBatch:
+class SaveMeshBatch(io.ComfyNode):
     """
     Save multiple meshes to a folder with sequential numbering.
 
@@ -33,39 +34,32 @@ class SaveMeshBatch:
     - 100-999 meshes: _001, _002, ...
     """
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "folder_name": ("STRING", {
-                    "default": "mesh_output",
-                    "multiline": False,
-                    "tooltip": "Name of the folder to create in the output directory"
-                }),
-                "base_name": ("STRING", {
-                    "default": "mesh",
-                    "multiline": False,
-                    "tooltip": "Base name for files (e.g., 'mesh' becomes 'mesh_001.obj'). Ignored if names provided."
-                }),
-                "format": (["obj", "ply", "stl", "off", "glb", "gltf", "vtp"],),
-            },
-            "optional": {
-                "names": ("STRING", {
-                    "forceInput": True,
-                    "tooltip": "Optional list of custom filenames (without extension). If provided, overrides base_name."
-                }),
-            },
-        }
 
-    RETURN_TYPES = ("STRING", "INT")
-    RETURN_NAMES = ("output_folder", "saved_count")
-    FUNCTION = "save_mesh_batch"
-    CATEGORY = "geompack/io"
-    OUTPUT_NODE = True
     INPUT_IS_LIST = True
 
-    def save_mesh_batch(self, trimesh, folder_name, base_name, format, names=None):
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackSaveMeshBatch",
+            display_name="Save Meshes to Folder",
+            category="geompack/io",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.String.Input("folder_name", default="mesh_output", multiline=False, tooltip="Name of the folder to create in the output directory"),
+                io.String.Input("base_name", default="mesh", multiline=False, tooltip="Base name for files (e.g., 'mesh' becomes 'mesh_001.obj'). Ignored if names provided."),
+                io.Combo.Input("format", options=["obj", "ply", "stl", "off", "glb", "gltf", "vtp"]),
+                io.String.Input("names", tooltip="Optional list of custom filenames (without extension). If provided, overrides base_name.", force_input=True, optional=True),
+            ],
+            outputs=[
+                io.String.Output(display_name="output_folder"),
+                io.Int.Output(display_name="saved_count"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, trimesh, folder_name, base_name, format, names=None):
         """
         Save batch of meshes to folder with sequential numbering or custom names.
 
@@ -176,7 +170,7 @@ class SaveMeshBatch:
         if saved_count == 0:
             raise ValueError(f"Failed to save any meshes. Errors: {'; '.join(errors[:3])}")
 
-        return (output_folder, saved_count)
+        return io.NodeOutput(output_folder, saved_count)
 
 
 # Node mappings

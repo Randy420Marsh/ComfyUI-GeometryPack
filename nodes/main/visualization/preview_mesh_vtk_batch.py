@@ -29,9 +29,10 @@ try:
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
 except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
+from comfy_api.latest import io
 
 
-class PreviewMeshVTKBatchNode:
+class PreviewMeshVTKBatchNode(io.ComfyNode):
     """
     Preview batch of meshes with VTK.js scientific visualization viewer with index navigation.
 
@@ -40,24 +41,26 @@ class PreviewMeshVTKBatchNode:
     Better for scientific visualization, mesh analysis, and large datasets.
     """
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "mode": (["fields", "texture"], {"default": "fields"}),
-                "index": ("INT", {"default": 0, "min": 0, "max": 100}),
-            },
-            "optional": {},
-        }
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "preview_mesh_vtk_batch"
-    CATEGORY = "geompack/visualization"
     INPUT_IS_LIST = True
 
-    def preview_mesh_vtk_batch(self, trimesh, mode, index):
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPreviewMeshVTKBatch",
+            display_name="Preview Mesh Batch (VTK)",
+            category="geompack/visualization",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("mode", options=["fields", "texture"], default="fields"),
+                io.Int.Input("index", default=0, min=0, max=100),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, trimesh, mode, index):
         """
         Export mesh from batch and prepare for VTK.js preview.
 
@@ -237,7 +240,7 @@ class PreviewMeshVTKBatchNode:
         else:
             log.info("Fields mode info: watertight=%s, volume=%s, area=%s, no fields", is_watertight, volume, area)
 
-        return {"ui": ui_data}
+        return io.NodeOutput(ui=ui_data)
 
 
 NODE_CLASS_MAPPINGS = {

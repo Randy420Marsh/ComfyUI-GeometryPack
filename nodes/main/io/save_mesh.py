@@ -19,39 +19,36 @@ except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
 
 from . import mesh_io
+from comfy_api.latest import io
 
 
-class SaveMesh:
+class SaveMesh(io.ComfyNode):
     """
     Save a mesh or point cloud to file (OBJ, PLY, STL, OFF, etc.)
     Supports all formats provided by trimesh.
     Point clouds (vertices without faces) can be saved as PLY format.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "file_path": ("STRING", {
-                    "default": "output",
-                    "multiline": False,
-                    "tooltip": "Output filename (without extension) or path"
-                }),
-                "format": (["obj", "ply", "stl", "off", "glb", "gltf", "vtp"], {
-                    "default": "obj",
-                    "tooltip": "Output file format"
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackSaveMesh",
+            display_name="Save Mesh",
+            category="geompack/io",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.String.Input("file_path", default="output", multiline=False, tooltip="Output filename (without extension) or path"),
+                io.Combo.Input("format", options=["obj", "ply", "stl", "off", "glb", "gltf", "vtp"], default="obj", tooltip="Output file format"),
+            ],
+            outputs=[
+                io.String.Output(display_name="file_path"),
+            ],
+        )
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("file_path",)
-    FUNCTION = "save_mesh"
-    CATEGORY = "geompack/io"
-    OUTPUT_NODE = True
-
-    def save_mesh(self, trimesh, file_path, format="obj"):
+    @classmethod
+    def execute(cls, trimesh, file_path, format="obj"):
         """
         Save mesh to file.
 
@@ -128,7 +125,7 @@ class SaveMesh:
         if not is_point_cloud:
             log.info("  Faces: %d", len(trimesh.faces))
 
-        return (full_path,)
+        return io.NodeOutput(full_path)
 
 
 # Node mappings

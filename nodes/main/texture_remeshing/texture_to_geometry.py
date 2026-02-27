@@ -10,9 +10,9 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
-
 
 def _to_numpy(x):
     """Convert tensor or array to numpy."""
@@ -22,8 +22,7 @@ def _to_numpy(x):
         return x.cpu().numpy()
     return np.array(x)
 
-
-class TextureToGeometryNode:
+class TextureToGeometryNode(io.ComfyNode):
     """
     Texture to Geometry - Convert a heightmap texture to 3D mesh geometry.
 
@@ -36,67 +35,38 @@ class TextureToGeometryNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "height_scale": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.01,
-                    "max": 10.0,
-                    "step": 0.1,
-                    "display": "number"
-                }),
-            },
-            "optional": {
-                "mask": ("MASK",),
-                "depth_image": ("IMAGE",),
-                "field": ("MASK", {
-                    "tooltip": "Optional field to store as vertex attribute on the mesh (e.g., face IDs, curvature)"
-                }),
-                "field_name": ("STRING", {
-                    "default": "field",
-                    "tooltip": "Name for the vertex attribute"
-                }),
-                "backend": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackTextureToGeometry",
+            display_name="Depth Map to Mesh",
+            category="geompack/texture_remeshing",
+            is_output_node=True,
+            inputs=[
+                io.Float.Input("height_scale", default=1.0, min=0.01, max=10.0, step=0.1, display="number"),
+                io.Mask.Input("mask", optional=True),
+                io.Image.Input("depth_image", optional=True),
+                io.Mask.Input("field", tooltip="Optional field to store as vertex attribute on the mesh (e.g., face IDs, curvature)", optional=True),
+                io.String.Input("field_name", default="field", tooltip="Name for the vertex attribute", optional=True),
+                io.Combo.Input("backend", options=[
                     "grid",
                     "poisson_pymeshlab",
                     "poisson_open3d",
                     "delaunay_2d",
-                ], {
-                    "default": "grid",
-                    "tooltip": "Reconstruction backend: grid (fast), poisson (smooth), delaunay"
-                }),
-                "poisson_depth": ("INT", {
-                    "default": 8,
-                    "min": 4,
-                    "max": 12,
-                    "step": 1,
-                    "tooltip": "Octree depth for Poisson reconstruction (higher = more detail)",
-                    "visible_when": {"backend": ["poisson_pymeshlab", "poisson_open3d"]},
-                }),
-                "invert_height": (["false", "true"], {"default": "false"}),
-                "smooth_normals": (["true", "false"], {
-                    "default": "true",
-                    "visible_when": {"backend": ["grid"]},
-                }),
-                "skip_black": (["false", "true"], {"default": "false", "tooltip": "Skip faces connected to near-black pixels in the depth map"}),
-                "black_threshold": ("FLOAT", {
-                    "default": 0.01,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.01,
-                    "tooltip": "Threshold below which pixels are considered black (only used when skip_black is true)"
-                }),
-            }
-        }
+                ], default="grid", tooltip="Reconstruction backend: grid (fast), poisson (smooth), delaunay", optional=True),
+                io.Int.Input("poisson_depth", default=8, min=4, max=12, step=1, tooltip="Octree depth for Poisson reconstruction (higher = more detail)", visible_when={"backend": ["poisson_pymeshlab", "poisson_open3d"]}, optional=True),
+                io.Combo.Input("invert_height", options=["false", "true"], default="false", optional=True),
+                io.Combo.Input("smooth_normals", options=["true", "false"], default="true", visible_when={"backend": ["grid"]}, optional=True),
+                io.Combo.Input("skip_black", options=["false", "true"], default="false", tooltip="Skip faces connected to near-black pixels in the depth map", optional=True),
+                io.Float.Input("black_threshold", default=0.01, min=0.0, max=1.0, step=0.01, tooltip="Threshold below which pixels are considered black (only used when skip_black is true)", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("mesh", "info")
-    OUTPUT_NODE = True
-    FUNCTION = "texture_to_geometry"
-    CATEGORY = "geompack/texture_remeshing"
-
-    def texture_to_geometry(self, height_scale,
+    @classmethod
+    def execute(cls, height_scale,
                            mask=None, depth_image=None,
                            field=None, field_name="field",
                            backend="grid", poisson_depth=8,
@@ -164,7 +134,7 @@ class TextureToGeometryNode:
             heightmap = 1.0 - heightmap
 
         # Build point cloud from heightmap
-        points, valid_mask = self._heightmap_to_points(
+        points, valid_mask = cls._heightmap_to_points(
             heightmap, height_scale,
             skip_black == "true", black_threshold
         )
@@ -173,7 +143,7 @@ class TextureToGeometryNode:
 
         # Dispatch to appropriate backend
         if backend == "grid":
-            mesh = self._build_grid_mesh(
+            mesh = cls._build_grid_mesh(
                 heightmap, height_scale, width, height,
                 skip_black == "true", black_threshold,
                 smooth_normals == "true",
@@ -181,13 +151,13 @@ class TextureToGeometryNode:
             )
             backend_info = "Grid-based displacement mesh"
         elif backend == "poisson_pymeshlab":
-            mesh = self._build_poisson_pymeshlab(points, poisson_depth)
+            mesh = cls._build_poisson_pymeshlab(points, poisson_depth)
             backend_info = f"PyMeshLab Screened Poisson reconstruction (depth={poisson_depth})"
         elif backend == "poisson_open3d":
-            mesh = self._build_poisson_open3d(points, poisson_depth)
+            mesh = cls._build_poisson_open3d(points, poisson_depth)
             backend_info = f"Open3D Poisson reconstruction (depth={poisson_depth})"
         elif backend == "delaunay_2d":
-            mesh = self._build_delaunay_2d(points)
+            mesh = cls._build_delaunay_2d(points)
             backend_info = "2D Delaunay triangulation"
         else:
             raise ValueError(f"Unknown backend: {backend}")
@@ -218,12 +188,10 @@ Output Mesh:
   Watertight: {mesh.is_watertight}
 """
 
-        return {
-            "result": (mesh, info),
-            "ui": {"text": [info]}
-        }
+        return io.NodeOutput(mesh, info, ui={"text": [info]})
 
-    def _heightmap_to_points(self, heightmap, height_scale, skip_black, black_threshold):
+    @staticmethod
+    def _heightmap_to_points(heightmap, height_scale, skip_black, black_threshold):
         """Convert heightmap to 3D point cloud."""
         height, width = heightmap.shape
         points = []
@@ -246,7 +214,8 @@ Output Mesh:
 
         return np.array(points, dtype=np.float64), valid_mask
 
-    def _build_grid_mesh(self, heightmap, height_scale, width, height,
+    @staticmethod
+    def _build_grid_mesh(heightmap, height_scale, width, height,
                          skip_black, black_threshold, smooth_normals,
                          field=None, field_name="field"):
         """Build mesh using grid-based displacement (original algorithm)."""
@@ -311,7 +280,8 @@ Output Mesh:
 
         return mesh
 
-    def _build_poisson_open3d(self, points, depth):
+    @staticmethod
+    def _build_poisson_open3d(points, depth):
         """Build mesh using Open3D Poisson reconstruction."""
         try:
             import open3d as o3d
@@ -360,7 +330,8 @@ Output Mesh:
 
         return mesh
 
-    def _build_poisson_pymeshlab(self, points, depth):
+    @staticmethod
+    def _build_poisson_pymeshlab(points, depth):
         """Build mesh using PyMeshLab Screened Poisson reconstruction."""
         try:
             import pymeshlab
@@ -408,7 +379,8 @@ Output Mesh:
 
         return mesh
 
-    def _build_delaunay_2d(self, points):
+    @staticmethod
+    def _build_delaunay_2d(points):
         """Build mesh using 2D Delaunay triangulation."""
         try:
             from scipy.spatial import Delaunay
@@ -432,7 +404,6 @@ Output Mesh:
         )
 
         return mesh
-
 
 # Node mappings
 NODE_CLASS_MAPPINGS = {

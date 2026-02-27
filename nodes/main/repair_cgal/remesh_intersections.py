@@ -9,11 +9,12 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class RemeshSelfIntersectionsNode:
+class RemeshSelfIntersectionsNode(io.ComfyNode):
     """
     Remove self-intersections by remeshing.
 
@@ -23,25 +24,29 @@ class RemeshSelfIntersectionsNode:
     boolean operations or 3D printing.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh": ("TRIMESH",),
-                "detect_only": ("BOOLEAN", {"default": False}),
-                "remove_unreferenced": ("BOOLEAN", {"default": True}),
-                "extract_outer_hull": ("BOOLEAN", {"default": False}),
-                "stitch_all": ("BOOLEAN", {"default": True}),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackRemeshSelfIntersections",
+            display_name="Remesh Self Intersections",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh"),
+                io.Boolean.Input("detect_only", default=False),
+                io.Boolean.Input("remove_unreferenced", default=True),
+                io.Boolean.Input("extract_outer_hull", default=False),
+                io.Boolean.Input("stitch_all", default=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="fixed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("fixed_mesh", "info")
-    FUNCTION = "remesh_intersections"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def remesh_intersections(self, mesh, detect_only=False, remove_unreferenced=True,
+    @classmethod
+    def execute(cls, mesh, detect_only=False, remove_unreferenced=True,
                            extract_outer_hull=False, stitch_all=True):
         """
         Remesh self-intersections using libigl CGAL.
@@ -80,7 +85,7 @@ Install with: pip install cgal
 Returning mesh unchanged.
 """
                 log.info("CGAL not available")
-                return {"ui": {"text": [error_msg]}, "result": (mesh, error_msg)}
+                return io.NodeOutput(mesh, error_msg, ui={"text": [error_msg]})
 
             log.info("Using libigl CGAL method")
 
@@ -192,7 +197,7 @@ Status:
 {'  Consider enabling extract_outer_hull for a clean manifold result.' if not extract_outer_hull else ''}
 """
 
-                return {"ui": {"text": [report]}, "result": (result_mesh, report)}
+                return io.NodeOutput(result_mesh, report, ui={"text": [report]})
 
             except Exception as e:
                 log.error("Remeshing error", exc_info=True)
@@ -203,7 +208,7 @@ Status:
 Returning mesh unchanged. Check console for details.
 """
                 log.error("Remeshing error: %s", e)
-                return {"ui": {"text": [error_msg]}, "result": (mesh, error_msg)}
+                return io.NodeOutput(mesh, error_msg, ui={"text": [error_msg]})
 
         except ImportError as e:
             error_msg = f"""Error: libigl not available
@@ -216,7 +221,7 @@ Install with: pip install libigl cgal
 Returning mesh unchanged.
 """
             log.error("libigl import error: %s", e)
-            return {"ui": {"text": [error_msg]}, "result": (mesh, error_msg)}
+            return io.NodeOutput(mesh, error_msg, ui={"text": [error_msg]})
 
         except Exception as e:
             log.error("Unexpected error", exc_info=True)
@@ -227,7 +232,7 @@ Returning mesh unchanged.
 Returning mesh unchanged. Check console for details.
 """
             log.error("Unexpected error: %s", e)
-            return {"ui": {"text": [error_msg]}, "result": (mesh, error_msg)}
+            return io.NodeOutput(mesh, error_msg, ui={"text": [error_msg]})
 
 
 NODE_CLASS_MAPPINGS = {

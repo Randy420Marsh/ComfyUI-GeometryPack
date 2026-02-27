@@ -12,11 +12,12 @@ Degenerate faces can be created by:
 
 import logging
 import numpy as np
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class RemoveDegenerateFacesNode:
+class RemoveDegenerateFacesNode(io.ComfyNode):
     """
     Remove degenerate faces from a mesh.
 
@@ -28,30 +29,26 @@ class RemoveDegenerateFacesNode:
     or for fixing meshes imported from CAD systems that create sliver triangles.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh": ("TRIMESH",),
-            },
-            "optional": {
-                "min_area": ("FLOAT", {
-                    "default": 1e-10,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 1e-10,
-                    "tooltip": "Minimum face area threshold (faces below this are removed)"
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackRemoveDegenerateFaces",
+            display_name="Remove Degenerate Faces",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh"),
+                io.Float.Input("min_area", default=1e-10, min=0.0, max=1.0, step=1e-10, tooltip="Minimum face area threshold (faces below this are removed)", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="cleaned_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("cleaned_mesh", "info")
-    FUNCTION = "remove_degenerate"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def remove_degenerate(self, mesh, min_area=1e-10):
+    @classmethod
+    def execute(cls, mesh, min_area=1e-10):
         """
         Remove degenerate faces from mesh.
 
@@ -120,7 +117,7 @@ After:
 
         log.info("Removed %d degenerate faces, %d unreferenced vertices", faces_removed, verts_removed)
 
-        return {"ui": {"text": [info]}, "result": (cleaned_mesh, info)}
+        return io.NodeOutput(cleaned_mesh, info, ui={"text": [info]})
 
 
 NODE_CLASS_MAPPINGS = {

@@ -27,9 +27,10 @@ try:
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
+from comfy_api.latest import io
 
 
-class LoadMeshPath:
+class LoadMeshPath(io.ComfyNode):
     """
     Load a mesh from a string path (OBJ, PLY, STL, OFF, etc.)
     Takes a string input for the path, allowing dynamic path construction.
@@ -38,24 +39,23 @@ class LoadMeshPath:
     When multiple paths are provided, returns lists of meshes and textures.
     """
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "file_path": ("STRING", {
-                    "default": "",
-                    "multiline": True,
-                    "tooltip": "Path to mesh file(s). Supports multiple paths separated by newlines or commas."
-                }),
-            },
-        }
 
-    RETURN_TYPES = ("TRIMESH", "IMAGE")
-    RETURN_NAMES = ("mesh", "texture")
-    OUTPUT_IS_LIST = (True, True)
-    FUNCTION = "load_mesh"
-    CATEGORY = "geompack/io"
-    DESCRIPTION = "Load mesh(es) from path(s). Supports batch paths (newline or comma separated)."
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackLoadMeshPath",
+            display_name="Load Mesh (Path)",
+            category="geompack/io",
+            description='Load mesh(es) from path(s). Supports batch paths (newline or comma separated).',
+            inputs=[
+                io.String.Input("file_path", default="", multiline=True, tooltip="Path to mesh file(s). Supports multiple paths separated by newlines or commas."),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+                io.Image.Output(display_name="texture"),
+            ],
+            output_is_list=(True, True),
+        )
 
     @classmethod
     def _parse_paths(cls, file_path_input):
@@ -76,7 +76,7 @@ class LoadMeshPath:
         return paths
 
     @classmethod
-    def IS_CHANGED(cls, file_path):
+    def fingerprint_inputs(cls, file_path):
         """Force re-execution when any file changes."""
         paths = cls._parse_paths(file_path)
         mtimes = []
@@ -123,7 +123,8 @@ class LoadMeshPath:
 
         return None
 
-    def _extract_texture_image(self, mesh):
+    @staticmethod
+    def _extract_texture_image(mesh):
         """Extract texture from mesh and convert to ComfyUI IMAGE format."""
         if not PIL_AVAILABLE:
             return None
@@ -163,12 +164,13 @@ class LoadMeshPath:
         img_array = np.array(texture_image.convert("RGB")).astype(np.float32) / 255.0
         return img_array[np.newaxis, ...]
 
-    def _load_single_mesh(self, file_path):
+    @staticmethod
+    def _load_single_mesh(file_path):
         """Load a single mesh from file path string."""
         file_path = file_path.strip()
 
         # Resolve the path
-        full_path = self._resolve_path(file_path)
+        full_path = LoadMeshPath._resolve_path(file_path)
 
         if full_path is None:
             # Build error message with searched paths
@@ -199,11 +201,12 @@ class LoadMeshPath:
             log.info("Loaded pointcloud: %d points", len(loaded_mesh.vertices))
 
         # Extract texture
-        texture = self._extract_texture_image(loaded_mesh)
+        texture = LoadMeshPath._extract_texture_image(loaded_mesh)
 
         return (loaded_mesh, texture)
 
-    def load_mesh(self, file_path):
+    @classmethod
+    def execute(cls, file_path):
         """
         Load mesh(es) from file path string(s).
 
@@ -218,7 +221,7 @@ class LoadMeshPath:
             raise ValueError("File path cannot be empty")
 
         # Parse paths
-        paths = self._parse_paths(file_path)
+        paths = cls._parse_paths(file_path)
 
         if not paths:
             raise ValueError("No valid paths provided")
@@ -230,7 +233,7 @@ class LoadMeshPath:
 
         for i, path in enumerate(paths):
             try:
-                mesh, texture = self._load_single_mesh(path)
+                mesh, texture = cls._load_single_mesh(path)
                 meshes.append(mesh)
                 textures.append(texture)
             except Exception as e:
@@ -239,7 +242,7 @@ class LoadMeshPath:
                 raise
 
         log.info("Successfully loaded %d mesh(es)", len(meshes))
-        return (meshes, textures)
+        return io.NodeOutput(meshes, textures)
 
 
 # Node mappings

@@ -32,6 +32,7 @@ try:
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
 except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
+from comfy_api.latest import io
 
 
 def extract_field_names(mesh):
@@ -67,7 +68,7 @@ def get_texture_info(mesh):
     }
 
 
-class PreviewMeshMultiNode:
+class PreviewMeshMultiNode(io.ComfyNode):
     """
     Multi mesh preview with VTK.js - displays up to 4 meshes in a grid layout.
 
@@ -80,26 +81,25 @@ class PreviewMeshMultiNode:
     Supports scalar field visualization with synchronized cameras.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh_1": ("TRIMESH",),
-            },
-            "optional": {
-                "mesh_2": ("TRIMESH",),
-                "mesh_3": ("TRIMESH",),
-                "mesh_4": ("TRIMESH",),
-                "mode": (["fields", "texture"], {"default": "fields"}),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPreviewMeshMulti",
+            display_name="Preview Mesh Multi",
+            category="geompack/visualization",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh_1"),
+                io.Custom("TRIMESH").Input("mesh_2", optional=True),
+                io.Custom("TRIMESH").Input("mesh_3", optional=True),
+                io.Custom("TRIMESH").Input("mesh_4", optional=True),
+                io.Combo.Input("mode", options=["fields", "texture"], default="fields", optional=True),
+            ],
+        )
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "preview_multi"
-    CATEGORY = "geompack/visualization"
-
-    def preview_multi(self, mesh_1, mesh_2=None, mesh_3=None, mesh_4=None, mode="fields"):
+    @classmethod
+    def execute(cls, mesh_1, mesh_2=None, mesh_3=None, mesh_4=None, mode="fields"):
         """
         Preview multiple meshes in a grid layout.
 
@@ -218,7 +218,7 @@ class PreviewMeshMultiNode:
             ui_data["field_names_list"] = [field_names_list]
 
         log.info("Grid: %dx%d, Preview ready", grid_cols, grid_rows)
-        return {"ui": ui_data}
+        return io.NodeOutput(ui=ui_data)
 
 
 NODE_CLASS_MAPPINGS = {

@@ -10,11 +10,12 @@ import logging
 
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class BooleanCGALNode:
+class BooleanCGALNode(io.ComfyNode):
     """
     Boolean CGAL - Union, Difference, and Intersection of meshes using CGAL.
 
@@ -27,23 +28,27 @@ class BooleanCGALNode:
     For Blender-based booleans, use "Boolean Blender" node.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh_a": ("TRIMESH",),
-                "mesh_b": ("TRIMESH",),
-                "operation": (["union", "difference", "intersection"],),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackBooleanCGAL",
+            display_name="Boolean CGAL",
+            category="geompack/boolean",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh_a"),
+                io.Custom("TRIMESH").Input("mesh_b"),
+                io.Combo.Input("operation", options=["union", "difference", "intersection"]),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="result_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("result_mesh", "info")
-    FUNCTION = "boolean_op"
-    CATEGORY = "geompack/boolean"
-    OUTPUT_NODE = True
-
-    def boolean_op(self, mesh_a, mesh_b, operation):
+    @classmethod
+    def execute(cls, mesh_a, mesh_b, operation):
         """
         Perform boolean operation on two meshes using libigl+CGAL.
 
@@ -119,7 +124,7 @@ Watertight: {result.is_watertight}
 """
 
             log.info("Success: %d vertices, %d faces", len(result.vertices), len(result.faces))
-            return {"ui": {"text": [info]}, "result": (result, info)}
+            return io.NodeOutput(result, info, ui={"text": [info]})
 
         except Exception as e:
             raise RuntimeError(f"Boolean CGAL operation failed: {e}")

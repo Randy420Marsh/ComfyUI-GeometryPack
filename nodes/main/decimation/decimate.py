@@ -15,9 +15,9 @@ Available backends:
 import logging
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
-
 
 def _pymeshlab_quadric_edge_collapse(mesh, target_face_count, quality_threshold,
                                      preserve_boundary, preserve_normal,
@@ -64,7 +64,6 @@ def _pymeshlab_quadric_edge_collapse(mesh, target_face_count, quality_threshold,
     )
     return result, ""
 
-
 def _fast_simplification_decimate(mesh, target_reduction, agg):
     """Fast quadric mesh simplification."""
     try:
@@ -87,7 +86,6 @@ def _fast_simplification_decimate(mesh, target_reduction, agg):
         process=False,
     )
     return result, ""
-
 
 def _pymeshlab_vertex_clustering(mesh, threshold_percentage):
     """Vertex clustering decimation via PyMeshLab."""
@@ -125,7 +123,6 @@ def _pymeshlab_vertex_clustering(mesh, threshold_percentage):
         process=False,
     )
     return result, ""
-
 
 def _cgal_edge_collapse(mesh, target_edge_count, cost_strategy):
     """CGAL surface mesh simplification via edge collapse."""
@@ -196,7 +193,6 @@ def _cgal_edge_collapse(mesh, target_edge_count, cost_strategy):
     )
     return result, ""
 
-
 def _pyvista_decimate_pro(mesh, target_reduction, preserve_topology, feature_angle):
     """VTK DecimatePro via PyVista."""
     try:
@@ -233,8 +229,7 @@ def _pyvista_decimate_pro(mesh, target_reduction, preserve_topology, feature_ang
     )
     return result, ""
 
-
-class DecimateMeshNode:
+class DecimateMeshNode(io.ComfyNode):
     """
     Decimate Mesh - Reduce mesh face/vertex count using multiple algorithms.
 
@@ -252,152 +247,81 @@ class DecimateMeshNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "backend": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackDecimateMesh",
+            display_name="Decimate Mesh",
+            category="geompack/decimation",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("backend", options=[
                     "quadric_edge_collapse",
                     "fast_simplification",
                     "vertex_clustering",
                     "cgal_edge_collapse",
                     "decimate_pro",
-                ], {
-                    "default": "quadric_edge_collapse",
-                    "tooltip": (
+                ], default="quadric_edge_collapse", tooltip=(
                         "Decimation algorithm. "
                         "quadric_edge_collapse=best quality, "
                         "fast_simplification=fastest, "
                         "vertex_clustering=aggressive, "
                         "cgal_edge_collapse=highest fidelity, "
                         "decimate_pro=topology-preserving"
-                    ),
-                }),
-            },
-            "optional": {
-                # --- Shared: target face count (quadric, cgal) ---
-                "target_face_count": ("INT", {
-                    "default": 5000,
-                    "min": 4,
-                    "max": 10000000,
-                    "step": 100,
-                    "tooltip": "Target number of output faces.",
-                    "visible_when": {"backend": [
+                    )),
+                io.Int.Input("target_face_count", default=5000, min=4, max=10000000, step=100, tooltip="Target number of output faces.", visible_when={"backend": [
                         "quadric_edge_collapse", "cgal_edge_collapse",
-                    ]},
-                }),
-                # --- Shared: target reduction ratio (fast_simplification, decimate_pro) ---
-                "target_reduction": ("FLOAT", {
-                    "default": 0.5,
-                    "min": 0.01,
-                    "max": 0.99,
-                    "step": 0.01,
-                    "tooltip": (
+                    ]}, optional=True),
+                io.Float.Input("target_reduction", default=0.5, min=0.01, max=0.99, step=0.01, tooltip=(
                         "Fraction of faces to REMOVE. "
                         "0.5 = reduce to ~50%% of original faces, "
                         "0.9 = reduce to ~10%% of original."
-                    ),
-                    "visible_when": {"backend": [
+                    ), visible_when={"backend": [
                         "fast_simplification", "decimate_pro",
-                    ]},
-                }),
-                # --- quadric_edge_collapse specific ---
-                "quality_threshold": ("FLOAT", {
-                    "default": 0.3,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.05,
-                    "tooltip": (
+                    ]}, optional=True),
+                io.Float.Input("quality_threshold", default=0.3, min=0.0, max=1.0, step=0.05, tooltip=(
                         "Quality threshold for edge collapse. "
                         "Higher = more conservative, better triangle quality."
-                    ),
-                    "visible_when": {"backend": ["quadric_edge_collapse"]},
-                }),
-                "preserve_boundary": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Preserve mesh boundary edges during decimation.",
-                    "visible_when": {"backend": ["quadric_edge_collapse"]},
-                }),
-                "preserve_normal": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Prevent face normal flips during decimation.",
-                    "visible_when": {"backend": ["quadric_edge_collapse"]},
-                }),
-                "preserve_topology": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Preserve mesh topology (genus) during decimation.",
-                    "visible_when": {"backend": [
+                    ), visible_when={"backend": ["quadric_edge_collapse"]}, optional=True),
+                io.Combo.Input("preserve_boundary", options=["true", "false"], default="true", tooltip="Preserve mesh boundary edges during decimation.", visible_when={"backend": ["quadric_edge_collapse"]}, optional=True),
+                io.Combo.Input("preserve_normal", options=["true", "false"], default="true", tooltip="Prevent face normal flips during decimation.", visible_when={"backend": ["quadric_edge_collapse"]}, optional=True),
+                io.Combo.Input("preserve_topology", options=["true", "false"], default="true", tooltip="Preserve mesh topology (genus) during decimation.", visible_when={"backend": [
                         "quadric_edge_collapse", "decimate_pro",
-                    ]},
-                }),
-                "planar_quadric": (["true", "false"], {
-                    "default": "false",
-                    "tooltip": (
+                    ]}, optional=True),
+                io.Combo.Input("planar_quadric", options=["true", "false"], default="false", tooltip=(
                         "Add penalty for non-planar faces. "
                         "Helps preserve flat regions."
-                    ),
-                    "visible_when": {"backend": ["quadric_edge_collapse"]},
-                }),
-                # --- fast_simplification specific ---
-                "aggressiveness": ("INT", {
-                    "default": 7,
-                    "min": 1,
-                    "max": 15,
-                    "step": 1,
-                    "tooltip": (
+                    ), visible_when={"backend": ["quadric_edge_collapse"]}, optional=True),
+                io.Int.Input("aggressiveness", default=7, min=1, max=15, step=1, tooltip=(
                         "How aggressively to simplify. "
                         "Higher = faster but lower quality. Default 7."
-                    ),
-                    "visible_when": {"backend": ["fast_simplification"]},
-                }),
-                # --- vertex_clustering specific ---
-                "cluster_threshold": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 10.0,
-                    "step": 0.1,
-                    "tooltip": (
+                    ), visible_when={"backend": ["fast_simplification"]}, optional=True),
+                io.Float.Input("cluster_threshold", default=1.0, min=0.1, max=10.0, step=0.1, tooltip=(
                         "Clustering cell size as percentage of bounding box diagonal. "
                         "Larger = more aggressive reduction."
-                    ),
-                    "visible_when": {"backend": ["vertex_clustering"]},
-                }),
-                # --- cgal_edge_collapse specific ---
-                "cost_strategy": ([
+                    ), visible_when={"backend": ["vertex_clustering"]}, optional=True),
+                io.Combo.Input("cost_strategy", options=[
                     "lindstrom_turk",
                     "edge_length",
-                ], {
-                    "default": "lindstrom_turk",
-                    "tooltip": (
+                ], default="lindstrom_turk", tooltip=(
                         "CGAL cost strategy. "
                         "lindstrom_turk=optimizes geometry+volume+boundary (best), "
                         "edge_length=collapses shortest edges first (fast)."
-                    ),
-                    "visible_when": {"backend": ["cgal_edge_collapse"]},
-                }),
-                # --- decimate_pro specific ---
-                "feature_angle": ("FLOAT", {
-                    "default": 15.0,
-                    "min": 0.0,
-                    "max": 180.0,
-                    "step": 1.0,
-                    "tooltip": (
+                    ), visible_when={"backend": ["cgal_edge_collapse"]}, optional=True),
+                io.Float.Input("feature_angle", default=15.0, min=0.0, max=180.0, step=1.0, tooltip=(
                         "Feature angle threshold (degrees). "
                         "Edges with dihedral angle above this are preserved."
-                    ),
-                    "visible_when": {"backend": ["decimate_pro"]},
-                }),
-            },
-        }
+                    ), visible_when={"backend": ["decimate_pro"]}, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="decimated_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("decimated_mesh", "info")
-    FUNCTION = "decimate"
-    CATEGORY = "geompack/decimation"
-    OUTPUT_NODE = True
-
-    def decimate(
-        self,
+    @classmethod
+    def execute(
+        cls,
         trimesh,
         backend,
         target_face_count=5000,
@@ -542,8 +466,7 @@ After:
   Faces: {len(decimated.faces):,}
   Reduction: {abs(face_pct):.1f}%
 """
-        return {"ui": {"text": [info]}, "result": (decimated, info)}
-
+        return io.NodeOutput(decimated, info, ui={"text": [info]})
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackDecimateMesh": DecimateMeshNode,

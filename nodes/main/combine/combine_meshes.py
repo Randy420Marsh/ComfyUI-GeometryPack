@@ -9,11 +9,12 @@ import logging
 
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class CombineMeshesNode:
+class CombineMeshesNode(io.ComfyNode):
     """
     Combine Meshes - Concatenate multiple meshes into one.
 
@@ -22,26 +23,28 @@ class CombineMeshesNode:
     Useful for grouping objects or preparing batch operations.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh_a": ("TRIMESH",),
-            },
-            "optional": {
-                "mesh_b": ("TRIMESH",),
-                "mesh_c": ("TRIMESH",),
-                "mesh_d": ("TRIMESH",),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackCombineMeshes",
+            display_name="Combine Meshes",
+            category="geompack/combine",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh_a"),
+                io.Custom("TRIMESH").Input("mesh_b", optional=True),
+                io.Custom("TRIMESH").Input("mesh_c", optional=True),
+                io.Custom("TRIMESH").Input("mesh_d", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="combined_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("combined_mesh", "info")
-    FUNCTION = "combine"
-    CATEGORY = "geompack/combine"
-    OUTPUT_NODE = True
-
-    def combine(self, mesh_a, mesh_b=None, mesh_c=None, mesh_d=None):
+    @classmethod
+    def execute(cls, mesh_a, mesh_b=None, mesh_c=None, mesh_d=None):
         """
         Combine multiple meshes into one.
 
@@ -114,7 +117,7 @@ Components remain separate within the combined mesh.
 """
 
         log.info("Result: %d vertices, %d faces", len(result.vertices), len(result.faces))
-        return {"ui": {"text": [info]}, "result": (result, info)}
+        return io.NodeOutput(result, info, ui={"text": [info]})
 
 
 # Node mappings

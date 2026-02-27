@@ -8,11 +8,11 @@ Point to Mesh Distance Node - Compute distances from points to mesh surface
 import logging
 
 import numpy as np
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
-
-class PointToMeshDistanceNode:
+class PointToMeshDistanceNode(io.ComfyNode):
     """
     Point to Mesh Distance - Compute distance field from point cloud/mesh to target mesh surface.
 
@@ -29,23 +29,26 @@ class PointToMeshDistanceNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "target_mesh": ("TRIMESH",),
-                "pointcloud": ("TRIMESH",),
-                "distance_type": (["unsigned", "signed"],),
-                "sign_method": (["default", "winding_number", "fast_winding_number", "pseudonormal", "unsigned"],),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPointToMeshDistance",
+            display_name="Point to Mesh Distance",
+            category="geompack/distance",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("target_mesh"),
+                io.Custom("TRIMESH").Input("pointcloud"),
+                io.Combo.Input("distance_type", options=["unsigned", "signed"]),
+                io.Combo.Input("sign_method", options=["default", "winding_number", "fast_winding_number", "pseudonormal", "unsigned"]),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="pointcloud"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("pointcloud", "info")
-    OUTPUT_NODE = True
-    FUNCTION = "compute_distance"
-    CATEGORY = "geompack/distance"
-
-    def compute_distance(self, target_mesh, pointcloud, distance_type="unsigned", sign_method="default"):
+    @classmethod
+    def execute(cls, target_mesh, pointcloud, distance_type="unsigned", sign_method="default"):
         """
         Compute distances from point cloud/mesh vertices to target mesh surface.
 
@@ -207,11 +210,7 @@ Output: {input_type} with 'distance' field in vertex_attributes
         log.info("Min: %.6f, Max: %.6f, Mean: %.6f", min_dist, max_dist, mean_dist)
         log.info("Distance field added to vertex_attributes['distance']")
 
-        return {
-            "result": (result, info),
-            "ui": {"text": [info]}
-        }
-
+        return io.NodeOutput(result, info, ui={"text": [info]})
 
 # Node mappings
 NODE_CLASS_MAPPINGS = {

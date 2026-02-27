@@ -29,6 +29,7 @@ try:
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
 except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
+from comfy_api.latest import io
 
 # Global mesh cache for API access
 # Key: mesh_id, Value: (trimesh, current_filename, fields_added)
@@ -148,7 +149,7 @@ def compute_self_intersections(mesh):
         return mesh, 0
 
 
-class PreviewMeshAnalysisNode:
+class PreviewMeshAnalysisNode(io.ComfyNode):
     """
     Preview mesh with analysis buttons.
 
@@ -160,20 +161,21 @@ class PreviewMeshAnalysisNode:
     Click a button to compute and visualize that analysis.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPreviewMeshAnalysis",
+            display_name="Preview Mesh (Analysis)",
+            category="geompack/visualization",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+        )
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "preview_mesh_analysis"
-    CATEGORY = "geompack/visualization"
-
-    def preview_mesh_analysis(self, trimesh):
+    @classmethod
+    def execute(cls, trimesh):
         """
         Export mesh and prepare for analysis preview.
 
@@ -250,7 +252,7 @@ class PreviewMeshAnalysisNode:
             "field_names": [field_names],
         }
 
-        return {"ui": ui_data}
+        return io.NodeOutput(ui=ui_data)
 
 
 NODE_CLASS_MAPPINGS = {

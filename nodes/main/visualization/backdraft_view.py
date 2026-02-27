@@ -24,11 +24,12 @@ import logging
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import os
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class BackdraftViewNode:
+class BackdraftViewNode(io.ComfyNode):
     """
     Render mesh from Z-axis and detect backdraft regions.
 
@@ -36,37 +37,26 @@ class BackdraftViewNode:
     This indicates an undercut that would trap material in manufacturing.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "resolution": ("INT", {
-                    "default": 1024,
-                    "min": 128,
-                    "max": 4096,
-                    "step": 64,
-                    "tooltip": "Output image resolution. Higher = more detail but slower."
-                }),
-                "backend": (["trimesh", "pyvista", "face_normals"], {
-                    "default": "trimesh",
-                    "tooltip": "trimesh (embree) is faster, pyvista uses VTK, face_normals checks Z-normal consistency (requires single connected component)."
-                }),
-            },
-            "optional": {
-                "show_filename": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Display mesh filename on the output image"
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackBackdraftView",
+            display_name="Backdraft View",
+            category="geompack/visualization",
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Int.Input("resolution", default=1024, min=128, max=4096, step=64, tooltip="Output image resolution. Higher = more detail but slower."),
+                io.Combo.Input("backend", options=["trimesh", "pyvista", "face_normals"], default="trimesh", tooltip="trimesh (embree) is faster, pyvista uses VTK, face_normals checks Z-normal consistency (requires single connected component)."),
+                io.Boolean.Input("show_filename", default=True, tooltip="Display mesh filename on the output image", optional=True),
+            ],
+            outputs=[
+                io.Image.Output(display_name="backdraft_image"),
+            ],
+        )
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("backdraft_image",)
-    FUNCTION = "render_backdraft"
-    CATEGORY = "geompack/visualization"
-
-    def render_backdraft(self, trimesh, resolution=1024, backend="trimesh", show_filename=True):
+    @classmethod
+    def execute(cls, trimesh, resolution=1024, backend="trimesh", show_filename=True):
         """
         Render mesh with backdraft detection using batch ray casting.
 
@@ -120,11 +110,11 @@ class BackdraftViewNode:
 
         # Dispatch to appropriate backend
         if backend == "trimesh":
-            hit_counts = self._raytrace_trimesh(trimesh, xs, ys, z_start, nx, ny, total_rays)
+            hit_counts = cls._raytrace_trimesh(trimesh, xs, ys, z_start, nx, ny, total_rays)
         elif backend == "pyvista":
-            hit_counts = self._raytrace_pyvista(trimesh, xs, ys, z_start, z_end, nx, ny)
+            hit_counts = cls._raytrace_pyvista(trimesh, xs, ys, z_start, z_end, nx, ny)
         elif backend == "face_normals":
-            hit_counts = self._check_face_normals(trimesh, xs, ys, z_start, nx, ny)
+            hit_counts = cls._check_face_normals(trimesh, xs, ys, z_start, nx, ny)
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
@@ -185,9 +175,10 @@ class BackdraftViewNode:
         # Convert to ComfyUI IMAGE format: (B, H, W, C) float32 0-1
         img_arr = (image.astype(np.float32) / 255.0)[np.newaxis, ...]
 
-        return (img_arr,)
+        return io.NodeOutput(img_arr)
 
-    def _raytrace_trimesh(self, mesh, xs, ys, z_start, nx, ny, total_rays):
+    @staticmethod
+    def _raytrace_trimesh(mesh, xs, ys, z_start, nx, ny, total_rays):
         """Batch ray casting using trimesh (embree backend) with progress display."""
         log.info("Using trimesh backend (embree)...")
 
@@ -246,7 +237,8 @@ class BackdraftViewNode:
         hit_counts = hit_counts.reshape(ny, nx)
         return hit_counts
 
-    def _raytrace_pyvista(self, mesh, xs, ys, z_start, z_end, nx, ny):
+    @staticmethod
+    def _raytrace_pyvista(mesh, xs, ys, z_start, z_end, nx, ny):
         """Batch ray casting using PyVista multi_ray_trace."""
         import pyvista as pv
 
@@ -290,7 +282,8 @@ class BackdraftViewNode:
 
         return hit_counts
 
-    def _check_face_normals(self, mesh, xs, ys, z_start, nx, ny):
+    @staticmethod
+    def _check_face_normals(mesh, xs, ys, z_start, nx, ny):
         """
         Check face normal Z-component consistency and render visualization.
 

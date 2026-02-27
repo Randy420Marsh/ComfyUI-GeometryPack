@@ -9,57 +9,46 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class SubsamplePointCloudNode:
+class SubsamplePointCloudNode(io.ComfyNode):
     """
     Subsample a point cloud to reduce point count while preserving attributes.
 
     Supports multiple sampling methods and preserves colors, normals, and other vertex data.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "point_cloud": ("TRIMESH",),
-                "method": (["random", "uniform_grid", "farthest_point"], {
-                    "default": "random",
-                    "tooltip": "random: fast random selection. uniform_grid: voxel-based uniform spacing. farthest_point: maximize coverage (slow for large clouds)."
-                }),
-                "target_count": ("INT", {
-                    "default": 100000,
-                    "min": 100,
-                    "max": 10000000,
-                    "step": 1000,
-                    "tooltip": "Target number of points to keep"
-                }),
-            },
-            "optional": {
-                "seed": ("INT", {
-                    "default": 42,
-                    "min": 0,
-                    "max": 2147483647,
-                    "tooltip": "Random seed for reproducible results (random method only)"
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackSubsamplePointCloud",
+            display_name="Subsample Point Cloud",
+            category="geompack/conversion",
+            inputs=[
+                io.Custom("TRIMESH").Input("point_cloud"),
+                io.Combo.Input("method", options=["random", "uniform_grid", "farthest_point"], default="random", tooltip="random: fast random selection. uniform_grid: voxel-based uniform spacing. farthest_point: maximize coverage (slow for large clouds)."),
+                io.Int.Input("target_count", default=100000, min=100, max=10000000, step=1000, tooltip="Target number of points to keep"),
+                io.Int.Input("seed", default=42, min=0, max=2147483647, tooltip="Random seed for reproducible results (random method only)", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="point_cloud"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("point_cloud",)
-    FUNCTION = "subsample"
-    CATEGORY = "geompack/conversion"
-
-    def _random_subsample(self, vertices, target_count, seed):
+    @staticmethod
+    def _random_subsample(vertices, target_count, seed):
         """Random subsampling - fast and simple."""
         np.random.seed(seed)
         indices = np.random.choice(len(vertices), size=target_count, replace=False)
         indices.sort()  # Keep spatial ordering
         return indices
 
-    def _uniform_grid_subsample(self, vertices, target_count):
+    @staticmethod
+    def _uniform_grid_subsample(vertices, target_count):
         """Voxel-based uniform subsampling for even spatial distribution."""
         # Calculate voxel size to achieve target count
         bbox_min = vertices.min(axis=0)
@@ -90,7 +79,8 @@ class SubsamplePointCloudNode:
 
         return indices
 
-    def _farthest_point_subsample(self, vertices, target_count):
+    @staticmethod
+    def _farthest_point_subsample(vertices, target_count):
         """Farthest point sampling for maximum coverage (slow for large clouds)."""
         n_points = len(vertices)
 
@@ -119,7 +109,8 @@ class SubsamplePointCloudNode:
 
         return np.array(sorted(indices))
 
-    def subsample(self, point_cloud, method, target_count, seed=42):
+    @classmethod
+    def execute(cls, point_cloud, method, target_count, seed=42):
         """
         Subsample point cloud while preserving all vertex attributes.
 
@@ -140,18 +131,18 @@ class SubsamplePointCloudNode:
         # If already at or below target, return as-is
         if n_points <= target_count:
             log.info("Point count already at or below target, returning unchanged")
-            return (point_cloud,)
+            return io.NodeOutput(point_cloud)
 
         # Get indices based on method
         if method == "random":
-            indices = self._random_subsample(vertices, target_count, seed)
+            indices = cls._random_subsample(vertices, target_count, seed)
         elif method == "uniform_grid":
-            indices = self._uniform_grid_subsample(vertices, target_count)
+            indices = cls._uniform_grid_subsample(vertices, target_count)
         elif method == "farthest_point":
             # Warn if using FPS on large clouds
             if n_points > 100000:
                 log.warning("Farthest point sampling on %s points will be slow. Consider 'random' or 'uniform_grid'.", f"{n_points:,}")
-            indices = self._farthest_point_subsample(vertices, target_count)
+            indices = cls._farthest_point_subsample(vertices, target_count)
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -201,7 +192,7 @@ class SubsamplePointCloudNode:
 
         log.info("Output: %s points", f"{len(new_vertices):,}")
 
-        return (new_cloud,)
+        return io.NodeOutput(new_cloud)
 
 
 # Node mappings

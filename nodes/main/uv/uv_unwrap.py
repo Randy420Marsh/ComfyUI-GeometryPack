@@ -21,6 +21,7 @@ import logging
 
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -191,7 +192,7 @@ def _bpy_sphere_uv_project(vertices, faces, scale_to_bounds):
     return {'vertices': result_verts, 'faces': result_faces, 'uvs': result_uvs}
 
 
-class UVUnwrapNode:
+class UVUnwrapNode(io.ComfyNode):
     """
     Universal UV Unwrap - Unified UV unwrapping operations.
 
@@ -199,12 +200,17 @@ class UVUnwrapNode:
     Parameters are method-specific; unused parameters are ignored.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "method": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackUVUnwrap",
+            display_name="UV Unwrap",
+            category="geompack/uv",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("method", options=[
                     "xatlas",
                     "cumesh",
                     "libigl_lscm",
@@ -214,93 +220,26 @@ class UVUnwrapNode:
                     "blender_cube",
                     "blender_cylinder",
                     "blender_sphere"
-                ], {"default": "xatlas"}),
-            },
-            "optional": {
-                # cumesh parameters (GPU-accelerated)
-                "chart_cone_angle": ("FLOAT", {
-                    "default": 90.0,
-                    "min": 0.0,
-                    "max": 359.9,
-                    "step": 1.0,
-                    "visible_when": {"method": ["cumesh"]},
-                }),
-                "chart_refine_iterations": ("INT", {
-                    "default": 0,
-                    "min": 0,
-                    "max": 10,
-                    "step": 1,
-                    "visible_when": {"method": ["cumesh"]},
-                }),
-                "chart_global_iterations": ("INT", {
-                    "default": 1,
-                    "min": 0,
-                    "max": 10,
-                    "step": 1,
-                    "visible_when": {"method": ["cumesh"]},
-                }),
-                "chart_smooth_strength": ("INT", {
-                    "default": 1,
-                    "min": 0,
-                    "max": 10,
-                    "step": 1,
-                    "visible_when": {"method": ["cumesh"]},
-                }),
+                ], default="xatlas"),
+                io.Float.Input("chart_cone_angle", default=90.0, min=0.0, max=359.9, step=1.0, visible_when={"method": ["cumesh"]}, optional=True),
+                io.Int.Input("chart_refine_iterations", default=0, min=0, max=10, step=1, visible_when={"method": ["cumesh"]}, optional=True),
+                io.Int.Input("chart_global_iterations", default=1, min=0, max=10, step=1, visible_when={"method": ["cumesh"]}, optional=True),
+                io.Int.Input("chart_smooth_strength", default=1, min=0, max=10, step=1, visible_when={"method": ["cumesh"]}, optional=True),
+                io.Int.Input("iterations", default=10, min=1, max=100, step=1, visible_when={"method": ["libigl_arap"]}, optional=True),
+                io.Float.Input("angle_limit", default=66.0, min=1.0, max=89.0, step=1.0, visible_when={"method": ["blender_smart"]}, optional=True),
+                io.Float.Input("island_margin", default=0.02, min=0.0, max=1.0, step=0.01, visible_when={"method": ["blender_smart"]}, optional=True),
+                io.Combo.Input("scale_to_bounds", options=["true", "false"], default="true", visible_when={"method": ["blender_smart", "blender_cube", "blender_cylinder", "blender_sphere"]}, optional=True),
+                io.Float.Input("cube_size", default=1.0, min=0.1, max=10.0, step=0.1, visible_when={"method": ["blender_cube"]}, optional=True),
+                io.Float.Input("cylinder_radius", default=1.0, min=0.1, max=10.0, step=0.1, visible_when={"method": ["blender_cylinder"]}, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="unwrapped_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-                # libigl_arap parameters
-                "iterations": ("INT", {
-                    "default": 10,
-                    "min": 1,
-                    "max": 100,
-                    "step": 1,
-                    "visible_when": {"method": ["libigl_arap"]},
-                }),
-
-                # Blender smart_uv parameters
-                "angle_limit": ("FLOAT", {
-                    "default": 66.0,
-                    "min": 1.0,
-                    "max": 89.0,
-                    "step": 1.0,
-                    "visible_when": {"method": ["blender_smart"]},
-                }),
-                "island_margin": ("FLOAT", {
-                    "default": 0.02,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.01,
-                    "visible_when": {"method": ["blender_smart"]},
-                }),
-
-                # Blender projection parameters
-                "scale_to_bounds": (["true", "false"], {
-                    "default": "true",
-                    "visible_when": {"method": ["blender_smart", "blender_cube", "blender_cylinder", "blender_sphere"]},
-                }),
-                "cube_size": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 10.0,
-                    "step": 0.1,
-                    "visible_when": {"method": ["blender_cube"]},
-                }),
-                "cylinder_radius": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 10.0,
-                    "step": 0.1,
-                    "visible_when": {"method": ["blender_cylinder"]},
-                }),
-            }
-        }
-
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("unwrapped_mesh", "info")
-    FUNCTION = "unwrap"
-    CATEGORY = "geompack/uv"
-    OUTPUT_NODE = True
-
-    def unwrap(self, trimesh, method,
+    @classmethod
+    def execute(cls, trimesh, method,
                chart_cone_angle=90.0, chart_refine_iterations=0,
                chart_global_iterations=1, chart_smooth_strength=1,
                iterations=10, angle_limit=66.0, island_margin=0.02,
@@ -332,34 +271,35 @@ class UVUnwrapNode:
         log.info("Method: %s", method)
 
         if method == "xatlas":
-            unwrapped_mesh, info = self._xatlas(trimesh)
+            unwrapped_mesh, info = cls._xatlas(trimesh)
         elif method == "cumesh":
-            unwrapped_mesh, info = self._cumesh(
+            unwrapped_mesh, info = cls._cumesh(
                 trimesh, chart_cone_angle, chart_refine_iterations,
                 chart_global_iterations, chart_smooth_strength
             )
         elif method == "libigl_lscm":
-            unwrapped_mesh, info = self._libigl_lscm(trimesh)
+            unwrapped_mesh, info = cls._libigl_lscm(trimesh)
         elif method == "libigl_harmonic":
-            unwrapped_mesh, info = self._libigl_harmonic(trimesh)
+            unwrapped_mesh, info = cls._libigl_harmonic(trimesh)
         elif method == "libigl_arap":
-            unwrapped_mesh, info = self._libigl_arap(trimesh, iterations)
+            unwrapped_mesh, info = cls._libigl_arap(trimesh, iterations)
         elif method == "blender_smart":
-            unwrapped_mesh, info = self._blender_smart(trimesh, angle_limit, island_margin, scale_to_bounds)
+            unwrapped_mesh, info = cls._blender_smart(trimesh, angle_limit, island_margin, scale_to_bounds)
         elif method == "blender_cube":
-            unwrapped_mesh, info = self._blender_cube(trimesh, cube_size, scale_to_bounds)
+            unwrapped_mesh, info = cls._blender_cube(trimesh, cube_size, scale_to_bounds)
         elif method == "blender_cylinder":
-            unwrapped_mesh, info = self._blender_cylinder(trimesh, cylinder_radius, scale_to_bounds)
+            unwrapped_mesh, info = cls._blender_cylinder(trimesh, cylinder_radius, scale_to_bounds)
         elif method == "blender_sphere":
-            unwrapped_mesh, info = self._blender_sphere(trimesh, scale_to_bounds)
+            unwrapped_mesh, info = cls._blender_sphere(trimesh, scale_to_bounds)
         else:
             raise ValueError(f"Unknown method: {method}")
 
         log.info("Output: %d vertices, %d faces", len(unwrapped_mesh.vertices), len(unwrapped_mesh.faces))
 
-        return {"ui": {"text": [info]}, "result": (unwrapped_mesh, info)}
+        return io.NodeOutput(unwrapped_mesh, info, ui={"text": [info]})
 
-    def _xatlas(self, trimesh):
+    @staticmethod
+    def _xatlas(trimesh):
         """XAtlas automatic UV unwrapping."""
         try:
             import xatlas
@@ -409,7 +349,8 @@ Fast automatic UV unwrapping with vertex splitting at seams.
 """
         return unwrapped, info
 
-    def _cumesh(self, trimesh, chart_cone_angle, chart_refine_iterations,
+    @staticmethod
+    def _cumesh(trimesh, chart_cone_angle, chart_refine_iterations,
                 chart_global_iterations, chart_smooth_strength):
         """CuMesh GPU-accelerated UV unwrapping with fast clustering + xatlas."""
         try:
@@ -513,7 +454,8 @@ Two-stage GPU-accelerated UV unwrapping with vertex splitting at seams.
 """
         return unwrapped, info
 
-    def _libigl_lscm(self, trimesh):
+    @staticmethod
+    def _libigl_lscm(trimesh):
         """libigl LSCM conformal mapping."""
         try:
             import igl
@@ -565,7 +507,8 @@ Minimizes angle distortion for organic shapes.
 """
         return unwrapped, info
 
-    def _libigl_harmonic(self, trimesh):
+    @staticmethod
+    def _libigl_harmonic(trimesh):
         """libigl harmonic (Laplacian) mapping."""
         try:
             import igl
@@ -622,7 +565,8 @@ Simple, fast, and stable parameterization.
 """
         return unwrapped, info
 
-    def _libigl_arap(self, trimesh, iterations):
+    @staticmethod
+    def _libigl_arap(trimesh, iterations):
         """libigl ARAP-like parameterization."""
         try:
             import igl
@@ -699,7 +643,8 @@ Better preservation of angles and shapes.
 """
         return unwrapped, info
 
-    def _blender_smart(self, trimesh, angle_limit, island_margin, scale_to_bounds):
+    @staticmethod
+    def _blender_smart(trimesh, angle_limit, island_margin, scale_to_bounds):
         """Blender Smart UV Project using bpy."""
         import math
 
@@ -751,7 +696,8 @@ Automatic seam-based unwrapping with intelligent island creation.
 """
         return unwrapped, info
 
-    def _blender_cube(self, trimesh, cube_size, scale_to_bounds):
+    @staticmethod
+    def _blender_cube(trimesh, cube_size, scale_to_bounds):
         """Blender Cube Projection using bpy."""
         log.info("Running Blender Cube Projection...")
         result = _bpy_cube_uv_project(
@@ -792,7 +738,8 @@ Best for box-like objects.
 """
         return unwrapped, info
 
-    def _blender_cylinder(self, trimesh, cylinder_radius, scale_to_bounds):
+    @staticmethod
+    def _blender_cylinder(trimesh, cylinder_radius, scale_to_bounds):
         """Blender Cylinder Projection using bpy."""
         log.info("Running Blender Cylinder Projection...")
         result = _bpy_cylinder_uv_project(
@@ -833,7 +780,8 @@ Best for cylindrical objects.
 """
         return unwrapped, info
 
-    def _blender_sphere(self, trimesh, scale_to_bounds):
+    @staticmethod
+    def _blender_sphere(trimesh, scale_to_bounds):
         """Blender Sphere Projection using bpy."""
         log.info("Running Blender Sphere Projection...")
         result = _bpy_sphere_uv_project(

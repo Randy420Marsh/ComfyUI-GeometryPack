@@ -11,11 +11,11 @@ from collections import defaultdict
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
-
-class ScrambleIntField:
+class ScrambleIntField(io.ComfyNode):
     """
     Reassigns integer field values to maximize contrast between adjacent faces.
     Useful for visualizing segmentation results where adjacent segments
@@ -25,32 +25,24 @@ class ScrambleIntField:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh": ("TRIMESH",),
-                "field_name": ("STRING", {
-                    "default": "seg",
-                    "tooltip": "Name of the integer face field to scramble."
-                }),
-            },
-            "optional": {
-                "seed": ("INT", {
-                    "default": 0,
-                    "min": 0,
-                    "max": 0xffffffff,
-                    "tooltip": "Random seed for color assignment order."
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="ScrambleIntField",
+            display_name="Scramble Int Field",
+            category="geometrypack/analysis",
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh"),
+                io.String.Input("field_name", default="seg", tooltip="Name of the integer face field to scramble."),
+                io.Int.Input("seed", default=0, min=0, max=0xffffffff, tooltip="Random seed for color assignment order.", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("mesh",)
-    FUNCTION = "scramble"
-    CATEGORY = "geometrypack/analysis"
-
-    def scramble(
-        self,
+    @classmethod
+    def execute(
+        cls,
         mesh: trimesh.Trimesh,
         field_name: str,
         seed: int = 0,
@@ -64,7 +56,7 @@ class ScrambleIntField:
                 labels = np.array(mesh.metadata[face_data_key])
             else:
                 log.warning("Field '%s' not found, returning unchanged", field_name)
-                return (mesh,)
+                return io.NodeOutput(mesh)
         else:
             labels = np.array(mesh.face_attributes[face_data_key])
 
@@ -142,8 +134,7 @@ class ScrambleIntField:
 
         log.info("Output: scrambled %d segments using %d colors", n_labels, max_color)
 
-        return (output_mesh,)
-
+        return io.NodeOutput(output_mesh)
 
 NODE_CLASS_MAPPINGS = {
     "ScrambleIntField": ScrambleIntField,

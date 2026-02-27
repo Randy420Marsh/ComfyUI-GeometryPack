@@ -16,9 +16,9 @@ Available backends:
 import logging
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
-
 
 def _pymeshlab_two_step_sharpen(mesh, smooth_steps, normal_threshold,
                                 normal_iterations, fit_iterations, selected_only):
@@ -66,7 +66,6 @@ def _pymeshlab_two_step_sharpen(mesh, smooth_steps, normal_threshold,
     )
     return result, ""
 
-
 def _pymeshlab_unsharp_mask_sharpen(mesh, weight, weight_original, iterations):
     """Geometric unsharp mask sharpening via PyMeshLab."""
     try:
@@ -108,8 +107,7 @@ def _pymeshlab_unsharp_mask_sharpen(mesh, weight, weight_original, iterations):
     )
     return result, ""
 
-
-class SharpenMeshNode:
+class SharpenMeshNode(io.ComfyNode):
     """
     Sharpen Mesh - Edge-recovering sharpening algorithms.
 
@@ -123,80 +121,50 @@ class SharpenMeshNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "backend": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackSharpenMesh",
+            display_name="Sharpen Mesh",
+            category="geompack/smoothing",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("backend", options=[
                     "two_step",
                     "unsharp_mask",
-                ], {
-                    "default": "two_step",
-                    "tooltip": (
+                ], default="two_step", tooltip=(
                         "Sharpening algorithm. "
                         "two_step=bilateral normal filtering (recommended for CAD-like edges), "
                         "unsharp_mask=geometric unsharp masking (general enhancement)"
-                    ),
-                }),
-            },
-            "optional": {
-                "smooth_steps": ("INT", {
-                    "default": 3,
-                    "min": 1,
-                    "max": 50,
-                    "step": 1,
-                    "tooltip": (
+                    )),
+                io.Int.Input("smooth_steps", default=3, min=1, max=50, step=1, tooltip=(
                         "Number of two-step smoothing passes. "
                         "More steps = stronger sharpening effect."
-                    ),
-                    "visible_when": {"backend": ["two_step"]},
-                }),
-                "normal_threshold": ("FLOAT", {
-                    "default": 60.0,
-                    "min": 0.0,
-                    "max": 180.0,
-                    "step": 0.5,
-                    "tooltip": (
+                    ), visible_when={"backend": ["two_step"]}, optional=True),
+                io.Float.Input("normal_threshold", default=60.0, min=0.0, max=180.0, step=0.5, tooltip=(
                         "Dihedral angle threshold in degrees. "
                         "Edges sharper than this angle are preserved as features. "
                         "Lower = more aggressive (more edges treated as creases). "
                         "60 is a good default for most CAD models."
-                    ),
-                    "visible_when": {"backend": ["two_step"]},
-                }),
-                "weight": ("FLOAT", {
-                    "default": 0.3,
-                    "min": 0.0,
-                    "max": 3.0,
-                    "step": 0.01,
-                    "tooltip": (
+                    ), visible_when={"backend": ["two_step"]}, optional=True),
+                io.Float.Input("weight", default=0.3, min=0.0, max=3.0, step=0.01, tooltip=(
                         "Unsharp mask weight controlling sharpening strength. "
                         "Higher = more pronounced sharpening."
-                    ),
-                    "visible_when": {"backend": ["unsharp_mask"]},
-                }),
-                "iterations": ("INT", {
-                    "default": 5,
-                    "min": 1,
-                    "max": 50,
-                    "step": 1,
-                    "tooltip": (
+                    ), visible_when={"backend": ["unsharp_mask"]}, optional=True),
+                io.Int.Input("iterations", default=5, min=1, max=50, step=1, tooltip=(
                         "Smoothing iterations for the reference smooth mesh. "
                         "More iterations = larger-scale sharpening."
-                    ),
-                    "visible_when": {"backend": ["unsharp_mask"]},
-                }),
-            },
-        }
+                    ), visible_when={"backend": ["unsharp_mask"]}, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="sharpened_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("sharpened_mesh", "info")
-    FUNCTION = "sharpen"
-    CATEGORY = "geompack/smoothing"
-    OUTPUT_NODE = True
-
-    def sharpen(
-        self,
+    @classmethod
+    def execute(
+        cls,
         trimesh,
         backend,
         smooth_steps=3,
@@ -282,8 +250,7 @@ Displacement:
   Average: {avg_disp:.6f}
   Maximum: {max_disp:.6f}
 """
-        return {"ui": {"text": [info]}, "result": (sharpened, info)}
-
+        return io.NodeOutput(sharpened, info, ui={"text": [info]})
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackSharpenMesh": SharpenMeshNode,

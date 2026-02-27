@@ -10,11 +10,12 @@ import logging
 
 import trimesh
 import numpy as np
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class MergeVerticesNode:
+class MergeVerticesNode(io.ComfyNode):
     """
     Merge duplicate vertices in a mesh with configurable tolerance.
 
@@ -30,28 +31,26 @@ class MergeVerticesNode:
     - 1e-3: Loose (for coarse meshes)
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh": ("TRIMESH",),
-                "tolerance": ("FLOAT", {
-                    "default": 1e-5,
-                    "min": 1e-8,
-                    "max": 1e-2,
-                    "step": 1e-6,
-                    "tooltip": "Distance tolerance for merging vertices (1e-5 recommended for CAD meshes)"
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackMergeVertices",
+            display_name="Merge Vertices",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh"),
+                io.Float.Input("tolerance", default=1e-5, min=1e-8, max=1e-2, step=1e-6, tooltip="Distance tolerance for merging vertices (1e-5 recommended for CAD meshes)"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="merged_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("merged_mesh", "info")
-    FUNCTION = "merge_vertices"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def merge_vertices(self, mesh, tolerance=1e-5):
+    @classmethod
+    def execute(cls, mesh, tolerance=1e-5):
         """
         Merge duplicate vertices within tolerance.
 
@@ -128,7 +127,7 @@ After:
         if components_change is not None:
             log.info("Components: %d -> %d", components_before, components_after)
 
-        return {"ui": {"text": [info]}, "result": (merged_mesh, info)}
+        return io.NodeOutput(merged_mesh, info, ui={"text": [info]})
 
 
 NODE_CLASS_MAPPINGS = {

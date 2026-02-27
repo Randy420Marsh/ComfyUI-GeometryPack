@@ -30,9 +30,9 @@ try:
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
 except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
+from comfy_api.latest import io
 
-
-class PreviewMeshUVNode:
+class PreviewMeshUVNode(io.ComfyNode):
     """
     Preview mesh with synchronized 3D and UV layout views.
 
@@ -45,29 +45,21 @@ class PreviewMeshUVNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-            "optional": {
-                "show_checker": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "Apply checker pattern to visualize UV distortion"
-                }),
-                "show_wireframe": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Show mesh wireframe on 3D view"
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPreviewMeshUV",
+            display_name="Preview Mesh UV",
+            category="geompack/visualization",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Boolean.Input("show_checker", default=False, tooltip="Apply checker pattern to visualize UV distortion", optional=True),
+                io.Boolean.Input("show_wireframe", default=True, tooltip="Show mesh wireframe on 3D view", optional=True),
+            ],
+        )
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "preview_mesh_uv"
-    CATEGORY = "geompack/visualization"
-
-    def preview_mesh_uv(self, trimesh, show_checker=False, show_wireframe=True):
+    @classmethod
+    def execute(cls, trimesh, show_checker=False, show_wireframe=True):
         """
         Export mesh and UV data for synchronized 3D + UV layout preview.
 
@@ -84,11 +76,7 @@ class PreviewMeshUVNode:
         # Point clouds don't have UVs or faces
         if is_point_cloud(trimesh):
             log.warning("UV viewing not applicable to point clouds")
-            return {
-                "ui": {
-                    "error": ["UV viewing requires a mesh with faces. This is a point cloud."]
-                }
-            }
+            return io.NodeOutput(ui={ "error": ["UV viewing requires a mesh with faces. This is a point cloud."] })
 
         # Check for UV data
         has_uvs = False
@@ -201,8 +189,7 @@ class PreviewMeshUVNode:
 
         log.info("Preview ready: has_uvs=%s, checker=%s, wireframe=%s", has_uvs, show_checker, show_wireframe)
 
-        return {"ui": ui_data}
-
+        return io.NodeOutput(ui=ui_data)
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackPreviewMeshUV": PreviewMeshUVNode,

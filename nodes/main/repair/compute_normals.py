@@ -9,11 +9,12 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class ComputeNormalsNode:
+class ComputeNormalsNode(io.ComfyNode):
     """
     Recompute mesh normals with custom settings.
 
@@ -21,23 +22,24 @@ class ComputeNormalsNode:
     importing from formats without normals, or when normals seem incorrect.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "smooth_vertex_normals": (["true", "false"], {
-                    "default": "true"
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackComputeNormals",
+            display_name="Compute Normals",
+            category="geompack/repair",
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("smooth_vertex_normals", options=["true", "false"], default="true"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh_with_normals"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("mesh_with_normals",)
-    FUNCTION = "compute_normals"
-    CATEGORY = "geompack/repair"
-
-    def compute_normals(self, trimesh, smooth_vertex_normals="true"):
+    @classmethod
+    def execute(cls, trimesh, smooth_vertex_normals="true"):
         """
         Recompute mesh normals.
 
@@ -94,7 +96,7 @@ class ComputeNormalsNode:
 
             log.info("Computed smooth vertex normals")
 
-        return (result_mesh,)
+        return io.NodeOutput(result_mesh)
 
 
 NODE_CLASS_MAPPINGS = {

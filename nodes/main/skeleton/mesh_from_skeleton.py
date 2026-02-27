@@ -9,33 +9,37 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class SkeletonToMesh:
+class SkeletonToMesh(io.ComfyNode):
     """
     Convert skeleton to solid mesh with cylinders (bones) and spheres (joints).
 
     High-quality visualization with adjustable geometry.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "skeleton": ("SKELETON",),
-                "joint_radius": ("FLOAT", {"default": 0.02, "min": 0.001, "max": 0.1, "step": 0.001}),
-                "bone_radius": ("FLOAT", {"default": 0.01, "min": 0.001, "max": 0.05, "step": 0.001}),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackMeshFromSkeleton",
+            display_name="Mesh from Skeleton",
+            category="geompack/skeleton",
+            inputs=[
+                io.Custom("SKELETON").Input("skeleton"),
+                io.Float.Input("joint_radius", default=0.02, min=0.001, max=0.1, step=0.001),
+                io.Float.Input("bone_radius", default=0.01, min=0.001, max=0.05, step=0.001),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="trimesh"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("trimesh",)
-    FUNCTION = "convert"
-    CATEGORY = "geompack/skeleton"
-
-    def convert(self, skeleton, joint_radius, bone_radius):
+    @classmethod
+    def execute(cls, skeleton, joint_radius, bone_radius):
         """Convert skeleton to solid geometry."""
         vertices = skeleton["vertices"]
         edges = skeleton["edges"]
@@ -129,7 +133,7 @@ class SkeletonToMesh:
         log.info("  Size: [%.3f, %.3f, %.3f]", mesh_size[0], mesh_size[1], mesh_size[2])
         log.info("  Center: [%.3f, %.3f, %.3f]", mesh_center[0], mesh_center[1], mesh_center[2])
 
-        return (combined_mesh,)
+        return io.NodeOutput(combined_mesh)
 
 
 # Node mappings

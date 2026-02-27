@@ -9,11 +9,12 @@ import logging
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
 
-class FixSelfIntersectionsByRemovalNode:
+class FixSelfIntersectionsByRemovalNode(io.ComfyNode):
     """
     Fix self-intersections by removing intersecting faces and filling holes.
 
@@ -22,27 +23,29 @@ class FixSelfIntersectionsByRemovalNode:
     but effective approach for meshes with isolated self-intersection regions.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-            "optional": {
-                "fill_holes": ("BOOLEAN", {"default": True}),
-                "fix_normals": ("BOOLEAN", {"default": True}),
-                "max_hole_size": ("INT", {"default": 100, "min": 3, "max": 10000}),
-                "re_detect_after_fix": ("BOOLEAN", {"default": True}),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackFixSelfIntersectionsByRemoval",
+            display_name="Fix Self Intersections (Removal)",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Boolean.Input("fill_holes", default=True, optional=True),
+                io.Boolean.Input("fix_normals", default=True, optional=True),
+                io.Int.Input("max_hole_size", default=100, min=3, max=10000, optional=True),
+                io.Boolean.Input("re_detect_after_fix", default=True, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="fixed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("fixed_mesh", "info")
-    FUNCTION = "fix_by_removal"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def fix_by_removal(self, trimesh, fill_holes=True, fix_normals=True, max_hole_size=100,
+    @classmethod
+    def execute(cls, trimesh, fill_holes=True, fix_normals=True, max_hole_size=100,
                       re_detect_after_fix=True):
         """
         Fix self-intersections by removing bad faces and filling holes.
@@ -77,7 +80,7 @@ Returning mesh unchanged.
 Workflow suggestion:
 1. Load Mesh -> Detect Self Intersections -> Fix Self Intersections By Removal
 """
-            return {"ui": {"text": [warning_msg]}, "result": (trimesh, warning_msg)}
+            return io.NodeOutput(trimesh, warning_msg, ui={"text": [warning_msg]})
 
         # Get intersecting face indices
         face_field = trimesh.face_attributes['self_intersecting']
@@ -94,7 +97,7 @@ Either the mesh is already clean, or you need to run
 
 Returning mesh unchanged.
 """
-            return {"ui": {"text": [report]}, "result": (trimesh, report)}
+            return io.NodeOutput(trimesh, report, ui={"text": [report]})
 
         log.info("Found %d intersecting faces to remove", num_intersecting)
 
@@ -251,7 +254,7 @@ Status:
 """
 
         log.info("Complete: %d vertices, %d faces", final_vertices, final_faces)
-        return {"ui": {"text": [report]}, "result": (result_mesh, report)}
+        return io.NodeOutput(result_mesh, report, ui={"text": [report]})
 
 
 NODE_CLASS_MAPPINGS = {

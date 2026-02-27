@@ -9,6 +9,7 @@ import logging
 import numpy as np
 import trimesh as trimesh_module
 from typing import Tuple, Optional
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -209,7 +210,7 @@ def _mmg_adaptive_remesh(
         return None, f"Error during mmg remeshing: {str(e)}"
 
 
-class RemeshNode:
+class RemeshNode(io.ComfyNode):
     """
     Remesh - Topology-changing remeshing operations (main backends).
 
@@ -224,142 +225,45 @@ class RemeshNode:
     For GPU-accelerated remeshing, use "Remesh GPU" node.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "backend": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackRemesh",
+            display_name="Remesh",
+            category="geompack/remeshing",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("backend", options=[
                     "pymeshlab_isotropic",
                     "instant_meshes",
                     "quadriflow",
                     "mmg_adaptive",
-                ], {
-                    "default": "pymeshlab_isotropic",
-                    "tooltip": "Remeshing algorithm. pymeshlab=fast isotropic, instant_meshes=field-aligned quads, quadriflow=quad remesh with good topology, mmg_adaptive=curvature-adaptive surface remeshing"
-                }),
-            },
-            "optional": {
-                # Isotropic params (pymeshlab)
-                "target_edge_length": ("FLOAT", {
-                    "default": 1.00,
-                    "min": 0.001,
-                    "max": 10.0,
-                    "step": 0.01,
-                    "display": "number",
-                    "tooltip": "Target edge length for output triangles. Value is relative to mesh scale.",
-                    "visible_when": {"backend": ["pymeshlab_isotropic"]},
-                }),
-                "iterations": ("INT", {
-                    "default": 3,
-                    "min": 1,
-                    "max": 20,
-                    "step": 1,
-                    "tooltip": "Number of remeshing passes. More iterations = smoother result, slower processing.",
-                    "visible_when": {"backend": ["pymeshlab_isotropic"]},
-                }),
-                # PyMeshLab-specific
-                "feature_angle": ("FLOAT", {
-                    "default": 30.0,
-                    "min": 0.0,
-                    "max": 180.0,
-                    "step": 1.0,
-                    "tooltip": "Angle threshold (degrees) for feature edge detection. Edges with dihedral angle greater than this are preserved as sharp creases.",
-                    "visible_when": {"backend": ["pymeshlab_isotropic"]},
-                }),
-                "adaptive": (["true", "false"], {
-                    "default": "false",
-                    "tooltip": "Use curvature-adaptive edge lengths. Creates smaller triangles in high-curvature areas, larger triangles in flat areas.",
-                    "visible_when": {"backend": ["pymeshlab_isotropic"]},
-                }),
-                # Instant Meshes specific
-                "target_vertex_count": ("INT", {
-                    "default": 5000,
-                    "min": 100,
-                    "max": 1000000,
-                    "step": 100,
-                    "tooltip": "Target vertex count for Instant Meshes output. Creates field-aligned quad-dominant mesh.",
-                    "visible_when": {"backend": ["instant_meshes"]},
-                }),
-                "deterministic": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Use deterministic algorithm for reproducible results. Disable for potentially better quality but non-reproducible output.",
-                    "visible_when": {"backend": ["instant_meshes"]},
-                }),
-                "crease_angle": ("FLOAT", {
-                    "default": 0.0,
-                    "min": 0.0,
-                    "max": 180.0,
-                    "step": 1.0,
-                    "tooltip": "Angle threshold (degrees) for preserving sharp/crease edges in Instant Meshes. 0 = no crease preservation.",
-                    "visible_when": {"backend": ["instant_meshes"]},
-                }),
-                # QuadriFlow specific
-                "target_face_count": ("INT", {
-                    "default": 5000,
-                    "min": 100,
-                    "max": 5000000,
-                    "step": 100,
-                    "tooltip": "Target number of output faces for QuadriFlow. Creates quad-dominant mesh with good topology.",
-                    "visible_when": {"backend": ["quadriflow"]},
-                }),
-                "preserve_sharp": (["true", "false"], {
-                    "default": "false",
-                    "tooltip": "Preserve sharp edges during QuadriFlow remeshing.",
-                    "visible_when": {"backend": ["quadriflow"]},
-                }),
-                "preserve_boundary": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Preserve mesh boundary edges during QuadriFlow remeshing.",
-                    "visible_when": {"backend": ["quadriflow"]},
-                }),
-                # MMG adaptive surface remeshing
-                "hausd": ("FLOAT", {
-                    "default": 0.01,
-                    "min": 0.0001,
-                    "max": 10.0,
-                    "step": 0.001,
-                    "display": "number",
-                    "tooltip": "Hausdorff distance: maximum geometric deviation from original surface. Smaller values preserve detail better but produce more triangles.",
-                    "visible_when": {"backend": ["mmg_adaptive"]},
-                }),
-                "hmin": ("FLOAT", {
-                    "default": 0.0,
-                    "min": 0.0,
-                    "max": 10.0,
-                    "step": 0.001,
-                    "display": "number",
-                    "tooltip": "Minimum edge length. 0 = auto (MMG computes from mesh geometry). Setting this prevents overly small triangles.",
-                    "visible_when": {"backend": ["mmg_adaptive"]},
-                }),
-                "hmax": ("FLOAT", {
-                    "default": 0.0,
-                    "min": 0.0,
-                    "max": 100.0,
-                    "step": 0.01,
-                    "display": "number",
-                    "tooltip": "Maximum edge length. 0 = auto (MMG computes from mesh geometry). Setting this prevents overly large triangles in flat areas.",
-                    "visible_when": {"backend": ["mmg_adaptive"]},
-                }),
-                "hgrad": ("FLOAT", {
-                    "default": 1.3,
-                    "min": 1.0,
-                    "max": 5.0,
-                    "step": 0.1,
-                    "display": "number",
-                    "tooltip": "Gradation: controls how fast element sizes change across the mesh. 1.3 = smooth transitions (default). Lower = more uniform, higher = faster size changes.",
-                    "visible_when": {"backend": ["mmg_adaptive"]},
-                }),
-            }
-        }
+                ], default="pymeshlab_isotropic", tooltip="Remeshing algorithm. pymeshlab=fast isotropic, instant_meshes=field-aligned quads, quadriflow=quad remesh with good topology, mmg_adaptive=curvature-adaptive surface remeshing"),
+                io.Float.Input("target_edge_length", default=1.00, min=0.001, max=10.0, step=0.01, display="number", tooltip="Target edge length for output triangles. Value is relative to mesh scale.", visible_when={"backend": ["pymeshlab_isotropic"]}, optional=True),
+                io.Int.Input("iterations", default=3, min=1, max=20, step=1, tooltip="Number of remeshing passes. More iterations = smoother result, slower processing.", visible_when={"backend": ["pymeshlab_isotropic"]}, optional=True),
+                io.Float.Input("feature_angle", default=30.0, min=0.0, max=180.0, step=1.0, tooltip="Angle threshold (degrees) for feature edge detection. Edges with dihedral angle greater than this are preserved as sharp creases.", visible_when={"backend": ["pymeshlab_isotropic"]}, optional=True),
+                io.Combo.Input("adaptive", options=["true", "false"], default="false", tooltip="Use curvature-adaptive edge lengths. Creates smaller triangles in high-curvature areas, larger triangles in flat areas.", visible_when={"backend": ["pymeshlab_isotropic"]}, optional=True),
+                io.Int.Input("target_vertex_count", default=5000, min=100, max=1000000, step=100, tooltip="Target vertex count for Instant Meshes output. Creates field-aligned quad-dominant mesh.", visible_when={"backend": ["instant_meshes"]}, optional=True),
+                io.Combo.Input("deterministic", options=["true", "false"], default="true", tooltip="Use deterministic algorithm for reproducible results. Disable for potentially better quality but non-reproducible output.", visible_when={"backend": ["instant_meshes"]}, optional=True),
+                io.Float.Input("crease_angle", default=0.0, min=0.0, max=180.0, step=1.0, tooltip="Angle threshold (degrees) for preserving sharp/crease edges in Instant Meshes. 0 = no crease preservation.", visible_when={"backend": ["instant_meshes"]}, optional=True),
+                io.Int.Input("target_face_count", default=5000, min=100, max=5000000, step=100, tooltip="Target number of output faces for QuadriFlow. Creates quad-dominant mesh with good topology.", visible_when={"backend": ["quadriflow"]}, optional=True),
+                io.Combo.Input("preserve_sharp", options=["true", "false"], default="false", tooltip="Preserve sharp edges during QuadriFlow remeshing.", visible_when={"backend": ["quadriflow"]}, optional=True),
+                io.Combo.Input("preserve_boundary", options=["true", "false"], default="true", tooltip="Preserve mesh boundary edges during QuadriFlow remeshing.", visible_when={"backend": ["quadriflow"]}, optional=True),
+                io.Float.Input("hausd", default=0.01, min=0.0001, max=10.0, step=0.001, display="number", tooltip="Hausdorff distance: maximum geometric deviation from original surface. Smaller values preserve detail better but produce more triangles.", visible_when={"backend": ["mmg_adaptive"]}, optional=True),
+                io.Float.Input("hmin", default=0.0, min=0.0, max=10.0, step=0.001, display="number", tooltip="Minimum edge length. 0 = auto (MMG computes from mesh geometry). Setting this prevents overly small triangles.", visible_when={"backend": ["mmg_adaptive"]}, optional=True),
+                io.Float.Input("hmax", default=0.0, min=0.0, max=100.0, step=0.01, display="number", tooltip="Maximum edge length. 0 = auto (MMG computes from mesh geometry). Setting this prevents overly large triangles in flat areas.", visible_when={"backend": ["mmg_adaptive"]}, optional=True),
+                io.Float.Input("hgrad", default=1.3, min=1.0, max=5.0, step=0.1, display="number", tooltip="Gradation: controls how fast element sizes change across the mesh. 1.3 = smooth transitions (default). Lower = more uniform, higher = faster size changes.", visible_when={"backend": ["mmg_adaptive"]}, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="remeshed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("remeshed_mesh", "info")
-    FUNCTION = "remesh"
-    CATEGORY = "geompack/remeshing"
-    OUTPUT_NODE = True
-
-    def remesh(self, trimesh, backend, target_edge_length=1.0, iterations=3,
+    @classmethod
+    def execute(cls, trimesh, backend, target_edge_length=1.0, iterations=3,
                feature_angle=30.0, adaptive="false",
                target_vertex_count=5000, deterministic="true", crease_angle=0.0,
                target_face_count=5000, preserve_sharp="false", preserve_boundary="true",
@@ -386,25 +290,25 @@ class RemeshNode:
         if backend == "pymeshlab_isotropic":
             log.info("Parameters: target_edge_length=%s, iterations=%s, feature_angle=%s, adaptive=%s",
                      target_edge_length, iterations, feature_angle, adaptive)
-            remeshed_mesh, info = self._pymeshlab_isotropic(
+            remeshed_mesh, info = cls._pymeshlab_isotropic(
                 trimesh, target_edge_length, iterations, feature_angle, adaptive
             )
         elif backend == "instant_meshes":
             log.info("Parameters: target_vertex_count=%s, deterministic=%s, crease_angle=%s",
                      f"{target_vertex_count:,}", deterministic, crease_angle)
-            remeshed_mesh, info = self._instant_meshes(
+            remeshed_mesh, info = cls._instant_meshes(
                 trimesh, target_vertex_count, deterministic, crease_angle
             )
         elif backend == "quadriflow":
             log.info("Parameters: target_face_count=%s, preserve_sharp=%s, preserve_boundary=%s",
                      f"{target_face_count:,}", preserve_sharp, preserve_boundary)
-            remeshed_mesh, info = self._quadriflow(
+            remeshed_mesh, info = cls._quadriflow(
                 trimesh, target_face_count, preserve_sharp, preserve_boundary
             )
         elif backend == "mmg_adaptive":
             log.info("Parameters: hausd=%s, hmin=%s, hmax=%s, hgrad=%s",
                      hausd, hmin, hmax, hgrad)
-            remeshed_mesh, info = self._mmg_adaptive(
+            remeshed_mesh, info = cls._mmg_adaptive(
                 trimesh, hausd, hmin, hmax, hgrad
             )
         else:
@@ -416,9 +320,10 @@ class RemeshNode:
         log.info("Output: %d vertices (%+d), %d faces (%+d)",
                  len(remeshed_mesh.vertices), vertex_change, len(remeshed_mesh.faces), face_change)
 
-        return {"ui": {"text": [info]}, "result": (remeshed_mesh, info)}
+        return io.NodeOutput(remeshed_mesh, info, ui={"text": [info]})
 
-    def _pymeshlab_isotropic(self, trimesh, target_edge_length, iterations, feature_angle, adaptive):
+    @staticmethod
+    def _pymeshlab_isotropic(trimesh, target_edge_length, iterations, feature_angle, adaptive):
         """PyMeshLab isotropic remeshing."""
         adaptive_bool = (adaptive == "true")
         remeshed_mesh, error = _pymeshlab_isotropic_remesh(
@@ -445,7 +350,8 @@ After:
 """
         return remeshed_mesh, info
 
-    def _instant_meshes(self, trimesh, target_vertex_count, deterministic, crease_angle):
+    @staticmethod
+    def _instant_meshes(trimesh, target_vertex_count, deterministic, crease_angle):
         """Instant Meshes field-aligned remeshing."""
         try:
             import pynanoinstantmeshes as pynano
@@ -498,7 +404,8 @@ Instant Meshes creates flow-aligned quad meshes.
 """
         return remeshed_mesh, info
 
-    def _quadriflow(self, trimesh, target_face_count, preserve_sharp, preserve_boundary):
+    @staticmethod
+    def _quadriflow(trimesh, target_face_count, preserve_sharp, preserve_boundary):
         """QuadriFlow quad remeshing using pyQuadriFlow."""
         try:
             from pyQuadriFlow.pyQuadriFlow import pyquadriflow
@@ -559,7 +466,8 @@ QuadriFlow creates quad-dominant meshes with good topology.
 """
         return remeshed_mesh, info
 
-    def _mmg_adaptive(self, trimesh, hausd, hmin, hmax, hgrad):
+    @staticmethod
+    def _mmg_adaptive(trimesh, hausd, hmin, hmax, hgrad):
         """MMG adaptive surface remeshing."""
         remeshed_mesh, error = _mmg_adaptive_remesh(
             trimesh, hausd=hausd, hmin=hmin, hmax=hmax, hgrad=hgrad

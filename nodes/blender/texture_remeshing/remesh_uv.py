@@ -12,6 +12,7 @@ import tempfile
 
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -174,7 +175,7 @@ def _load_as_comfy_image(texture_path):
     return torch.from_numpy(img_array)[None,]
 
 
-class RemeshWithTexture:
+class RemeshWithTexture(io.ComfyNode):
     """
     Remesh with texture preservation using Blender baking.
 
@@ -185,41 +186,31 @@ class RemeshWithTexture:
     4. Returns remeshed mesh with baked texture
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "method": (["blender", "xatlas"], {"default": "blender"}),
-                "remesh_method": (["voxel", "quadriflow"], {"default": "quadriflow"}),
-                "voxel_size": ("FLOAT", {
-                    "default": 0.05,
-                    "min": 0.001,
-                    "max": 1.0,
-                    "step": 0.01,
-                }),
-                "target_face_count": ("INT", {
-                    "default": 5000,
-                    "min": 100,
-                    "max": 1000000,
-                    "step": 100
-                }),
-                "bake_margin": ("INT", {
-                    "default": 48,
-                    "min": 0,
-                    "max": 128,
-                    "step": 1
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackRemeshWithTexture",
+            display_name="Remesh with Texture",
+            category="geompack/texture_remeshing",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("method", options=["blender", "xatlas"], default="blender"),
+                io.Combo.Input("remesh_method", options=["voxel", "quadriflow"], default="quadriflow"),
+                io.Float.Input("voxel_size", default=0.05, min=0.001, max=1.0, step=0.01),
+                io.Int.Input("target_face_count", default=5000, min=100, max=1000000, step=100),
+                io.Int.Input("bake_margin", default=48, min=0, max=128, step=1),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="remeshed_mesh"),
+                io.Image.Output(display_name="baked_texture"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "IMAGE", "STRING")
-    RETURN_NAMES = ("remeshed_mesh", "baked_texture", "info")
-    FUNCTION = "remesh_with_texture"
-    CATEGORY = "geompack/texture_remeshing"
-    OUTPUT_NODE = True
-
-    def remesh_with_texture(self, trimesh, method, remesh_method, voxel_size, target_face_count,
+    @classmethod
+    def execute(cls, trimesh, method, remesh_method, voxel_size, target_face_count,
                            bake_margin):
         """Remesh a textured mesh while preserving texture through Python closest-point projection."""
         raise NotImplementedError(
@@ -546,7 +537,7 @@ Texture Transfer: Closest-Point Projection{placeholder_warning}
 """
 
             log.info("Complete")
-            return {"ui": {"text": [info]}, "result": (remeshed_with_colors, comfy_image, info)}
+            return io.NodeOutput(remeshed_with_colors, comfy_image, info, ui={"text": [info]})
 
         finally:
             # Cleanup

@@ -11,6 +11,7 @@ import logging
 
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
@@ -93,7 +94,7 @@ def _bpy_remesh_modifier(vertices, faces, mode, octree_depth=6, scale=0.9, sharp
     return _bpy_extract_and_cleanup(obj)
 
 
-class RemeshBlenderNode:
+class RemeshBlenderNode(io.ComfyNode):
     """
     Remesh Blender - Blender-based remeshing using bpy.
 
@@ -106,69 +107,35 @@ class RemeshBlenderNode:
     Requires bpy (Blender Python module) to be installed.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "backend": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackRemeshBlender",
+            display_name="Remesh Blender",
+            category="geompack/remeshing",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("backend", options=[
                     "blender_voxel",
                     "blender_smooth",
                     "blender_sharp",
                     "blender_blocks",
-                ], {
-                    "default": "blender_voxel",
-                    "tooltip": "Remeshing algorithm. voxel=watertight, smooth/sharp/blocks=modifier-based"
-                }),
-            },
-            "optional": {
-                # Blender voxel
-                "voxel_size": ("FLOAT", {
-                    "default": 1,
-                    "min": 0.001,
-                    "max": 1.0,
-                    "step": 0.01,
-                    "display": "number",
-                    "tooltip": "Voxel size for Blender voxel remesh. Smaller = more detail, more faces. Output is always watertight.",
-                    "visible_when": {"backend": ["blender_voxel"]},
-                }),
-                # Modifier-based (Smooth/Sharp/Blocks)
-                "octree_depth": ("INT", {
-                    "default": 6,
-                    "min": 1,
-                    "max": 10,
-                    "step": 1,
-                    "tooltip": "Resolution of the remesh. Higher = more detail, more faces.",
-                    "visible_when": {"backend": ["blender_smooth", "blender_sharp", "blender_blocks"]},
-                }),
-                "scale": ("FLOAT", {
-                    "default": 0.9,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.05,
-                    "display": "number",
-                    "tooltip": "Ratio of output size to input bounding box.",
-                    "visible_when": {"backend": ["blender_smooth", "blender_sharp", "blender_blocks"]},
-                }),
-                "sharpness": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.0,
-                    "max": 5.0,
-                    "step": 0.1,
-                    "display": "number",
-                    "tooltip": "Edge sharpness for Sharp mode.",
-                    "visible_when": {"backend": ["blender_sharp"]},
-                }),
-            }
-        }
+                ], default="blender_voxel", tooltip="Remeshing algorithm. voxel=watertight, smooth/sharp/blocks=modifier-based"),
+                io.Float.Input("voxel_size", default=1, min=0.001, max=1.0, step=0.01, display="number", tooltip="Voxel size for Blender voxel remesh. Smaller = more detail, more faces. Output is always watertight.", visible_when={"backend": ["blender_voxel"]}, optional=True),
+                io.Int.Input("octree_depth", default=6, min=1, max=10, step=1, tooltip="Resolution of the remesh. Higher = more detail, more faces.", visible_when={"backend": ["blender_smooth", "blender_sharp", "blender_blocks"]}, optional=True),
+                io.Float.Input("scale", default=0.9, min=0.0, max=1.0, step=0.05, display="number", tooltip="Ratio of output size to input bounding box.", visible_when={"backend": ["blender_smooth", "blender_sharp", "blender_blocks"]}, optional=True),
+                io.Float.Input("sharpness", default=1.0, min=0.0, max=5.0, step=0.1, display="number", tooltip="Edge sharpness for Sharp mode.", visible_when={"backend": ["blender_sharp"]}, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="remeshed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("remeshed_mesh", "info")
-    FUNCTION = "remesh"
-    CATEGORY = "geompack/remeshing"
-    OUTPUT_NODE = True
-
-    def remesh(self, trimesh, backend, voxel_size=1.0,
+    @classmethod
+    def execute(cls, trimesh, backend, voxel_size=1.0,
                octree_depth=6, scale=0.9, sharpness=1.0):
         """Apply Blender-based remeshing."""
         # Sanitize hidden widget values (ComfyUI sends '' for hidden visible_when widgets)
@@ -185,13 +152,13 @@ class RemeshBlenderNode:
 
         if backend == "blender_voxel":
             log.info("Parameters: voxel_size=%s", voxel_size)
-            remeshed_mesh, info = self._blender_voxel(trimesh, voxel_size)
+            remeshed_mesh, info = cls._blender_voxel(trimesh, voxel_size)
         elif backend in ("blender_smooth", "blender_sharp", "blender_blocks"):
             mode = backend.replace("blender_", "").upper()
             log.info("Parameters: mode=%s, octree_depth=%d, scale=%s%s",
                      mode, octree_depth, scale,
                      f", sharpness={sharpness}" if backend == "blender_sharp" else "")
-            remeshed_mesh, info = self._blender_modifier(trimesh, mode, octree_depth, scale, sharpness)
+            remeshed_mesh, info = cls._blender_modifier(trimesh, mode, octree_depth, scale, sharpness)
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
@@ -204,9 +171,10 @@ class RemeshBlenderNode:
                  len(remeshed_mesh.vertices), vertex_change,
                  len(remeshed_mesh.faces), face_change)
 
-        return {"ui": {"text": [info]}, "result": (remeshed_mesh, info)}
+        return io.NodeOutput(remeshed_mesh, info, ui={"text": [info]})
 
-    def _blender_voxel(self, trimesh, voxel_size):
+    @staticmethod
+    def _blender_voxel(trimesh, voxel_size):
         """Blender voxel remeshing using bpy."""
         log.info("Running Blender voxel remesh (voxel_size=%s)...", voxel_size)
         result = _bpy_voxel_remesh(
@@ -244,7 +212,8 @@ After:
 """
         return remeshed_mesh, info
 
-    def _blender_modifier(self, trimesh, mode, octree_depth, scale, sharpness):
+    @staticmethod
+    def _blender_modifier(trimesh, mode, octree_depth, scale, sharpness):
         """Blender Remesh Modifier (Smooth/Sharp/Blocks)."""
         log.info("Running Blender Remesh Modifier (mode=%s, depth=%d)...", mode, octree_depth)
         result = _bpy_remesh_modifier(

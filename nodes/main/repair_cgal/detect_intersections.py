@@ -10,11 +10,11 @@ import os
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
-
-class DetectSelfIntersectionsNode:
+class DetectSelfIntersectionsNode(io.ComfyNode):
     """
     Detect self-intersecting faces in a mesh.
 
@@ -25,20 +25,23 @@ class DetectSelfIntersectionsNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackDetectSelfIntersections",
+            display_name="Self Intersections",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh_with_field"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("mesh_with_field", "info")
-    OUTPUT_NODE = True  # Enable UI output for dynamic display
-    FUNCTION = "detect_intersections"
-    CATEGORY = "geompack/repair"
-
-    def detect_intersections(self, trimesh):
+    @classmethod
+    def execute(cls, trimesh):
         """
         Detect self-intersecting faces and mark them with scalar fields.
 
@@ -196,13 +199,7 @@ Use 'Preview Mesh (VTK with Fields)' node to visualize the intersection fields!
                 "faces": intersecting_faces_list
             }
 
-            return {
-                "result": (result_mesh, report),
-                "ui": {
-                    "text": [report],
-                    "intersection_data": [ui_data]
-                }
-            }
+            return io.NodeOutput(result_mesh, report, ui={ "text": [report], "intersection_data": [ui_data] })
 
         except ImportError as e:
             # libigl not available at all
@@ -216,7 +213,7 @@ Install with: pip install libigl cgal
 For now, returning mesh unchanged.
 """
             log.error("libigl import error: %s", e)
-            return {"ui": {"text": [error_msg]}, "result": (trimesh, error_msg)}
+            return io.NodeOutput(trimesh, error_msg, ui={"text": [error_msg]})
 
         except Exception as e:
             log.error("Unexpected error detecting self-intersections", exc_info=True)
@@ -227,8 +224,7 @@ For now, returning mesh unchanged.
 Returning mesh unchanged. Check console for details.
 """
             log.error("Unexpected error: %s", e)
-            return {"ui": {"text": [error_msg]}, "result": (trimesh, error_msg)}
-
+            return io.NodeOutput(trimesh, error_msg, ui={"text": [error_msg]})
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackDetectSelfIntersections": DetectSelfIntersectionsNode,
