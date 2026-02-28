@@ -255,63 +255,39 @@ class DecimateMeshNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
-                io.Combo.Input("backend", options=[
-                    "quadric_edge_collapse",
-                    "fast_simplification",
-                    "vertex_clustering",
-                    "cgal_edge_collapse",
-                    "decimate_pro",
-                ], default="quadric_edge_collapse", tooltip=(
+                io.DynamicCombo.Input("backend", tooltip=(
                         "Decimation algorithm. "
                         "quadric_edge_collapse=best quality, "
                         "fast_simplification=fastest, "
                         "vertex_clustering=aggressive, "
                         "cgal_edge_collapse=highest fidelity, "
                         "decimate_pro=topology-preserving"
-                    )),
-                io.Int.Input("target_face_count", default=5000, min=4, max=10000000, step=100, tooltip="Target number of output faces.", visible_when={"backend": [
-                        "quadric_edge_collapse", "cgal_edge_collapse",
-                    ]}, optional=True),
-                io.Float.Input("target_reduction", default=0.5, min=0.01, max=0.99, step=0.01, tooltip=(
-                        "Fraction of faces to REMOVE. "
-                        "0.5 = reduce to ~50%% of original faces, "
-                        "0.9 = reduce to ~10%% of original."
-                    ), visible_when={"backend": [
-                        "fast_simplification", "decimate_pro",
-                    ]}, optional=True),
-                io.Float.Input("quality_threshold", default=0.3, min=0.0, max=1.0, step=0.05, tooltip=(
-                        "Quality threshold for edge collapse. "
-                        "Higher = more conservative, better triangle quality."
-                    ), visible_when={"backend": ["quadric_edge_collapse"]}, optional=True),
-                io.Combo.Input("preserve_boundary", options=["true", "false"], default="true", tooltip="Preserve mesh boundary edges during decimation.", visible_when={"backend": ["quadric_edge_collapse"]}, optional=True),
-                io.Combo.Input("preserve_normal", options=["true", "false"], default="true", tooltip="Prevent face normal flips during decimation.", visible_when={"backend": ["quadric_edge_collapse"]}, optional=True),
-                io.Combo.Input("preserve_topology", options=["true", "false"], default="true", tooltip="Preserve mesh topology (genus) during decimation.", visible_when={"backend": [
-                        "quadric_edge_collapse", "decimate_pro",
-                    ]}, optional=True),
-                io.Combo.Input("planar_quadric", options=["true", "false"], default="false", tooltip=(
-                        "Add penalty for non-planar faces. "
-                        "Helps preserve flat regions."
-                    ), visible_when={"backend": ["quadric_edge_collapse"]}, optional=True),
-                io.Int.Input("aggressiveness", default=7, min=1, max=15, step=1, tooltip=(
-                        "How aggressively to simplify. "
-                        "Higher = faster but lower quality. Default 7."
-                    ), visible_when={"backend": ["fast_simplification"]}, optional=True),
-                io.Float.Input("cluster_threshold", default=1.0, min=0.1, max=10.0, step=0.1, tooltip=(
-                        "Clustering cell size as percentage of bounding box diagonal. "
-                        "Larger = more aggressive reduction."
-                    ), visible_when={"backend": ["vertex_clustering"]}, optional=True),
-                io.Combo.Input("cost_strategy", options=[
-                    "lindstrom_turk",
-                    "edge_length",
-                ], default="lindstrom_turk", tooltip=(
-                        "CGAL cost strategy. "
-                        "lindstrom_turk=optimizes geometry+volume+boundary (best), "
-                        "edge_length=collapses shortest edges first (fast)."
-                    ), visible_when={"backend": ["cgal_edge_collapse"]}, optional=True),
-                io.Float.Input("feature_angle", default=15.0, min=0.0, max=180.0, step=1.0, tooltip=(
-                        "Feature angle threshold (degrees). "
-                        "Edges with dihedral angle above this are preserved."
-                    ), visible_when={"backend": ["decimate_pro"]}, optional=True),
+                    ), options=[
+                    io.DynamicCombo.Option("quadric_edge_collapse", [
+                        io.Int.Input("target_face_count", default=5000, min=4, max=10000000, step=100, tooltip="Target number of output faces."),
+                        io.Float.Input("quality_threshold", default=0.3, min=0.0, max=1.0, step=0.05, tooltip="Quality threshold for edge collapse. Higher = more conservative, better triangle quality."),
+                        io.Combo.Input("preserve_boundary", options=["true", "false"], default="true", tooltip="Preserve mesh boundary edges during decimation."),
+                        io.Combo.Input("preserve_normal", options=["true", "false"], default="true", tooltip="Prevent face normal flips during decimation."),
+                        io.Combo.Input("preserve_topology", options=["true", "false"], default="true", tooltip="Preserve mesh topology (genus) during decimation."),
+                        io.Combo.Input("planar_quadric", options=["true", "false"], default="false", tooltip="Add penalty for non-planar faces. Helps preserve flat regions."),
+                    ]),
+                    io.DynamicCombo.Option("fast_simplification", [
+                        io.Float.Input("target_reduction", default=0.5, min=0.01, max=0.99, step=0.01, tooltip="Fraction of faces to REMOVE. 0.5 = reduce to ~50%% of original faces, 0.9 = reduce to ~10%% of original."),
+                        io.Int.Input("aggressiveness", default=7, min=1, max=15, step=1, tooltip="How aggressively to simplify. Higher = faster but lower quality. Default 7."),
+                    ]),
+                    io.DynamicCombo.Option("vertex_clustering", [
+                        io.Float.Input("cluster_threshold", default=1.0, min=0.1, max=10.0, step=0.1, tooltip="Clustering cell size as percentage of bounding box diagonal. Larger = more aggressive reduction."),
+                    ]),
+                    io.DynamicCombo.Option("cgal_edge_collapse", [
+                        io.Int.Input("target_face_count", default=5000, min=4, max=10000000, step=100, tooltip="Target number of output faces."),
+                        io.Combo.Input("cost_strategy", options=["lindstrom_turk", "edge_length"], default="lindstrom_turk", tooltip="CGAL cost strategy. lindstrom_turk=optimizes geometry+volume+boundary (best), edge_length=collapses shortest edges first (fast)."),
+                    ]),
+                    io.DynamicCombo.Option("decimate_pro", [
+                        io.Float.Input("target_reduction", default=0.5, min=0.01, max=0.99, step=0.01, tooltip="Fraction of faces to REMOVE. 0.5 = reduce to ~50%% of original faces, 0.9 = reduce to ~10%% of original."),
+                        io.Float.Input("feature_angle", default=15.0, min=0.0, max=180.0, step=1.0, tooltip="Feature angle threshold (degrees). Edges with dihedral angle above this are preserved."),
+                        io.Combo.Input("preserve_topology", options=["true", "false"], default="true", tooltip="Preserve mesh topology (genus) during decimation."),
+                    ]),
+                ]),
             ],
             outputs=[
                 io.Custom("TRIMESH").Output(display_name="decimated_mesh"),
@@ -320,39 +296,29 @@ class DecimateMeshNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(
-        cls,
-        trimesh,
-        backend,
-        target_face_count=5000,
-        target_reduction=0.5,
-        quality_threshold=0.3,
-        preserve_boundary="true",
-        preserve_normal="true",
-        preserve_topology="true",
-        planar_quadric="false",
-        aggressiveness=7,
-        cluster_threshold=1.0,
-        cost_strategy="lindstrom_turk",
-        feature_angle=15.0,
-    ):
+    def execute(cls, trimesh, backend):
         """Apply mesh decimation based on selected backend."""
-        # Sanitize hidden widget values
-        target_face_count = int(target_face_count) if target_face_count not in (None, "") else 5000
-        target_reduction = float(target_reduction) if target_reduction not in (None, "") else 0.5
-        quality_threshold = float(quality_threshold) if quality_threshold not in (None, "") else 0.3
-        aggressiveness = int(aggressiveness) if aggressiveness not in (None, "") else 7
-        cluster_threshold = float(cluster_threshold) if cluster_threshold not in (None, "") else 1.0
-        feature_angle = float(feature_angle) if feature_angle not in (None, "") else 15.0
+        selected = backend["backend"]
+        target_face_count = backend.get("target_face_count", 5000)
+        target_reduction = backend.get("target_reduction", 0.5)
+        quality_threshold = backend.get("quality_threshold", 0.3)
+        preserve_boundary = backend.get("preserve_boundary", "true")
+        preserve_normal = backend.get("preserve_normal", "true")
+        preserve_topology = backend.get("preserve_topology", "true")
+        planar_quadric = backend.get("planar_quadric", "false")
+        aggressiveness = backend.get("aggressiveness", 7)
+        cluster_threshold = backend.get("cluster_threshold", 1.0)
+        cost_strategy = backend.get("cost_strategy", "lindstrom_turk")
+        feature_angle = backend.get("feature_angle", 15.0)
 
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        log.info("Decimate backend: %s", backend)
+        log.info("Decimate backend: %s", selected)
         log.info("Input: %s vertices, %s faces",
                  f"{initial_vertices:,}", f"{initial_faces:,}")
 
-        if backend == "quadric_edge_collapse":
+        if selected == "quadric_edge_collapse":
             log.info("Parameters: target_face_count=%d, quality_thr=%.2f, "
                      "preserve_boundary=%s, preserve_normal=%s, preserve_topology=%s",
                      target_face_count, quality_threshold,
@@ -365,22 +331,20 @@ class DecimateMeshNode(io.ComfyNode):
                 planar_quadric == "true",
             )
 
-        elif backend == "fast_simplification":
+        elif selected == "fast_simplification":
             log.info("Parameters: target_reduction=%.2f, aggressiveness=%d",
                      target_reduction, aggressiveness)
             decimated, error = _fast_simplification_decimate(
                 trimesh, target_reduction, aggressiveness,
             )
 
-        elif backend == "vertex_clustering":
+        elif selected == "vertex_clustering":
             log.info("Parameters: cluster_threshold=%.1f%%", cluster_threshold)
             decimated, error = _pymeshlab_vertex_clustering(
                 trimesh, cluster_threshold,
             )
 
-        elif backend == "cgal_edge_collapse":
-            # CGAL uses edge count as stop predicate; approximate from face count
-            # For a closed triangle mesh: E ~ 1.5 * F
+        elif selected == "cgal_edge_collapse":
             target_edges = int(target_face_count * 1.5)
             log.info("Parameters: target_edges=%d (from target_faces=%d), cost=%s",
                      target_edges, target_face_count, cost_strategy)
@@ -388,7 +352,7 @@ class DecimateMeshNode(io.ComfyNode):
                 trimesh, target_edges, cost_strategy,
             )
 
-        elif backend == "decimate_pro":
+        elif selected == "decimate_pro":
             log.info("Parameters: target_reduction=%.2f, preserve_topology=%s, feature_angle=%.1f",
                      target_reduction, preserve_topology, feature_angle)
             decimated, error = _pyvista_decimate_pro(
@@ -398,16 +362,16 @@ class DecimateMeshNode(io.ComfyNode):
             )
 
         else:
-            raise ValueError(f"Unknown backend: {backend}")
+            raise ValueError(f"Unknown backend: {selected}")
 
         if decimated is None:
-            raise ValueError(f"Decimation failed ({backend}): {error}")
+            raise ValueError(f"Decimation failed ({selected}): {error}")
 
         # Copy metadata
         if hasattr(trimesh, "metadata") and trimesh.metadata:
             decimated.metadata = trimesh.metadata.copy()
         decimated.metadata["decimation"] = {
-            "algorithm": backend,
+            "algorithm": selected,
             "original_vertices": initial_vertices,
             "original_faces": initial_faces,
             "result_vertices": len(decimated.vertices),
@@ -423,7 +387,7 @@ class DecimateMeshNode(io.ComfyNode):
                  len(decimated.faces), face_change, face_pct)
 
         # Build backend-specific param block
-        if backend == "quadric_edge_collapse":
+        if selected == "quadric_edge_collapse":
             param_text = (
                 f"Target Face Count: {target_face_count:,}\n"
                 f"Quality Threshold: {quality_threshold}\n"
@@ -432,19 +396,19 @@ class DecimateMeshNode(io.ComfyNode):
                 f"Preserve Topology: {preserve_topology}\n"
                 f"Planar Quadric: {planar_quadric}"
             )
-        elif backend == "fast_simplification":
+        elif selected == "fast_simplification":
             param_text = (
                 f"Target Reduction: {target_reduction:.0%}\n"
                 f"Aggressiveness: {aggressiveness}"
             )
-        elif backend == "vertex_clustering":
+        elif selected == "vertex_clustering":
             param_text = f"Cluster Threshold: {cluster_threshold}%"
-        elif backend == "cgal_edge_collapse":
+        elif selected == "cgal_edge_collapse":
             param_text = (
                 f"Target Face Count: {target_face_count:,}\n"
                 f"Cost Strategy: {cost_strategy}"
             )
-        elif backend == "decimate_pro":
+        elif selected == "decimate_pro":
             param_text = (
                 f"Target Reduction: {target_reduction:.0%}\n"
                 f"Preserve Topology: {preserve_topology}\n"
@@ -453,7 +417,7 @@ class DecimateMeshNode(io.ComfyNode):
         else:
             param_text = ""
 
-        info = f"""Decimate Results ({backend}):
+        info = f"""Decimate Results ({selected}):
 
 {param_text}
 

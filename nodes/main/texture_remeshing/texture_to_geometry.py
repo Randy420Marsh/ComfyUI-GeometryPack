@@ -47,15 +47,19 @@ class TextureToGeometryNode(io.ComfyNode):
                 io.Image.Input("depth_image", optional=True),
                 io.Mask.Input("field", tooltip="Optional field to store as vertex attribute on the mesh (e.g., face IDs, curvature)", optional=True),
                 io.String.Input("field_name", default="field", tooltip="Name for the vertex attribute", optional=True),
-                io.Combo.Input("backend", options=[
-                    "grid",
-                    "poisson_pymeshlab",
-                    "poisson_open3d",
-                    "delaunay_2d",
-                ], default="grid", tooltip="Reconstruction backend: grid (fast), poisson (smooth), delaunay", optional=True),
-                io.Int.Input("poisson_depth", default=8, min=4, max=12, step=1, tooltip="Octree depth for Poisson reconstruction (higher = more detail)", visible_when={"backend": ["poisson_pymeshlab", "poisson_open3d"]}, optional=True),
+                io.DynamicCombo.Input("backend", tooltip="Reconstruction backend: grid (fast), poisson (smooth), delaunay", options=[
+                    io.DynamicCombo.Option("grid", [
+                        io.Combo.Input("smooth_normals", options=["true", "false"], default="true"),
+                    ]),
+                    io.DynamicCombo.Option("poisson_pymeshlab", [
+                        io.Int.Input("poisson_depth", default=8, min=4, max=12, step=1, tooltip="Octree depth for Poisson reconstruction (higher = more detail)"),
+                    ]),
+                    io.DynamicCombo.Option("poisson_open3d", [
+                        io.Int.Input("poisson_depth", default=8, min=4, max=12, step=1, tooltip="Octree depth for Poisson reconstruction (higher = more detail)"),
+                    ]),
+                    io.DynamicCombo.Option("delaunay_2d", []),
+                ]),
                 io.Combo.Input("invert_height", options=["false", "true"], default="false", optional=True),
-                io.Combo.Input("smooth_normals", options=["true", "false"], default="true", visible_when={"backend": ["grid"]}, optional=True),
                 io.Combo.Input("skip_black", options=["false", "true"], default="false", tooltip="Skip faces connected to near-black pixels in the depth map", optional=True),
                 io.Float.Input("black_threshold", default=0.01, min=0.0, max=1.0, step=0.01, tooltip="Threshold below which pixels are considered black (only used when skip_black is true)", optional=True),
             ],
@@ -69,8 +73,8 @@ class TextureToGeometryNode(io.ComfyNode):
     def execute(cls, height_scale,
                            mask=None, depth_image=None,
                            field=None, field_name="field",
-                           backend="grid", poisson_depth=8,
-                           invert_height="false", smooth_normals="true",
+                           backend=None, poisson_depth=8,
+                           invert_height="false",
                            skip_black="false", black_threshold=0.01):
         """
         Convert binary mask to 3D mesh with height displacement.
@@ -93,7 +97,14 @@ class TextureToGeometryNode(io.ComfyNode):
         if mask is None and depth_image is None:
             raise ValueError("Either 'mask' or 'depth_image' must be provided")
 
-        log.info("Converting to geometry using backend: %s", backend)
+        # Extract DynamicCombo values
+        if backend is None:
+            backend = {"backend": "grid"}
+        selected_backend = backend["backend"]
+        poisson_depth = backend.get("poisson_depth", 8)
+        smooth_normals = backend.get("smooth_normals", "true")
+
+        log.info("Converting to geometry using backend: %s", selected_backend)
 
         # Use depth_image if provided, otherwise use mask
         if depth_image is not None:
@@ -142,7 +153,7 @@ class TextureToGeometryNode(io.ComfyNode):
         log.info("Generated %d points", len(points))
 
         # Dispatch to appropriate backend
-        if backend == "grid":
+        if selected_backend == "grid":
             mesh = cls._build_grid_mesh(
                 heightmap, height_scale, width, height,
                 skip_black == "true", black_threshold,
@@ -150,17 +161,17 @@ class TextureToGeometryNode(io.ComfyNode):
                 field, field_name
             )
             backend_info = "Grid-based displacement mesh"
-        elif backend == "poisson_pymeshlab":
+        elif selected_backend == "poisson_pymeshlab":
             mesh = cls._build_poisson_pymeshlab(points, poisson_depth)
             backend_info = f"PyMeshLab Screened Poisson reconstruction (depth={poisson_depth})"
-        elif backend == "poisson_open3d":
+        elif selected_backend == "poisson_open3d":
             mesh = cls._build_poisson_open3d(points, poisson_depth)
             backend_info = f"Open3D Poisson reconstruction (depth={poisson_depth})"
-        elif backend == "delaunay_2d":
+        elif selected_backend == "delaunay_2d":
             mesh = cls._build_delaunay_2d(points)
             backend_info = "2D Delaunay triangulation"
         else:
-            raise ValueError(f"Unknown backend: {backend}")
+            raise ValueError(f"Unknown backend: {selected_backend}")
 
         log.info("Created mesh: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
 
@@ -177,7 +188,7 @@ Input:
   Inverted: {invert_height}
   Skip Black: {skip_black} (threshold: {black_threshold})
 
-Backend: {backend}
+Backend: {selected_backend}
   {backend_info}
 
 Output Mesh:

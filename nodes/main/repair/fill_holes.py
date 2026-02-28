@@ -52,9 +52,16 @@ class FillHolesNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("mesh"),
-                io.Combo.Input("method", options=["cumesh", "trimesh", "pymeshlab", "igl_fan"], default="cumesh"),
-                io.Float.Input("perimeter", default=0.03, min=0.001, max=1.0, step=0.001, visible_when={"method": ["cumesh"]}, optional=True),
-                io.Int.Input("maxholesize", default=1000, min=1, max=100000, step=100, visible_when={"method": ["pymeshlab"]}, optional=True),
+                io.DynamicCombo.Input("method", options=[
+                    io.DynamicCombo.Option("cumesh", [
+                        io.Float.Input("perimeter", default=0.03, min=0.001, max=1.0, step=0.001),
+                    ]),
+                    io.DynamicCombo.Option("trimesh", []),
+                    io.DynamicCombo.Option("pymeshlab", [
+                        io.Int.Input("maxholesize", default=1000, min=1, max=100000, step=100),
+                    ]),
+                    io.DynamicCombo.Option("igl_fan", []),
+                ]),
             ],
             outputs=[
                 io.Custom("TRIMESH").Output(display_name="filled_mesh"),
@@ -63,27 +70,31 @@ class FillHolesNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, mesh, method="cumesh", perimeter=0.03, maxholesize=1000):
+    def execute(cls, mesh, method):
         """
         Fill holes in the mesh.
 
         Args:
             mesh: Input trimesh.Trimesh object
-            method: Hole filling method ("cumesh", "trimesh", "pymeshlab", or "igl_fan")
-            perimeter: Maximum hole perimeter to fill (used by cumesh, default matches TRELLIS2)
+            method: DynamicCombo dict with selected method and its parameters
 
         Returns:
             tuple: (filled_trimesh, info_string)
         """
+        selected = method["method"]
+        perimeter = method.get("perimeter", 0.03)
+        maxholesize = method.get("maxholesize", 1000)
+
         # Log method and parameters
-        log.info("Method: %s", method)
+        log.info("Method: %s", selected)
         log.info("Input: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
-        if method == "cumesh":
+        if selected == "cumesh":
             log.info("Parameters: perimeter=%s", perimeter)
-        elif method == "pymeshlab":
+        elif selected == "pymeshlab":
             log.info("Parameters: maxholesize=%d", maxholesize)
-        elif method in ["trimesh", "igl_fan"]:
+        elif selected in ["trimesh", "igl_fan"]:
             log.info("Parameters: (none)")
+        method = selected
 
         # Check initial state
         was_watertight = mesh.is_watertight

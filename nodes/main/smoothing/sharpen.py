@@ -129,32 +129,34 @@ class SharpenMeshNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
-                io.Combo.Input("backend", options=[
-                    "two_step",
-                    "unsharp_mask",
-                ], default="two_step", tooltip=(
+                io.DynamicCombo.Input("backend", tooltip=(
                         "Sharpening algorithm. "
                         "two_step=bilateral normal filtering (recommended for CAD-like edges), "
                         "unsharp_mask=geometric unsharp masking (general enhancement)"
-                    )),
-                io.Int.Input("smooth_steps", default=3, min=1, max=50, step=1, tooltip=(
-                        "Number of two-step smoothing passes. "
-                        "More steps = stronger sharpening effect."
-                    ), visible_when={"backend": ["two_step"]}, optional=True),
-                io.Float.Input("normal_threshold", default=60.0, min=0.0, max=180.0, step=0.5, tooltip=(
-                        "Dihedral angle threshold in degrees. "
-                        "Edges sharper than this angle are preserved as features. "
-                        "Lower = more aggressive (more edges treated as creases). "
-                        "60 is a good default for most CAD models."
-                    ), visible_when={"backend": ["two_step"]}, optional=True),
-                io.Float.Input("weight", default=0.3, min=0.0, max=3.0, step=0.01, tooltip=(
-                        "Unsharp mask weight controlling sharpening strength. "
-                        "Higher = more pronounced sharpening."
-                    ), visible_when={"backend": ["unsharp_mask"]}, optional=True),
-                io.Int.Input("iterations", default=5, min=1, max=50, step=1, tooltip=(
-                        "Smoothing iterations for the reference smooth mesh. "
-                        "More iterations = larger-scale sharpening."
-                    ), visible_when={"backend": ["unsharp_mask"]}, optional=True),
+                    ), options=[
+                    io.DynamicCombo.Option("two_step", [
+                        io.Int.Input("smooth_steps", default=3, min=1, max=50, step=1, tooltip=(
+                            "Number of two-step smoothing passes. "
+                            "More steps = stronger sharpening effect."
+                        )),
+                        io.Float.Input("normal_threshold", default=60.0, min=0.0, max=180.0, step=0.5, tooltip=(
+                            "Dihedral angle threshold in degrees. "
+                            "Edges sharper than this angle are preserved as features. "
+                            "Lower = more aggressive (more edges treated as creases). "
+                            "60 is a good default for most CAD models."
+                        )),
+                    ]),
+                    io.DynamicCombo.Option("unsharp_mask", [
+                        io.Float.Input("weight", default=0.3, min=0.0, max=3.0, step=0.01, tooltip=(
+                            "Unsharp mask weight controlling sharpening strength. "
+                            "Higher = more pronounced sharpening."
+                        )),
+                        io.Int.Input("iterations", default=5, min=1, max=50, step=1, tooltip=(
+                            "Smoothing iterations for the reference smooth mesh. "
+                            "More iterations = larger-scale sharpening."
+                        )),
+                    ]),
+                ]),
             ],
             outputs=[
                 io.Custom("TRIMESH").Output(display_name="sharpened_mesh"),
@@ -163,30 +165,20 @@ class SharpenMeshNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(
-        cls,
-        trimesh,
-        backend,
-        smooth_steps=3,
-        normal_threshold=60.0,
-        weight=0.3,
-        iterations=5,
-    ):
+    def execute(cls, trimesh, backend):
         """Apply mesh sharpening based on selected backend."""
-        # Sanitize hidden widget values
-        smooth_steps = int(smooth_steps) if smooth_steps not in (None, "") else 3
-        normal_threshold = float(normal_threshold) if normal_threshold not in (None, "") else 60.0
-        weight = float(weight) if weight not in (None, "") else 0.3
-        iterations = int(iterations) if iterations not in (None, "") else 5
+        selected = backend["backend"]
 
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        log.info("Sharpen backend: %s", backend)
+        log.info("Sharpen backend: %s", selected)
         log.info("Input: %s vertices, %s faces",
                  f"{initial_vertices:,}", f"{initial_faces:,}")
 
-        if backend == "two_step":
+        if selected == "two_step":
+            smooth_steps = backend.get("smooth_steps", 3)
+            normal_threshold = backend.get("normal_threshold", 60.0)
             log.info("Parameters: smooth_steps=%d, normal_threshold=%.1f",
                      smooth_steps, normal_threshold)
             sharpened, error = _pymeshlab_two_step_sharpen(
@@ -194,13 +186,15 @@ class SharpenMeshNode(io.ComfyNode):
                 normal_iterations=20, fit_iterations=20,
                 selected_only=False,
             )
-        elif backend == "unsharp_mask":
+        elif selected == "unsharp_mask":
+            weight = backend.get("weight", 0.3)
+            iterations = backend.get("iterations", 5)
             log.info("Parameters: weight=%.3f, iterations=%d", weight, iterations)
             sharpened, error = _pymeshlab_unsharp_mask_sharpen(
                 trimesh, weight, weight_original=1.0, iterations=iterations,
             )
         else:
-            raise ValueError(f"Unknown backend: {backend}")
+            raise ValueError(f"Unknown backend: {selected}")
 
         if sharpened is None:
             raise ValueError(f"Sharpening failed ({backend}): {error}")
@@ -209,7 +203,7 @@ class SharpenMeshNode(io.ComfyNode):
         if hasattr(trimesh, "metadata") and trimesh.metadata:
             sharpened.metadata = trimesh.metadata.copy()
         sharpened.metadata["sharpening"] = {
-            "algorithm": backend,
+            "algorithm": selected,
             "original_vertices": initial_vertices,
             "original_faces": initial_faces,
         }
@@ -226,12 +220,12 @@ class SharpenMeshNode(io.ComfyNode):
         log.info("Avg vertex displacement: %.6f, max: %.6f", avg_disp, max_disp)
 
         # Build backend-specific param block
-        if backend == "two_step":
+        if selected == "two_step":
             param_text = (
                 f"Smooth Steps: {smooth_steps}\n"
                 f"Normal Threshold: {normal_threshold}\u00b0"
             )
-        elif backend == "unsharp_mask":
+        elif selected == "unsharp_mask":
             param_text = (
                 f"Weight: {weight}\n"
                 f"Iterations: {iterations}"
@@ -239,7 +233,7 @@ class SharpenMeshNode(io.ComfyNode):
         else:
             param_text = ""
 
-        info = f"""Sharpen Mesh Results ({backend}):
+        info = f"""Sharpen Mesh Results ({selected}):
 
 {param_text}
 

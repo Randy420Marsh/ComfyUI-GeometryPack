@@ -46,9 +46,8 @@ class LoadMeshBatch(io.ComfyNode):
                 io.Int.Input("max_meshes", default=-1, min=-1, max=100000),
             ],
             outputs=[
-                io.Custom("TRIMESH").Output(display_name="meshes"),
+                io.Custom("TRIMESH").Output(display_name="meshes", is_output_list=True),
             ],
-            output_is_list=(True,),
         )
 
     # Supported mesh file extensions

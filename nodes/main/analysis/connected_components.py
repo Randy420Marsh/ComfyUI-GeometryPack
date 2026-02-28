@@ -42,10 +42,9 @@ class ConnectedComponentsNode(io.ComfyNode):
                 io.Custom("TRIMESH").Input("trimesh"),
             ],
             outputs=[
-                io.Custom("TRIMESH").Output(display_name="trimesh"),
+                io.Custom("TRIMESH").Output(display_name="trimesh", is_output_list=True),
                 io.String.Output(display_name="info"),
             ],
-            output_is_list=(True, False),
         )
 
     @classmethod

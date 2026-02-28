@@ -47,30 +47,36 @@ class TransformMeshNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
-                io.Combo.Input("operation", options=[
-                    "translate",
-                    "rotate",
-                    "scale",
-                    "mirror",
-                    "center",
-                    "align_to_axes",
-                    "apply_matrix"
-                ], default="center"),
-                io.Float.Input("translate_x", default=0.0, min=-1000.0, max=1000.0, step=0.1, visible_when={"operation": ["translate"]}, optional=True),
-                io.Float.Input("translate_y", default=0.0, min=-1000.0, max=1000.0, step=0.1, visible_when={"operation": ["translate"]}, optional=True),
-                io.Float.Input("translate_z", default=0.0, min=-1000.0, max=1000.0, step=0.1, visible_when={"operation": ["translate"]}, optional=True),
-                io.Float.Input("rotate_x", default=0.0, min=-360.0, max=360.0, step=1.0, visible_when={"operation": ["rotate"]}, optional=True),
-                io.Float.Input("rotate_y", default=0.0, min=-360.0, max=360.0, step=1.0, visible_when={"operation": ["rotate"]}, optional=True),
-                io.Float.Input("rotate_z", default=0.0, min=-360.0, max=360.0, step=1.0, visible_when={"operation": ["rotate"]}, optional=True),
-                io.Float.Input("scale_uniform", default=1.0, min=0.001, max=1000.0, step=0.1, visible_when={"operation": ["scale"]}, optional=True),
-                io.Float.Input("scale_x", default=1.0, min=0.001, max=1000.0, step=0.1, visible_when={"operation": ["scale"]}, optional=True),
-                io.Float.Input("scale_y", default=1.0, min=0.001, max=1000.0, step=0.1, visible_when={"operation": ["scale"]}, optional=True),
-                io.Float.Input("scale_z", default=1.0, min=0.001, max=1000.0, step=0.1, visible_when={"operation": ["scale"]}, optional=True),
-                io.Combo.Input("mirror_axis", options=["x", "y", "z"], default="x", visible_when={"operation": ["mirror"]}, optional=True),
-                io.Combo.Input("center_x", options=["true", "false"], default="true", visible_when={"operation": ["center"]}, optional=True),
-                io.Combo.Input("center_y", options=["true", "false"], default="true", visible_when={"operation": ["center"]}, optional=True),
-                io.Combo.Input("center_z", options=["true", "false"], default="true", visible_when={"operation": ["center"]}, optional=True),
-                io.String.Input("matrix_string", default="1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1", multiline=False, visible_when={"operation": ["apply_matrix"]}, optional=True),
+                io.DynamicCombo.Input("operation", options=[
+                    io.DynamicCombo.Option("translate", [
+                        io.Float.Input("translate_x", default=0.0, min=-1000.0, max=1000.0, step=0.1),
+                        io.Float.Input("translate_y", default=0.0, min=-1000.0, max=1000.0, step=0.1),
+                        io.Float.Input("translate_z", default=0.0, min=-1000.0, max=1000.0, step=0.1),
+                    ]),
+                    io.DynamicCombo.Option("rotate", [
+                        io.Float.Input("rotate_x", default=0.0, min=-360.0, max=360.0, step=1.0),
+                        io.Float.Input("rotate_y", default=0.0, min=-360.0, max=360.0, step=1.0),
+                        io.Float.Input("rotate_z", default=0.0, min=-360.0, max=360.0, step=1.0),
+                    ]),
+                    io.DynamicCombo.Option("scale", [
+                        io.Float.Input("scale_uniform", default=1.0, min=0.001, max=1000.0, step=0.1),
+                        io.Float.Input("scale_x", default=1.0, min=0.001, max=1000.0, step=0.1),
+                        io.Float.Input("scale_y", default=1.0, min=0.001, max=1000.0, step=0.1),
+                        io.Float.Input("scale_z", default=1.0, min=0.001, max=1000.0, step=0.1),
+                    ]),
+                    io.DynamicCombo.Option("mirror", [
+                        io.Combo.Input("mirror_axis", options=["x", "y", "z"], default="x"),
+                    ]),
+                    io.DynamicCombo.Option("center", [
+                        io.Combo.Input("center_x", options=["true", "false"], default="true"),
+                        io.Combo.Input("center_y", options=["true", "false"], default="true"),
+                        io.Combo.Input("center_z", options=["true", "false"], default="true"),
+                    ]),
+                    io.DynamicCombo.Option("align_to_axes", []),
+                    io.DynamicCombo.Option("apply_matrix", [
+                        io.String.Input("matrix_string", default="1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1", multiline=False),
+                    ]),
+                ]),
             ],
             outputs=[
                 io.Custom("TRIMESH").Output(display_name="transformed_mesh"),
@@ -79,51 +85,61 @@ class TransformMeshNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, trimesh, operation,
-                  translate_x=0.0, translate_y=0.0, translate_z=0.0,
-                  rotate_x=0.0, rotate_y=0.0, rotate_z=0.0,
-                  scale_uniform=1.0, scale_x=1.0, scale_y=1.0, scale_z=1.0,
-                  mirror_axis="x",
-                  center_x="true", center_y="true", center_z="true",
-                  matrix_string="1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1"):
-        """
-        Apply transformation to mesh.
+    def execute(cls, trimesh, operation):
+        """Apply transformation to mesh."""
+        selected = operation["operation"]
 
-        Args:
-            trimesh: Input trimesh.Trimesh object
-            operation: Type of transformation to apply
-            [other params]: Operation-specific parameters
-
-        Returns:
-            tuple: (transformed_mesh, info_string)
-        """
         log.info("Input: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
-        log.info("Operation: %s", operation)
+        log.info("Operation: %s", selected)
 
         # Create copy to avoid modifying original
         result = trimesh.copy()
 
-        if operation == "translate":
-            result, info = cls._translate(result, translate_x, translate_y, translate_z)
-        elif operation == "rotate":
-            result, info = cls._rotate(result, rotate_x, rotate_y, rotate_z)
-        elif operation == "scale":
-            result, info = cls._scale(result, scale_uniform, scale_x, scale_y, scale_z)
-        elif operation == "mirror":
-            result, info = cls._mirror(result, mirror_axis)
-        elif operation == "center":
-            result, info = cls._center(result, center_x, center_y, center_z)
-        elif operation == "align_to_axes":
+        if selected == "translate":
+            result, info = cls._translate(
+                result,
+                operation.get("translate_x", 0.0),
+                operation.get("translate_y", 0.0),
+                operation.get("translate_z", 0.0),
+            )
+        elif selected == "rotate":
+            result, info = cls._rotate(
+                result,
+                operation.get("rotate_x", 0.0),
+                operation.get("rotate_y", 0.0),
+                operation.get("rotate_z", 0.0),
+            )
+        elif selected == "scale":
+            result, info = cls._scale(
+                result,
+                operation.get("scale_uniform", 1.0),
+                operation.get("scale_x", 1.0),
+                operation.get("scale_y", 1.0),
+                operation.get("scale_z", 1.0),
+            )
+        elif selected == "mirror":
+            result, info = cls._mirror(result, operation.get("mirror_axis", "x"))
+        elif selected == "center":
+            result, info = cls._center(
+                result,
+                operation.get("center_x", "true"),
+                operation.get("center_y", "true"),
+                operation.get("center_z", "true"),
+            )
+        elif selected == "align_to_axes":
             result, info = cls._align_to_axes(result)
-        elif operation == "apply_matrix":
-            result, info = cls._apply_matrix(result, matrix_string)
+        elif selected == "apply_matrix":
+            result, info = cls._apply_matrix(
+                result,
+                operation.get("matrix_string", "1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1"),
+            )
         else:
-            raise ValueError(f"Unknown operation: {operation}")
+            raise ValueError(f"Unknown operation: {selected}")
 
         # Preserve metadata
         result.metadata = trimesh.metadata.copy()
         result.metadata['transform'] = {
-            'operation': operation,
+            'operation': selected,
             'original_bounds': trimesh.bounds.tolist(),
             'new_bounds': result.bounds.tolist()
         }

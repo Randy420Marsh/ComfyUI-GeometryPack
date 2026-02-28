@@ -210,27 +210,36 @@ class UVUnwrapNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
-                io.Combo.Input("method", options=[
-                    "xatlas",
-                    "cumesh",
-                    "libigl_lscm",
-                    "libigl_harmonic",
-                    "libigl_arap",
-                    "blender_smart",
-                    "blender_cube",
-                    "blender_cylinder",
-                    "blender_sphere"
-                ], default="xatlas"),
-                io.Float.Input("chart_cone_angle", default=90.0, min=0.0, max=359.9, step=1.0, visible_when={"method": ["cumesh"]}, optional=True),
-                io.Int.Input("chart_refine_iterations", default=0, min=0, max=10, step=1, visible_when={"method": ["cumesh"]}, optional=True),
-                io.Int.Input("chart_global_iterations", default=1, min=0, max=10, step=1, visible_when={"method": ["cumesh"]}, optional=True),
-                io.Int.Input("chart_smooth_strength", default=1, min=0, max=10, step=1, visible_when={"method": ["cumesh"]}, optional=True),
-                io.Int.Input("iterations", default=10, min=1, max=100, step=1, visible_when={"method": ["libigl_arap"]}, optional=True),
-                io.Float.Input("angle_limit", default=66.0, min=1.0, max=89.0, step=1.0, visible_when={"method": ["blender_smart"]}, optional=True),
-                io.Float.Input("island_margin", default=0.02, min=0.0, max=1.0, step=0.01, visible_when={"method": ["blender_smart"]}, optional=True),
-                io.Combo.Input("scale_to_bounds", options=["true", "false"], default="true", visible_when={"method": ["blender_smart", "blender_cube", "blender_cylinder", "blender_sphere"]}, optional=True),
-                io.Float.Input("cube_size", default=1.0, min=0.1, max=10.0, step=0.1, visible_when={"method": ["blender_cube"]}, optional=True),
-                io.Float.Input("cylinder_radius", default=1.0, min=0.1, max=10.0, step=0.1, visible_when={"method": ["blender_cylinder"]}, optional=True),
+                io.DynamicCombo.Input("method", options=[
+                    io.DynamicCombo.Option("xatlas", []),
+                    io.DynamicCombo.Option("cumesh", [
+                        io.Float.Input("chart_cone_angle", default=90.0, min=0.0, max=359.9, step=1.0),
+                        io.Int.Input("chart_refine_iterations", default=0, min=0, max=10, step=1),
+                        io.Int.Input("chart_global_iterations", default=1, min=0, max=10, step=1),
+                        io.Int.Input("chart_smooth_strength", default=1, min=0, max=10, step=1),
+                    ]),
+                    io.DynamicCombo.Option("libigl_lscm", []),
+                    io.DynamicCombo.Option("libigl_harmonic", []),
+                    io.DynamicCombo.Option("libigl_arap", [
+                        io.Int.Input("iterations", default=10, min=1, max=100, step=1),
+                    ]),
+                    io.DynamicCombo.Option("blender_smart", [
+                        io.Float.Input("angle_limit", default=66.0, min=1.0, max=89.0, step=1.0),
+                        io.Float.Input("island_margin", default=0.02, min=0.0, max=1.0, step=0.01),
+                        io.Combo.Input("scale_to_bounds", options=["true", "false"], default="true"),
+                    ]),
+                    io.DynamicCombo.Option("blender_cube", [
+                        io.Float.Input("cube_size", default=1.0, min=0.1, max=10.0, step=0.1),
+                        io.Combo.Input("scale_to_bounds", options=["true", "false"], default="true"),
+                    ]),
+                    io.DynamicCombo.Option("blender_cylinder", [
+                        io.Float.Input("cylinder_radius", default=1.0, min=0.1, max=10.0, step=0.1),
+                        io.Combo.Input("scale_to_bounds", options=["true", "false"], default="true"),
+                    ]),
+                    io.DynamicCombo.Option("blender_sphere", [
+                        io.Combo.Input("scale_to_bounds", options=["true", "false"], default="true"),
+                    ]),
+                ]),
             ],
             outputs=[
                 io.Custom("TRIMESH").Output(display_name="unwrapped_mesh"),
@@ -239,60 +248,58 @@ class UVUnwrapNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, trimesh, method,
-               chart_cone_angle=90.0, chart_refine_iterations=0,
-               chart_global_iterations=1, chart_smooth_strength=1,
-               iterations=10, angle_limit=66.0, island_margin=0.02,
-               scale_to_bounds="true", cube_size=1.0, cylinder_radius=1.0):
-        """
-        Apply UV unwrapping based on selected method.
+    def execute(cls, trimesh, method):
+        """Apply UV unwrapping based on selected method."""
+        selected = method["method"]
 
-        Args:
-            trimesh: Input trimesh.Trimesh object
-            method: UV unwrapping method to use
-            chart_cone_angle: UV chart clustering threshold in degrees (cumesh, default: 90.0)
-            chart_refine_iterations: Refine UV charts iterations (cumesh, default: 0)
-            chart_global_iterations: Global UV optimization passes (cumesh, default: 1)
-            chart_smooth_strength: UV smoothing strength (cumesh, default: 1)
-            iterations: Number of iterations for libigl_arap (default: 10)
-            angle_limit: Angle limit for blender_smart in degrees (default: 66.0)
-            island_margin: Island margin for blender_smart (default: 0.02)
-            scale_to_bounds: Scale to bounds for Blender projections (default: "true")
-            cube_size: Cube size for blender_cube (default: 1.0)
-            cylinder_radius: Cylinder radius for blender_cylinder (default: 1.0)
-
-        Returns:
-            tuple: (unwrapped_mesh, info_string)
-        """
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
         log.info("Input: %d vertices, %d faces", initial_vertices, initial_faces)
-        log.info("Method: %s", method)
+        log.info("Method: %s", selected)
 
-        if method == "xatlas":
+        if selected == "xatlas":
             unwrapped_mesh, info = cls._xatlas(trimesh)
-        elif method == "cumesh":
+        elif selected == "cumesh":
             unwrapped_mesh, info = cls._cumesh(
-                trimesh, chart_cone_angle, chart_refine_iterations,
-                chart_global_iterations, chart_smooth_strength
+                trimesh,
+                method.get("chart_cone_angle", 90.0),
+                method.get("chart_refine_iterations", 0),
+                method.get("chart_global_iterations", 1),
+                method.get("chart_smooth_strength", 1),
             )
-        elif method == "libigl_lscm":
+        elif selected == "libigl_lscm":
             unwrapped_mesh, info = cls._libigl_lscm(trimesh)
-        elif method == "libigl_harmonic":
+        elif selected == "libigl_harmonic":
             unwrapped_mesh, info = cls._libigl_harmonic(trimesh)
-        elif method == "libigl_arap":
-            unwrapped_mesh, info = cls._libigl_arap(trimesh, iterations)
-        elif method == "blender_smart":
-            unwrapped_mesh, info = cls._blender_smart(trimesh, angle_limit, island_margin, scale_to_bounds)
-        elif method == "blender_cube":
-            unwrapped_mesh, info = cls._blender_cube(trimesh, cube_size, scale_to_bounds)
-        elif method == "blender_cylinder":
-            unwrapped_mesh, info = cls._blender_cylinder(trimesh, cylinder_radius, scale_to_bounds)
-        elif method == "blender_sphere":
-            unwrapped_mesh, info = cls._blender_sphere(trimesh, scale_to_bounds)
+        elif selected == "libigl_arap":
+            unwrapped_mesh, info = cls._libigl_arap(trimesh, method.get("iterations", 10))
+        elif selected == "blender_smart":
+            unwrapped_mesh, info = cls._blender_smart(
+                trimesh,
+                method.get("angle_limit", 66.0),
+                method.get("island_margin", 0.02),
+                method.get("scale_to_bounds", "true"),
+            )
+        elif selected == "blender_cube":
+            unwrapped_mesh, info = cls._blender_cube(
+                trimesh,
+                method.get("cube_size", 1.0),
+                method.get("scale_to_bounds", "true"),
+            )
+        elif selected == "blender_cylinder":
+            unwrapped_mesh, info = cls._blender_cylinder(
+                trimesh,
+                method.get("cylinder_radius", 1.0),
+                method.get("scale_to_bounds", "true"),
+            )
+        elif selected == "blender_sphere":
+            unwrapped_mesh, info = cls._blender_sphere(
+                trimesh,
+                method.get("scale_to_bounds", "true"),
+            )
         else:
-            raise ValueError(f"Unknown method: {method}")
+            raise ValueError(f"Unknown method: {selected}")
 
         log.info("Output: %d vertices, %d faces", len(unwrapped_mesh.vertices), len(unwrapped_mesh.faces))
 

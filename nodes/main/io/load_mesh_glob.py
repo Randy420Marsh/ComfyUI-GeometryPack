@@ -41,11 +41,10 @@ class LoadMeshGlob(io.ComfyNode):
                 io.Combo.Input("sort_by", options=["name", "modified_time"], default="name", tooltip="How to sort matched files", optional=True),
             ],
             outputs=[
-                io.Custom("TRIMESH").Output(display_name="meshes"),
-                io.Image.Output(display_name="textures"),
-                io.String.Output(display_name="file_paths"),
+                io.Custom("TRIMESH").Output(display_name="meshes", is_output_list=True),
+                io.Image.Output(display_name="textures", is_output_list=True),
+                io.String.Output(display_name="file_paths", is_output_list=True),
             ],
-            output_is_list=(True, True, True),
         )
 
     @classmethod

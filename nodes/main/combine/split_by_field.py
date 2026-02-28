@@ -36,10 +36,9 @@ class SplitByFieldNode(io.ComfyNode):
                 io.String.Input("field_name", default="label", tooltip="Name of the discrete field to split by (e.g., 'label', 'primitive_type', 'cluster')."),
             ],
             outputs=[
-                io.Custom("TRIMESH").Output(display_name="geometries"),
+                io.Custom("TRIMESH").Output(display_name="geometries", is_output_list=True),
                 io.String.Output(display_name="info"),
             ],
-            output_is_list=(True, False),
         )
 
     @classmethod

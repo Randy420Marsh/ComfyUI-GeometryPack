@@ -38,9 +38,8 @@ class GetMeshFilename(io.ComfyNode):
                 io.Custom("TRIMESH").Input("mesh"),
             ],
             outputs=[
-                io.String.Output(display_name="filename"),
+                io.String.Output(display_name="filename", is_output_list=True),
             ],
-            output_is_list=(True,),
         )
 
     @classmethod

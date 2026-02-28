@@ -117,16 +117,24 @@ class RemeshBlenderNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
-                io.Combo.Input("backend", options=[
-                    "blender_voxel",
-                    "blender_smooth",
-                    "blender_sharp",
-                    "blender_blocks",
-                ], default="blender_voxel", tooltip="Remeshing algorithm. voxel=watertight, smooth/sharp/blocks=modifier-based"),
-                io.Float.Input("voxel_size", default=1, min=0.001, max=1.0, step=0.01, display="number", tooltip="Voxel size for Blender voxel remesh. Smaller = more detail, more faces. Output is always watertight.", visible_when={"backend": ["blender_voxel"]}, optional=True),
-                io.Int.Input("octree_depth", default=6, min=1, max=10, step=1, tooltip="Resolution of the remesh. Higher = more detail, more faces.", visible_when={"backend": ["blender_smooth", "blender_sharp", "blender_blocks"]}, optional=True),
-                io.Float.Input("scale", default=0.9, min=0.0, max=1.0, step=0.05, display="number", tooltip="Ratio of output size to input bounding box.", visible_when={"backend": ["blender_smooth", "blender_sharp", "blender_blocks"]}, optional=True),
-                io.Float.Input("sharpness", default=1.0, min=0.0, max=5.0, step=0.1, display="number", tooltip="Edge sharpness for Sharp mode.", visible_when={"backend": ["blender_sharp"]}, optional=True),
+                io.DynamicCombo.Input("backend", tooltip="Remeshing algorithm. voxel=watertight, smooth/sharp/blocks=modifier-based", options=[
+                    io.DynamicCombo.Option("blender_voxel", [
+                        io.Float.Input("voxel_size", default=1, min=0.001, max=1.0, step=0.01, display="number", tooltip="Voxel size for Blender voxel remesh. Smaller = more detail, more faces. Output is always watertight."),
+                    ]),
+                    io.DynamicCombo.Option("blender_smooth", [
+                        io.Int.Input("octree_depth", default=6, min=1, max=10, step=1, tooltip="Resolution of the remesh. Higher = more detail, more faces."),
+                        io.Float.Input("scale", default=0.9, min=0.0, max=1.0, step=0.05, display="number", tooltip="Ratio of output size to input bounding box."),
+                    ]),
+                    io.DynamicCombo.Option("blender_sharp", [
+                        io.Int.Input("octree_depth", default=6, min=1, max=10, step=1, tooltip="Resolution of the remesh. Higher = more detail, more faces."),
+                        io.Float.Input("scale", default=0.9, min=0.0, max=1.0, step=0.05, display="number", tooltip="Ratio of output size to input bounding box."),
+                        io.Float.Input("sharpness", default=1.0, min=0.0, max=5.0, step=0.1, display="number", tooltip="Edge sharpness for Sharp mode."),
+                    ]),
+                    io.DynamicCombo.Option("blender_blocks", [
+                        io.Int.Input("octree_depth", default=6, min=1, max=10, step=1, tooltip="Resolution of the remesh. Higher = more detail, more faces."),
+                        io.Float.Input("scale", default=0.9, min=0.0, max=1.0, step=0.05, display="number", tooltip="Ratio of output size to input bounding box."),
+                    ]),
+                ]),
             ],
             outputs=[
                 io.Custom("TRIMESH").Output(display_name="remeshed_mesh"),
@@ -135,32 +143,31 @@ class RemeshBlenderNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, trimesh, backend, voxel_size=1.0,
-               octree_depth=6, scale=0.9, sharpness=1.0):
+    def execute(cls, trimesh, backend):
         """Apply Blender-based remeshing."""
-        # Sanitize hidden widget values (ComfyUI sends '' for hidden visible_when widgets)
-        voxel_size = float(voxel_size) if voxel_size not in (None, '') else 1.0
-        octree_depth = int(octree_depth) if octree_depth not in (None, '') else 6
-        scale = float(scale) if scale not in (None, '') else 0.9
-        sharpness = float(sharpness) if sharpness not in (None, '') else 1.0
+        selected = backend["backend"]
+        voxel_size = backend.get("voxel_size", 1.0)
+        octree_depth = backend.get("octree_depth", 6)
+        scale = backend.get("scale", 0.9)
+        sharpness = backend.get("sharpness", 1.0)
 
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        log.info("Backend: %s", backend)
+        log.info("Backend: %s", selected)
         log.info("Input: %s vertices, %s faces", f"{initial_vertices:,}", f"{initial_faces:,}")
 
-        if backend == "blender_voxel":
+        if selected == "blender_voxel":
             log.info("Parameters: voxel_size=%s", voxel_size)
             remeshed_mesh, info = cls._blender_voxel(trimesh, voxel_size)
-        elif backend in ("blender_smooth", "blender_sharp", "blender_blocks"):
-            mode = backend.replace("blender_", "").upper()
+        elif selected in ("blender_smooth", "blender_sharp", "blender_blocks"):
+            mode = selected.replace("blender_", "").upper()
             log.info("Parameters: mode=%s, octree_depth=%d, scale=%s%s",
                      mode, octree_depth, scale,
-                     f", sharpness={sharpness}" if backend == "blender_sharp" else "")
+                     f", sharpness={sharpness}" if selected == "blender_sharp" else "")
             remeshed_mesh, info = cls._blender_modifier(trimesh, mode, octree_depth, scale, sharpness)
         else:
-            raise ValueError(f"Unknown backend: {backend}")
+            raise ValueError(f"Unknown backend: {selected}")
 
         log.info("Remeshing complete")
 
