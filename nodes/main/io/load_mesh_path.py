@@ -51,10 +51,9 @@ class LoadMeshPath(io.ComfyNode):
                 io.String.Input("file_path", default="", multiline=True, tooltip="Path to mesh file(s). Supports multiple paths separated by newlines or commas."),
             ],
             outputs=[
-                io.Custom("TRIMESH").Output(display_name="mesh"),
-                io.Image.Output(display_name="texture"),
+                io.Custom("TRIMESH").Output(display_name="mesh", is_output_list=True),
+                io.Image.Output(display_name="texture", is_output_list=True),
             ],
-            output_is_list=(True, True),
         )
 
     @classmethod
