@@ -20,10 +20,11 @@ pymeshfix = ">=0.17.0"
 xatlas = ">=0.0.11"
 skeletor = ">=1.2.0"
 pynanoinstantmeshes = "*"
-pyquadriflow = { url = "https://github.com/PozzettiAndrea/pyQuadriFlow/releases/download/v0.0.6/pyquadriflow-0.0.6-py3-none-any.whl" }
+pyquadriflow = { version = ">=0.2.0", index = "https://pozzettiandrea.github.io/pyQuadriFlow/simple/" }
 pygeogram-ap = { version = ">=0.1.0", index = "https://pozzettiandrea.github.io/pygeogram/simple/" }
 pypmp = { version = ">=0.1.0", index = "https://pozzettiandrea.github.io/pypmp/simple/" }
 pyquadwild = { version = ">=0.1.0", index = "https://pozzettiandrea.github.io/pyquadwild/simple/" }
+pymesh2 = { version = ">=0.3", index = "https://pozzettiandrea.github.io/PyMesh/simple/" }
 matplotlib = ">=3.5.0"
 mmgpy = ">=0.5.2"
 pillow = ">=9.0.0"
