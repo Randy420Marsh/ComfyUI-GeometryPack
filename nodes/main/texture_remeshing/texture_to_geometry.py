@@ -42,7 +42,7 @@ class TextureToGeometryNode(io.ComfyNode):
             category="geompack/texture_remeshing",
             is_output_node=True,
             inputs=[
-                io.Float.Input("height_scale", default=1.0, min=0.01, max=10.0, step=0.1, display="number"),
+                io.Float.Input("height_scale", default=1.0, min=0.01, max=10.0, step=0.1, display_mode="number"),
                 io.Mask.Input("mask", optional=True),
                 io.Image.Input("depth_image", optional=True),
                 io.Mask.Input("field", tooltip="Optional field to store as vertex attribute on the mesh (e.g., face IDs, curvature)", optional=True),

@@ -102,7 +102,7 @@ class RemeshCGALNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
-                io.Float.Input("target_edge_length", default=1.00, min=0.001, max=10.0, step=0.01, display="number", tooltip="Target edge length for output triangles. Value is relative to mesh scale.", optional=True),
+                io.Float.Input("target_edge_length", default=1.00, min=0.001, max=10.0, step=0.01, display_mode="number", tooltip="Target edge length for output triangles. Value is relative to mesh scale.", optional=True),
                 io.Int.Input("iterations", default=3, min=1, max=20, step=1, tooltip="Number of remeshing passes. More iterations = smoother result, slower processing.", optional=True),
                 io.Combo.Input("protect_boundaries", options=["true", "false"], default="true", tooltip="Lock boundary/open edges in place during remeshing. Prevents modification of mesh borders and holes.", optional=True),
             ],
