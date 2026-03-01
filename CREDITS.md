@@ -32,7 +32,6 @@ Ordered from least to most stringent license.
 | [libigl](https://github.com/libigl/libigl) | MPL-2.0 | Geometry processing — signed distance, UV parameterization (LSCM/harmonic), winding number, booleans | https://libigl.github.io |
 | [skeletor](https://github.com/navis-org/skeletor) | GPL-3.0 | Skeleton extraction from triangle meshes (wavefront, vertex clusters, edge collapse, TEASAR) | https://github.com/navis-org/skeletor |
 | [pymeshfix](https://github.com/pyvista/pymeshfix) | GPL-3.0 | Automatic mesh repair — hole filling, self-intersection removal, watertight conversion | https://github.com/pyvista/pymeshfix |
-| [MeshFix](https://github.com/MarcoAttworskene/MeshFix-V2.1) | GPL-3.0 | Original MeshFix C++ library by Marco Attene (IMATI-GE/CNR) | https://github.com/MarcoAttene/MeshFix-V2.1 |
 | [PyMeshLab](https://github.com/cnr-isti-vclab/PyMeshLab) | GPL-3.0 | Python bindings for MeshLab — isotropic remeshing, Poisson/ball-pivoting reconstruction, smoothing, decimation | https://github.com/cnr-isti-vclab/PyMeshLab |
 | [MeshLab](https://github.com/cnr-isti-vclab/meshlab) | GPL-3.0 | The open-source mesh processing system (CNR-ISTI Visual Computing Lab) | https://www.meshlab.net |
 | [CGAL](https://www.cgal.org) | GPL-3.0 / LGPL-3.0 | Computational Geometry Algorithms Library — isotropic remeshing, alpha wrap, booleans, edge collapse, self-intersection repair. Dual licensed: algorithms are GPL-3.0, kernel/support components are LGPL-3.0. Commercial licenses available from GeometryFactory. | https://www.cgal.org |
