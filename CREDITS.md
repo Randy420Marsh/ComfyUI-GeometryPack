@@ -46,7 +46,6 @@ We hope to also wrap the following outstanding libraries in future releases:
 | Library | License | Description | Homepage |
 |---------|---------|-------------|----------|
 | [manifold3d](https://github.com/elalish/manifold) | Apache-2.0 | Robust, GPU-friendly CSG/boolean operations on manifold meshes | https://github.com/elalish/manifold |
-| [PyMesh](https://github.com/PyMesh/PyMesh) | MPL-2.0 | Rapid prototyping platform for geometry processing — booleans, winding number, mesh repair | https://pymesh.readthedocs.io |
 | [gmsh](https://gmsh.info) | GPL-2.0+ | 3D finite element mesh generator with built-in CAD engine; linking exception available | https://gmsh.info |
 
 ## License Notes

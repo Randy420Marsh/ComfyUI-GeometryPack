@@ -96,9 +96,10 @@ class RemeshCGALNode(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="GeomPackRemeshCGAL",
-            display_name="Remesh CGAL",
+            node_id="GeomPackRemesh_CGAL",
+            display_name="Remesh CGAL (backend)",
             category="geompack/remeshing",
+            is_dev_only=True,
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
@@ -167,9 +168,9 @@ After:
 
 
 NODE_CLASS_MAPPINGS = {
-    "GeomPackRemeshCGAL": RemeshCGALNode,
+    "GeomPackRemesh_CGAL": RemeshCGALNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackRemeshCGAL": "Remesh CGAL",
+    "GeomPackRemesh_CGAL": "Remesh CGAL (backend)",
 }

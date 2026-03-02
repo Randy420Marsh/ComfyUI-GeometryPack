@@ -124,9 +124,10 @@ class RemeshGPUNode(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="GeomPackRemeshGPU",
-            display_name="Remesh GPU",
+            node_id="GeomPackRemesh_GPU",
+            display_name="Remesh GPU (backend)",
             category="geompack/remeshing",
+            is_dev_only=True,
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
@@ -228,9 +229,9 @@ GPU-accelerated dual contouring (same algorithm as TRELLIS2).
 
 
 NODE_CLASS_MAPPINGS = {
-    "GeomPackRemeshGPU": RemeshGPUNode,
+    "GeomPackRemesh_GPU": RemeshGPUNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackRemeshGPU": "Remesh GPU",
+    "GeomPackRemesh_GPU": "Remesh GPU (backend)",
 }

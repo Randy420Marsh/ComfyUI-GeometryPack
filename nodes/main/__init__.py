@@ -6,6 +6,9 @@ Main nodes - All non-Blender geometry processing nodes.
 Runs in an isolation env (pixi/conda) to avoid DLL conflicts with ComfyUI's torch.
 """
 
+import logging
+logging.getLogger("geometrypack").setLevel(logging.INFO)
+
 from . import io
 from . import primitives
 from . import analysis

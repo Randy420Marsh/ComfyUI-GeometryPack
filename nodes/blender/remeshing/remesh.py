@@ -112,8 +112,9 @@ class RemeshBlenderNode(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(
             node_id="GeomPackRemeshBlender",
-            display_name="Remesh Blender",
+            display_name="Remesh Blender (legacy)",
             category="geompack/remeshing",
+            is_dev_only=True,
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
