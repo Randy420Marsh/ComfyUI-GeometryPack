@@ -2,46 +2,33 @@
 # Copyright (C) 2025 ComfyUI-GeometryPack Contributors
 
 """
-Fill holes in mesh by adding new faces.
+Unified Fill Holes Node - Single frontend with backend selector.
+
+Uses ComfyUI's node expansion (GraphBuilder) to dispatch to hidden
+backend-specific nodes, each running in its own isolation env.
 """
 
 import logging
-
-import trimesh
-import numpy as np
 from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
-def _get_cumesh():
-    """Lazy cumesh+torch import to avoid importing before ComfyUI startup."""
-    try:
-        import cumesh as CuMesh
-        import torch
-        return CuMesh, torch
-    except ImportError:
-        return None, None
-
-try:
-    import pymeshlab
-    HAS_PYMESHLAB = True
-except ImportError:
-    HAS_PYMESHLAB = False
-
-try:
-    import igl
-    HAS_IGL = True
-except ImportError:
-    HAS_IGL = False
 
 class FillHolesNode(io.ComfyNode):
     """
-    Fill holes in mesh by adding new faces.
+    Fill Holes - Unified hole filling with backend selection.
 
-    Identifies boundary loops (holes) and fills them with new triangular faces.
-    Useful for mesh repair, creating watertight meshes for 3D printing, or
-    closing gaps in scanned geometry.
+    Dispatches to hidden backend nodes via node expansion.
     """
+
+    BACKEND_MAP = {
+        "trimesh":    "GeomPackFillHoles_Trimesh",
+        "pymeshlab":  "GeomPackFillHoles_PyMeshLab",
+        "pymeshfix":  "GeomPackFillHoles_PyMeshFix",
+        "igl_fan":    "GeomPackFillHoles_IglFan",
+        "cgal":       "GeomPackFillHoles_CGAL",
+        "gpu_cumesh": "GeomPackFillHoles_GPU",
+    }
 
     @classmethod
     def define_schema(cls):
@@ -49,18 +36,32 @@ class FillHolesNode(io.ComfyNode):
             node_id="GeomPackFillHoles",
             display_name="Fill Holes",
             category="geompack/repair",
+            enable_expand=True,
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("mesh"),
-                io.DynamicCombo.Input("method", options=[
-                    io.DynamicCombo.Option("cumesh", [
-                        io.Float.Input("perimeter", default=0.03, min=0.001, max=1.0, step=0.001),
-                    ]),
+                io.DynamicCombo.Input("method", tooltip="Hole filling algorithm and backend", options=[
                     io.DynamicCombo.Option("trimesh", []),
                     io.DynamicCombo.Option("pymeshlab", [
-                        io.Int.Input("maxholesize", default=1000, min=1, max=100000, step=100),
+                        io.Int.Input("maxholesize", default=0, min=0, max=100000,
+                                     tooltip="Max number of boundary edges composing a hole. Only holes with this many edges or fewer are closed. 0 = close all."),
+                    ]),
+                    io.DynamicCombo.Option("pymeshfix", [
+                        io.Int.Input("max_edges", default=0, min=0, max=100000,
+                                     tooltip="Max boundary edges for a hole to be filled. 0 = fill all holes."),
+                        io.Combo.Input("refine", options=["true", "false"], default="true",
+                                       tooltip="Refine filled regions for better triangle quality."),
                     ]),
                     io.DynamicCombo.Option("igl_fan", []),
+                    io.DynamicCombo.Option("cgal", [
+                        io.Combo.Input("quality", options=["triangulate", "refine", "fair"],
+                                       default="refine",
+                                       tooltip="triangulate: fast, basic fill. refine: better triangle quality. fair: smooth fill to match surrounding surface."),
+                    ]),
+                    io.DynamicCombo.Option("gpu_cumesh", [
+                        io.Float.Input("perimeter", default=0.03, min=0.001, max=100.0, step=0.001,
+                                       tooltip="Maximum hole perimeter to fill. Relative to mesh scale."),
+                    ]),
                 ]),
             ],
             outputs=[
@@ -71,195 +72,30 @@ class FillHolesNode(io.ComfyNode):
 
     @classmethod
     def execute(cls, mesh, method):
-        """
-        Fill holes in the mesh.
+        from comfy_execution.graph_utils import GraphBuilder
 
-        Args:
-            mesh: Input trimesh.Trimesh object
-            method: DynamicCombo dict with selected method and its parameters
+        if cls.SCHEMA is None:
+            cls.GET_SCHEMA()
 
-        Returns:
-            tuple: (filled_trimesh, info_string)
-        """
         selected = method["method"]
-        perimeter = method.get("perimeter", 0.03)
-        maxholesize = method.get("maxholesize", 1000)
+        node_id = cls.BACKEND_MAP[selected]
 
-        # Log method and parameters
-        log.info("Method: %s", selected)
-        log.info("Input: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
-        if selected == "cumesh":
-            log.info("Parameters: perimeter=%s", perimeter)
-        elif selected == "pymeshlab":
-            log.info("Parameters: maxholesize=%d", maxholesize)
-        elif selected in ["trimesh", "igl_fan"]:
-            log.info("Parameters: (none)")
-        method = selected
+        log.info("Fill Holes dispatch: %s -> %s", selected, node_id)
 
-        # Check initial state
-        was_watertight = mesh.is_watertight
-        initial_vertices = len(mesh.vertices)
-        initial_faces = len(mesh.faces)
+        kwargs = {"mesh": mesh}
+        for k, v in method.items():
+            if k == "method":
+                continue
+            kwargs[k] = v
 
-        # Create a copy
-        filled_mesh = mesh.copy()
+        graph = GraphBuilder()
+        backend_node = graph.node(node_id, **kwargs)
 
-        # Track method actually used (for fallback cases)
-        method_used = method
-        num_holes_filled = None
+        return {
+            "result": (backend_node.out(0), backend_node.out(1)),
+            "expand": graph.finalize(),
+        }
 
-        # Fill holes using selected method
-        CuMesh, torch = _get_cumesh()
-        if method == "cumesh" and CuMesh is not None:
-            # GPU-accelerated hole filling (same as TRELLIS2)
-            import comfy.model_management
-            device = comfy.model_management.get_torch_device()
-            assert device.type == "cuda", f"CuMesh requires CUDA but got device '{device}' — cumesh is GPU-only, no CPU fallback"
-            vertices = torch.tensor(filled_mesh.vertices, dtype=torch.float32).to(device)
-            faces = torch.tensor(filled_mesh.faces, dtype=torch.int32).to(device)
-
-            # Initialize CuMesh
-            cumesh_obj = CuMesh.CuMesh()
-            cumesh_obj.init(vertices, faces)
-
-            # Fill holes with perimeter limit
-            cumesh_obj.fill_holes(max_hole_perimeter=perimeter)
-
-            # Read back result
-            final_verts, final_faces = cumesh_obj.read()
-            filled_mesh = trimesh.Trimesh(
-                vertices=final_verts.cpu().numpy(),
-                faces=final_faces.cpu().numpy(),
-                process=False
-            )
-
-            log.info("CuMesh method completed (perimeter=%s)", perimeter)
-
-        elif method == "cumesh" and CuMesh is None:
-            # Fallback to trimesh if cumesh not available
-            log.warning("CuMesh not available, falling back to trimesh method")
-            filled_mesh.fill_holes()
-            method_used = "trimesh (fallback)"
-
-        elif method == "pymeshlab" and HAS_PYMESHLAB:
-            # Use PyMeshLab's hole closing
-            ms = pymeshlab.MeshSet()
-            ms.add_mesh(pymeshlab.Mesh(
-                vertex_matrix=filled_mesh.vertices,
-                face_matrix=filled_mesh.faces
-            ))
-
-            # Close holes (pymeshlab uses edge count, use large default)
-            ms.meshing_close_holes(maxholesize=maxholesize)
-
-            # Extract result
-            m = ms.current_mesh()
-            filled_mesh = trimesh.Trimesh(
-                vertices=m.vertex_matrix(),
-                faces=m.face_matrix(),
-                process=False
-            )
-
-            log.info("PyMeshLab method completed")
-
-        elif method == "pymeshlab" and not HAS_PYMESHLAB:
-            # Fallback to trimesh if pymeshlab not available
-            log.warning("PyMeshLab not available, falling back to trimesh method")
-            filled_mesh.fill_holes()
-            method_used = "trimesh (fallback)"
-
-        elif method == "igl_fan" and HAS_IGL:
-            # Use libigl to find boundary and fill with fan triangulation
-            V = np.asarray(filled_mesh.vertices, dtype=np.float64)
-            F = np.asarray(filled_mesh.faces, dtype=np.int32)
-
-            # Get boundary loop (returns single loop as 1D array)
-            try:
-                loop = igl.boundary_loop(F)
-
-                # Check if we got a valid loop
-                if isinstance(loop, np.ndarray) and loop.size > 0 and loop.ndim == 1:
-                    if len(loop) >= 3:
-                        # Create fan triangulation from first vertex
-                        new_faces = []
-                        center_idx = loop[0]
-                        for i in range(1, len(loop) - 1):
-                            new_faces.append([center_idx, loop[i], loop[i + 1]])
-
-                        # Add new faces to mesh
-                        if new_faces:
-                            all_faces = np.vstack([F, np.array(new_faces, dtype=np.int32)])
-                            filled_mesh = trimesh.Trimesh(
-                                vertices=V,
-                                faces=all_faces,
-                                process=False
-                            )
-                            num_holes_filled = 1
-                            log.info("igl_fan filled boundary loop with %d faces", len(new_faces))
-                    else:
-                        log.warning("Boundary loop too small (%d vertices)", len(loop))
-                else:
-                    log.warning("No boundary loop found or invalid format")
-            except Exception as e:
-                log.warning("igl boundary_loop failed: %s, using trimesh fallback", e)
-                filled_mesh.fill_holes()
-                method_used = "trimesh (igl error fallback)"
-
-        elif method == "igl_fan" and not HAS_IGL:
-            # Fallback to trimesh if igl not available
-            log.warning("libigl not available, falling back to trimesh method")
-            filled_mesh.fill_holes()
-            method_used = "trimesh (fallback)"
-
-        else:
-            # Use trimesh's built-in method
-            filled_mesh.fill_holes()
-            log.info("Trimesh method completed")
-
-        # Check result
-        is_watertight = filled_mesh.is_watertight
-        final_vertices = len(filled_mesh.vertices)
-        final_faces = len(filled_mesh.faces)
-
-        added_vertices = final_vertices - initial_vertices
-        added_faces = final_faces - initial_faces
-
-        # Build holes info
-        holes_info = ""
-        if num_holes_filled is not None:
-            holes_info = f"\n  Holes Filled: {num_holes_filled}"
-
-        # Build param info based on method
-        if "cumesh" in method_used.lower():
-            param_info = f"Max Hole Perimeter: {perimeter}"
-        elif "pymeshlab" in method_used.lower():
-            param_info = f"Max Hole Size: {maxholesize}"
-        else:
-            param_info = "(no params)"
-
-        info = f"""Hole Filling Results:
-
-Method: {method_used}
-{param_info}
-
-Initial State:
-  Vertices: {initial_vertices:,}
-  Faces: {initial_faces:,}
-  Watertight: {'Yes' if was_watertight else 'No'}
-
-After Filling:
-  Vertices: {final_vertices:,} (+{added_vertices})
-  Faces: {final_faces:,} (+{added_faces})
-  Watertight: {'[OK] Yes' if is_watertight else '[WARN] No'}{holes_info}
-
-{'[OK] All holes successfully filled!' if is_watertight and added_faces > 0 else ''}
-{'[INFO] No holes detected - mesh was already watertight.' if was_watertight else ''}
-{'[WARN] Some holes may remain (check mesh topology).' if not is_watertight and added_faces > 0 else ''}
-"""
-
-        log.info("Added %d faces, Watertight: %s -> %s", added_faces, was_watertight, is_watertight)
-
-        return io.NodeOutput(filled_mesh, info, ui={"text": [info]})
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackFillHoles": FillHolesNode,
