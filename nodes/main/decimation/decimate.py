@@ -2,249 +2,32 @@
 # Copyright (C) 2025 ComfyUI-GeometryPack Contributors
 
 """
-Decimate Node - Multiple mesh decimation/simplification backends.
+Unified Decimate Mesh Node - Single frontend with backend selector.
 
-Available backends:
-- quadric_edge_collapse: PyMeshLab Garland-Heckbert quadric error (best quality)
-- fast_simplification: Fast-Quadric-Mesh-Simplification (~10x faster)
-- vertex_clustering: PyMeshLab vertex clustering (fastest, aggressive)
-- cgal_edge_collapse: CGAL Lindstrom-Turk edge collapse (high geometric fidelity)
-- decimate_pro: PyVista/VTK DecimatePro (topology-preserving)
+Uses ComfyUI's node expansion (GraphBuilder) to dispatch to hidden
+backend-specific nodes, each running in its own isolation env.
 """
 
 import logging
-import numpy as np
-import trimesh as trimesh_module
 from comfy_api.latest import io
 
 log = logging.getLogger("geometrypack")
 
-def _pymeshlab_quadric_edge_collapse(mesh, target_face_count, quality_threshold,
-                                     preserve_boundary, preserve_normal,
-                                     preserve_topology, planar_quadric):
-    """Quadric edge collapse decimation via PyMeshLab."""
-    try:
-        import pymeshlab
-    except (ImportError, OSError):
-        return None, "pymeshlab is not installed."
-
-    ms = pymeshlab.MeshSet()
-    pml_mesh = pymeshlab.Mesh(
-        vertex_matrix=np.asarray(mesh.vertices, dtype=np.float64),
-        face_matrix=np.asarray(mesh.faces, dtype=np.int32),
-    )
-    ms.add_mesh(pml_mesh)
-
-    kwargs = {
-        "targetfacenum": target_face_count,
-        "qualitythr": quality_threshold,
-        "preserveboundary": preserve_boundary,
-        "preservenormal": preserve_normal,
-        "preservetopology": preserve_topology,
-        "planarquadric": planar_quadric,
-        "autoclean": True,
-    }
-
-    try:
-        ms.meshing_decimation_quadric_edge_collapse(**kwargs)
-    except AttributeError:
-        try:
-            ms.simplification_quadric_edge_collapse_decimation(**kwargs)
-        except AttributeError:
-            return None, (
-                "PyMeshLab quadric edge collapse filter not available. "
-                "Ensure pymeshlab >= 2023.12 is installed."
-            )
-
-    out = ms.current_mesh()
-    result = trimesh_module.Trimesh(
-        vertices=out.vertex_matrix(),
-        faces=out.face_matrix(),
-        process=False,
-    )
-    return result, ""
-
-def _fast_simplification_decimate(mesh, target_reduction, agg):
-    """Fast quadric mesh simplification."""
-    try:
-        import fast_simplification
-    except (ImportError, OSError):
-        return None, "fast-simplification is not installed."
-
-    v = np.asarray(mesh.vertices, dtype=np.float64)
-    f = np.asarray(mesh.faces, dtype=np.int32)
-
-    v_out, f_out = fast_simplification.simplify(
-        v, f,
-        target_reduction=target_reduction,
-        agg=agg,
-    )
-
-    result = trimesh_module.Trimesh(
-        vertices=v_out,
-        faces=f_out,
-        process=False,
-    )
-    return result, ""
-
-def _pymeshlab_vertex_clustering(mesh, threshold_percentage):
-    """Vertex clustering decimation via PyMeshLab."""
-    try:
-        import pymeshlab
-    except (ImportError, OSError):
-        return None, "pymeshlab is not installed."
-
-    ms = pymeshlab.MeshSet()
-    pml_mesh = pymeshlab.Mesh(
-        vertex_matrix=np.asarray(mesh.vertices, dtype=np.float64),
-        face_matrix=np.asarray(mesh.faces, dtype=np.int32),
-    )
-    ms.add_mesh(pml_mesh)
-
-    try:
-        ms.meshing_decimation_clustering(
-            threshold=pymeshlab.PercentageValue(threshold_percentage),
-        )
-    except AttributeError:
-        try:
-            ms.simplification_clustering_decimation(
-                threshold=pymeshlab.PercentageValue(threshold_percentage),
-            )
-        except AttributeError:
-            return None, (
-                "PyMeshLab vertex clustering filter not available. "
-                "Ensure pymeshlab >= 2023.12 is installed."
-            )
-
-    out = ms.current_mesh()
-    result = trimesh_module.Trimesh(
-        vertices=out.vertex_matrix(),
-        faces=out.face_matrix(),
-        process=False,
-    )
-    return result, ""
-
-def _cgal_edge_collapse(mesh, target_edge_count, cost_strategy):
-    """CGAL surface mesh simplification via edge collapse."""
-    try:
-        from CGAL import CGAL_Surface_mesh_simplification
-        from CGAL.CGAL_Kernel import Point_3
-        from CGAL.CGAL_Polyhedron_3 import Polyhedron_3
-        from CGAL import CGAL_Polygon_mesh_processing
-    except (ImportError, OSError):
-        return None, "CGAL Python bindings not available."
-
-    vertices = np.asarray(mesh.vertices, dtype=np.float64)
-    faces = np.asarray(mesh.faces, dtype=np.int32)
-
-    if len(vertices) == 0 or len(faces) == 0:
-        return None, "Mesh is empty"
-
-    # Build CGAL Polyhedron_3
-    points = CGAL_Polygon_mesh_processing.Point_3_Vector()
-    points.reserve(len(vertices))
-    for v in vertices:
-        points.append(Point_3(float(v[0]), float(v[1]), float(v[2])))
-
-    polygons = [[int(idx) for idx in face] for face in faces]
-
-    P = Polyhedron_3()
-    CGAL_Polygon_mesh_processing.polygon_soup_to_polygon_mesh(points, polygons, P)
-
-    # Choose cost strategy
-    if cost_strategy == "lindstrom_turk":
-        cost = CGAL_Surface_mesh_simplification.LindstromTurk_cost()
-        placement = CGAL_Surface_mesh_simplification.LindstromTurk_placement()
-    else:
-        # edge_length cost
-        cost = CGAL_Surface_mesh_simplification.Edge_length_cost()
-        placement = CGAL_Surface_mesh_simplification.Midpoint_placement()
-
-    stop = CGAL_Surface_mesh_simplification.Count_stop_predicate(target_edge_count)
-
-    CGAL_Surface_mesh_simplification.edge_collapse(P, stop, cost, placement)
-
-    # Extract result
-    new_vertices = []
-    vertex_map = {}
-    for i, vertex in enumerate(P.vertices()):
-        point = vertex.point()
-        new_vertices.append([float(point.x()), float(point.y()), float(point.z())])
-        vertex_map[vertex] = i
-
-    new_faces = []
-    for facet in P.facets():
-        halfedge = facet.halfedge()
-        face_vertices = []
-        start = halfedge
-        current = start
-        while True:
-            face_vertices.append(vertex_map[current.vertex()])
-            current = current.next()
-            if current == start:
-                break
-        if len(face_vertices) == 3:
-            new_faces.append(face_vertices)
-
-    result = trimesh_module.Trimesh(
-        vertices=np.array(new_vertices, dtype=np.float64),
-        faces=np.array(new_faces, dtype=np.int32),
-        process=False,
-    )
-    return result, ""
-
-def _pyvista_decimate_pro(mesh, target_reduction, preserve_topology, feature_angle):
-    """VTK DecimatePro via PyVista."""
-    try:
-        import pyvista as pv
-    except (ImportError, OSError):
-        return None, "pyvista is not installed."
-
-    vertices = np.asarray(mesh.vertices, dtype=np.float64)
-    faces_raw = np.asarray(mesh.faces, dtype=np.int32)
-
-    # PyVista face format: [3, v0, v1, v2, 3, v0, v1, v2, ...]
-    n_faces = len(faces_raw)
-    pv_faces = np.empty((n_faces, 4), dtype=np.int32)
-    pv_faces[:, 0] = 3
-    pv_faces[:, 1:] = faces_raw
-    pv_faces = pv_faces.ravel()
-
-    pv_mesh = pv.PolyData(vertices, pv_faces)
-
-    decimated = pv_mesh.decimate_pro(
-        target_reduction,
-        preserve_topology=preserve_topology,
-        feature_angle=feature_angle,
-    )
-
-    # Extract back
-    out_verts = np.array(decimated.points, dtype=np.float64)
-    out_faces_pv = decimated.faces.reshape(-1, 4)[:, 1:]
-
-    result = trimesh_module.Trimesh(
-        vertices=out_verts,
-        faces=out_faces_pv,
-        process=False,
-    )
-    return result, ""
 
 class DecimateMeshNode(io.ComfyNode):
     """
-    Decimate Mesh - Reduce mesh face/vertex count using multiple algorithms.
+    Decimate Mesh - Unified decimation with backend selection.
 
-    Available backends:
-    - quadric_edge_collapse: Garland-Heckbert quadric error metric (PyMeshLab).
-      Best quality, most options. Industry standard.
-    - fast_simplification: Fast Quadric Mesh Simplification.
-      ~10x faster than PyMeshLab, slightly lower quality.
-    - vertex_clustering: Group nearby vertices (PyMeshLab).
-      Very fast, aggressive reduction. Good for massive meshes.
-    - cgal_edge_collapse: CGAL Lindstrom-Turk edge collapse.
-      Highest geometric fidelity, optimizes volume + boundary.
-    - decimate_pro: VTK DecimatePro (PyVista).
-      Topology-preserving vertex deletion with local re-triangulation.
+    Dispatches to hidden backend nodes via node expansion.
     """
+
+    BACKEND_MAP = {
+        "quadric_edge_collapse": "GeomPackDecimate_QuadricEdgeCollapse",
+        "fast_simplification":   "GeomPackDecimate_FastSimplification",
+        "vertex_clustering":     "GeomPackDecimate_VertexClustering",
+        # cgal_edge_collapse disabled: CGAL Python bindings lack Surface_mesh_simplification module
+        "decimate_pro":          "GeomPackDecimate_DecimatePro",
+    }
 
     @classmethod
     def define_schema(cls):
@@ -252,6 +35,7 @@ class DecimateMeshNode(io.ComfyNode):
             node_id="GeomPackDecimateMesh",
             display_name="Decimate Mesh",
             category="geompack/decimation",
+            enable_expand=True,
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
@@ -260,7 +44,6 @@ class DecimateMeshNode(io.ComfyNode):
                         "quadric_edge_collapse=best quality, "
                         "fast_simplification=fastest, "
                         "vertex_clustering=aggressive, "
-                        "cgal_edge_collapse=highest fidelity, "
                         "decimate_pro=topology-preserving"
                     ), options=[
                     io.DynamicCombo.Option("quadric_edge_collapse", [
@@ -278,10 +61,7 @@ class DecimateMeshNode(io.ComfyNode):
                     io.DynamicCombo.Option("vertex_clustering", [
                         io.Float.Input("cluster_threshold", default=1.0, min=0.1, max=10.0, step=0.1, tooltip="Clustering cell size as percentage of bounding box diagonal. Larger = more aggressive reduction."),
                     ]),
-                    io.DynamicCombo.Option("cgal_edge_collapse", [
-                        io.Int.Input("target_face_count", default=5000, min=4, max=10000000, step=100, tooltip="Target number of output faces."),
-                        io.Combo.Input("cost_strategy", options=["lindstrom_turk", "edge_length"], default="lindstrom_turk", tooltip="CGAL cost strategy. lindstrom_turk=optimizes geometry+volume+boundary (best), edge_length=collapses shortest edges first (fast)."),
-                    ]),
+
                     io.DynamicCombo.Option("decimate_pro", [
                         io.Float.Input("target_reduction", default=0.5, min=0.01, max=0.99, step=0.01, tooltip="Fraction of faces to REMOVE. 0.5 = reduce to ~50%% of original faces, 0.9 = reduce to ~10%% of original."),
                         io.Float.Input("feature_angle", default=15.0, min=0.0, max=180.0, step=1.0, tooltip="Feature angle threshold (degrees). Edges with dihedral angle above this are preserved."),
@@ -297,140 +77,30 @@ class DecimateMeshNode(io.ComfyNode):
 
     @classmethod
     def execute(cls, trimesh, backend):
-        """Apply mesh decimation based on selected backend."""
+        from comfy_execution.graph_utils import GraphBuilder
+
+        if cls.SCHEMA is None:
+            cls.GET_SCHEMA()
+
         selected = backend["backend"]
-        target_face_count = backend.get("target_face_count", 5000)
-        target_reduction = backend.get("target_reduction", 0.5)
-        quality_threshold = backend.get("quality_threshold", 0.3)
-        preserve_boundary = backend.get("preserve_boundary", "true")
-        preserve_normal = backend.get("preserve_normal", "true")
-        preserve_topology = backend.get("preserve_topology", "true")
-        planar_quadric = backend.get("planar_quadric", "false")
-        aggressiveness = backend.get("aggressiveness", 7)
-        cluster_threshold = backend.get("cluster_threshold", 1.0)
-        cost_strategy = backend.get("cost_strategy", "lindstrom_turk")
-        feature_angle = backend.get("feature_angle", 15.0)
+        node_id = cls.BACKEND_MAP[selected]
 
-        initial_vertices = len(trimesh.vertices)
-        initial_faces = len(trimesh.faces)
+        log.info("Decimate dispatch: %s -> %s", selected, node_id)
 
-        log.info("Decimate backend: %s", selected)
-        log.info("Input: %s vertices, %s faces",
-                 f"{initial_vertices:,}", f"{initial_faces:,}")
+        kwargs = {"trimesh": trimesh}
+        for k, v in backend.items():
+            if k == "backend":
+                continue
+            kwargs[k] = v
 
-        if selected == "quadric_edge_collapse":
-            log.info("Parameters: target_face_count=%d, quality_thr=%.2f, "
-                     "preserve_boundary=%s, preserve_normal=%s, preserve_topology=%s",
-                     target_face_count, quality_threshold,
-                     preserve_boundary, preserve_normal, preserve_topology)
-            decimated, error = _pymeshlab_quadric_edge_collapse(
-                trimesh, target_face_count, quality_threshold,
-                preserve_boundary == "true",
-                preserve_normal == "true",
-                preserve_topology == "true",
-                planar_quadric == "true",
-            )
+        graph = GraphBuilder()
+        backend_node = graph.node(node_id, **kwargs)
 
-        elif selected == "fast_simplification":
-            log.info("Parameters: target_reduction=%.2f, aggressiveness=%d",
-                     target_reduction, aggressiveness)
-            decimated, error = _fast_simplification_decimate(
-                trimesh, target_reduction, aggressiveness,
-            )
-
-        elif selected == "vertex_clustering":
-            log.info("Parameters: cluster_threshold=%.1f%%", cluster_threshold)
-            decimated, error = _pymeshlab_vertex_clustering(
-                trimesh, cluster_threshold,
-            )
-
-        elif selected == "cgal_edge_collapse":
-            target_edges = int(target_face_count * 1.5)
-            log.info("Parameters: target_edges=%d (from target_faces=%d), cost=%s",
-                     target_edges, target_face_count, cost_strategy)
-            decimated, error = _cgal_edge_collapse(
-                trimesh, target_edges, cost_strategy,
-            )
-
-        elif selected == "decimate_pro":
-            log.info("Parameters: target_reduction=%.2f, preserve_topology=%s, feature_angle=%.1f",
-                     target_reduction, preserve_topology, feature_angle)
-            decimated, error = _pyvista_decimate_pro(
-                trimesh, target_reduction,
-                preserve_topology == "true",
-                feature_angle,
-            )
-
-        else:
-            raise ValueError(f"Unknown backend: {selected}")
-
-        if decimated is None:
-            raise ValueError(f"Decimation failed ({selected}): {error}")
-
-        # Copy metadata
-        if hasattr(trimesh, "metadata") and trimesh.metadata:
-            decimated.metadata = trimesh.metadata.copy()
-        decimated.metadata["decimation"] = {
-            "algorithm": selected,
-            "original_vertices": initial_vertices,
-            "original_faces": initial_faces,
-            "result_vertices": len(decimated.vertices),
-            "result_faces": len(decimated.faces),
+        return {
+            "result": (backend_node.out(0), backend_node.out(1)),
+            "expand": graph.finalize(),
         }
 
-        vertex_change = len(decimated.vertices) - initial_vertices
-        face_change = len(decimated.faces) - initial_faces
-        face_pct = (face_change / initial_faces) * 100 if initial_faces > 0 else 0
-
-        log.info("Output: %d vertices (%+d), %d faces (%+d, %.1f%%)",
-                 len(decimated.vertices), vertex_change,
-                 len(decimated.faces), face_change, face_pct)
-
-        # Build backend-specific param block
-        if selected == "quadric_edge_collapse":
-            param_text = (
-                f"Target Face Count: {target_face_count:,}\n"
-                f"Quality Threshold: {quality_threshold}\n"
-                f"Preserve Boundary: {preserve_boundary}\n"
-                f"Preserve Normal: {preserve_normal}\n"
-                f"Preserve Topology: {preserve_topology}\n"
-                f"Planar Quadric: {planar_quadric}"
-            )
-        elif selected == "fast_simplification":
-            param_text = (
-                f"Target Reduction: {target_reduction:.0%}\n"
-                f"Aggressiveness: {aggressiveness}"
-            )
-        elif selected == "vertex_clustering":
-            param_text = f"Cluster Threshold: {cluster_threshold}%"
-        elif selected == "cgal_edge_collapse":
-            param_text = (
-                f"Target Face Count: {target_face_count:,}\n"
-                f"Cost Strategy: {cost_strategy}"
-            )
-        elif selected == "decimate_pro":
-            param_text = (
-                f"Target Reduction: {target_reduction:.0%}\n"
-                f"Preserve Topology: {preserve_topology}\n"
-                f"Feature Angle: {feature_angle}\u00b0"
-            )
-        else:
-            param_text = ""
-
-        info = f"""Decimate Results ({selected}):
-
-{param_text}
-
-Before:
-  Vertices: {initial_vertices:,}
-  Faces: {initial_faces:,}
-
-After:
-  Vertices: {len(decimated.vertices):,}
-  Faces: {len(decimated.faces):,}
-  Reduction: {abs(face_pct):.1f}%
-"""
-        return io.NodeOutput(decimated, info, ui={"text": [info]})
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackDecimateMesh": DecimateMeshNode,

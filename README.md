@@ -34,6 +34,23 @@ Questions or feature requests? Open a [Discussion](https://github.com/PozzettiAn
 
 Join the [Comfy3D Discord](https://discord.gg/bcdQCUjnHE) for help, updates, and chat about 3D workflows in ComfyUI.
 
+## Multi-Backend Nodes
+
+Each of these nodes presents a single UI with a backend selector dropdown. Under the hood, ComfyUI's GraphBuilder dispatches to hidden backend-specific nodes, enabling cross-environment execution (main, Blender, GPU, CGAL).
+
+| Node | Backends |
+|------|----------|
+| **Remesh** | pymeshlab_isotropic, instant_meshes, quadriflow, mmg_adaptive, geogram_smooth, geogram_anisotropic, pmp_uniform, pmp_adaptive, quadwild, cgal_isotropic, blender_voxel, blender_smooth, blender_sharp, blender_blocks, gpu_cumesh |
+| **Decimate Mesh** | quadric_edge_collapse, fast_simplification, vertex_clustering, cgal_edge_collapse, decimate_pro |
+| **Fill Holes** | trimesh, pymeshlab, pymeshfix, igl_fan, cgal, gpu_cumesh |
+| **Smooth Mesh** | taubin, laplacian, hc_laplacian, trimesh_laplacian, trimesh_taubin |
+| **Sharpen Mesh** | two_step, unsharp_mask, libigl_unsharp, l0_minimize, guided_normal, vsa_snap, fast_effective, non_iterative |
+| **Fix Normals** | trimesh, igl_bfs, igl_winding, igl_raycast, igl_signed_dist |
+| **Reconstruct Surface** | poisson, ball_pivoting, alpha_shape, convex_hull, delaunay_2d, alpha_wrap (CGAL) |
+| **UV Unwrap** | xatlas, cumesh (GPU), libigl_lscm, libigl_harmonic, libigl_arap, blender_smart, blender_cube, blender_cylinder, blender_sphere |
+| **Extract Skeleton** | wavefront, vertex_clusters, edge_collapse, teasar |
+| **Boolean** | libigl_cgal, blender_exact |
+
 ## Credits
 
 Built on [trimesh](https://trimesh.org/), [libigl](https://libigl.github.io/), [PyMeshLab](https://pymeshlab.readthedocs.io/), and [CGAL](https://www.cgal.org/).

@@ -2,7 +2,7 @@
 # Copyright (C) 2025 ComfyUI-GeometryPack Contributors
 
 """
-Blender boolean nodes
+Blender boolean backend nodes
 """
 
 from .boolean import NODE_CLASS_MAPPINGS as BOOLEAN_MAPS, NODE_DISPLAY_NAME_MAPPINGS as BOOLEAN_DISP

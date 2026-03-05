@@ -1,10 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2025 ComfyUI-GeometryPack Contributors
 
-"""
-Boolean Blender Node - CSG operations using bpy
-Requires bpy (Blender Python module).
-"""
+"""Blender EXACT solver boolean operations backend node."""
 
 import logging
 
@@ -60,26 +57,16 @@ def _bpy_boolean_operation(vertices_a, faces_a, vertices_b, faces_b, operation):
     return {'vertices': result_vertices, 'faces': result_faces}
 
 
-class BooleanBlenderNode(io.ComfyNode):
-    """
-    Boolean Blender - Union, Difference, and Intersection using Blender's EXACT solver.
-
-    Performs Constructive Solid Geometry (CSG) operations:
-    - union: Combine two meshes into one
-    - difference: Subtract mesh_b from mesh_a
-    - intersection: Keep only overlapping parts
-
-    Uses Blender's bpy module with the EXACT boolean solver.
-    For CGAL-based booleans, use "Boolean CGAL" node.
-    """
-
+class BooleanBlenderExactNode(io.ComfyNode):
+    """Blender EXACT solver boolean operations backend."""
 
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="GeomPackBooleanBlender",
-            display_name="Boolean Blender",
+            node_id="GeomPackBoolean_BlenderExact",
+            display_name="Boolean Blender Exact (backend)",
             category="geompack/boolean",
+            is_dev_only=True,
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("mesh_a"),
@@ -93,60 +80,46 @@ class BooleanBlenderNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, mesh_a, mesh_b, operation):
-        """
-        Perform boolean operation on two meshes using Blender.
-
-        Args:
-            mesh_a: First mesh (base mesh for difference)
-            mesh_b: Second mesh (subtracted mesh for difference)
-            operation: Boolean operation type
-
-        Returns:
-            tuple: (result_mesh, info_string)
-        """
+    def execute(cls, mesh_a, mesh_b, operation="union"):
+        log.info("Backend: blender_exact")
         log.info("Mesh A: %d vertices, %d faces", len(mesh_a.vertices), len(mesh_a.faces))
         log.info("Mesh B: %d vertices, %d faces", len(mesh_b.vertices), len(mesh_b.faces))
         log.info("Operation: %s", operation)
 
-        try:
-            log.info("Using Blender bpy backend...")
+        # Map operation to Blender modifier type
+        blender_op = {
+            "union": "UNION",
+            "difference": "DIFFERENCE",
+            "intersection": "INTERSECT"
+        }[operation]
 
-            # Map operation to Blender modifier type
-            blender_op = {
-                "union": "UNION",
-                "difference": "DIFFERENCE",
-                "intersection": "INTERSECT"
-            }[operation]
+        result_data = _bpy_boolean_operation(
+            vertices_a=np.asarray(mesh_a.vertices, dtype=np.float32),
+            faces_a=np.asarray(mesh_a.faces, dtype=np.int32),
+            vertices_b=np.asarray(mesh_b.vertices, dtype=np.float32),
+            faces_b=np.asarray(mesh_b.faces, dtype=np.int32),
+            operation=blender_op
+        )
 
-            result_data = _bpy_boolean_operation(
-                vertices_a=np.asarray(mesh_a.vertices, dtype=np.float32),
-                faces_a=np.asarray(mesh_a.faces, dtype=np.int32),
-                vertices_b=np.asarray(mesh_b.vertices, dtype=np.float32),
-                faces_b=np.asarray(mesh_b.faces, dtype=np.int32),
-                operation=blender_op
-            )
+        result = trimesh_module.Trimesh(
+            vertices=np.array(result_data['vertices'], dtype=np.float32),
+            faces=np.array(result_data['faces'], dtype=np.int32),
+            process=False
+        )
 
-            result = trimesh_module.Trimesh(
-                vertices=np.array(result_data['vertices'], dtype=np.float32),
-                faces=np.array(result_data['faces'], dtype=np.int32),
-                process=False
-            )
+        result.metadata = mesh_a.metadata.copy()
+        result.metadata['boolean'] = {
+            'operation': operation,
+            'engine': 'blender_bpy',
+            'mesh_a_vertices': len(mesh_a.vertices),
+            'mesh_a_faces': len(mesh_a.faces),
+            'mesh_b_vertices': len(mesh_b.vertices),
+            'mesh_b_faces': len(mesh_b.faces),
+            'result_vertices': len(result.vertices),
+            'result_faces': len(result.faces)
+        }
 
-            # Preserve metadata
-            result.metadata = mesh_a.metadata.copy()
-            result.metadata['boolean'] = {
-                'operation': operation,
-                'engine': 'blender_bpy',
-                'mesh_a_vertices': len(mesh_a.vertices),
-                'mesh_a_faces': len(mesh_a.faces),
-                'mesh_b_vertices': len(mesh_b.vertices),
-                'mesh_b_faces': len(mesh_b.faces),
-                'result_vertices': len(result.vertices),
-                'result_faces': len(result.faces)
-            }
-
-            info = f"""Boolean Operation Results:
+        info = f"""Boolean Operation Results:
 
 Operation: {operation.upper()}
 Engine: Blender bpy (EXACT solver)
@@ -166,17 +139,9 @@ Result:
 Watertight: {result.is_watertight}
 """
 
-            log.info("Success: %d vertices, %d faces", len(result.vertices), len(result.faces))
-            return io.NodeOutput(result, info, ui={"text": [info]})
-
-        except Exception as e:
-            raise RuntimeError(f"Boolean Blender operation failed: {e}")
+        log.info("Success: %d vertices, %d faces", len(result.vertices), len(result.faces))
+        return io.NodeOutput(result, info, ui={"text": [info]})
 
 
-NODE_CLASS_MAPPINGS = {
-    "GeomPackBooleanBlender": BooleanBlenderNode,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackBooleanBlender": "Boolean Blender",
-}
+NODE_CLASS_MAPPINGS = {"GeomPackBoolean_BlenderExact": BooleanBlenderExactNode}
+NODE_DISPLAY_NAME_MAPPINGS = {"GeomPackBoolean_BlenderExact": "Boolean Blender Exact (backend)"}

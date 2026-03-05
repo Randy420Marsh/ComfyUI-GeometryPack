@@ -34,6 +34,7 @@ from . import boolean
 from . import reconstruction_cgal
 from . import remeshing_cgal
 from . import repair_cgal
+from . import decimation_cgal
 
 # Collect all node class mappings
 NODE_CLASS_MAPPINGS = {}
@@ -58,6 +59,7 @@ NODE_CLASS_MAPPINGS.update(remeshing_cgal.NODE_CLASS_MAPPINGS)
 NODE_CLASS_MAPPINGS.update(repair_cgal.NODE_CLASS_MAPPINGS)
 NODE_CLASS_MAPPINGS.update(smoothing.NODE_CLASS_MAPPINGS)
 NODE_CLASS_MAPPINGS.update(decimation.NODE_CLASS_MAPPINGS)
+NODE_CLASS_MAPPINGS.update(decimation_cgal.NODE_CLASS_MAPPINGS)
 
 # Collect all display name mappings
 NODE_DISPLAY_NAME_MAPPINGS = {}
@@ -82,5 +84,6 @@ NODE_DISPLAY_NAME_MAPPINGS.update(remeshing_cgal.NODE_DISPLAY_NAME_MAPPINGS)
 NODE_DISPLAY_NAME_MAPPINGS.update(repair_cgal.NODE_DISPLAY_NAME_MAPPINGS)
 NODE_DISPLAY_NAME_MAPPINGS.update(smoothing.NODE_DISPLAY_NAME_MAPPINGS)
 NODE_DISPLAY_NAME_MAPPINGS.update(decimation.NODE_DISPLAY_NAME_MAPPINGS)
+NODE_DISPLAY_NAME_MAPPINGS.update(decimation_cgal.NODE_DISPLAY_NAME_MAPPINGS)
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
