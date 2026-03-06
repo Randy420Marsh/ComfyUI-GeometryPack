@@ -24,10 +24,10 @@ class ReconstructPoissonNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("points"),
-                io.Int.Input("poisson_depth", default=8, min=1, max=12, step=1),
-                io.Float.Input("poisson_scale", default=1.1, min=1.0, max=2.0, step=0.1),
-                io.Combo.Input("estimate_normals", options=["true", "false"], default="true"),
-                io.Float.Input("normal_radius", default=0.1, min=0.001, max=10.0, step=0.01),
+                io.Int.Input("poisson_depth", default=8, min=1, max=12, step=1, tooltip="Octree depth for the Poisson solver. Higher values capture finer detail but use exponentially more memory and time. 6=coarse, 8=balanced, 10+=high detail."),
+                io.Float.Input("poisson_scale", default=1.1, min=1.0, max=2.0, step=0.1, tooltip="Scale factor for the reconstruction grid relative to the bounding box. Values >1.0 add padding to avoid boundary artifacts. 1.1 is usually sufficient."),
+                io.Combo.Input("estimate_normals", options=["true", "false"], default="true", tooltip="Re-estimate point normals using k-nearest neighbors. Poisson reconstruction requires oriented normals — enable this if the input has no normals or unreliable normals."),
+                io.Float.Input("normal_radius", default=0.1, min=0.001, max=10.0, step=0.01, tooltip="Search radius for normal estimation via k-nearest neighbors. Should be 2-3x the average point spacing. Only used when estimate_normals is true."),
             ],
             outputs=[
                 io.Custom("TRIMESH").Output(display_name="reconstructed_mesh"),

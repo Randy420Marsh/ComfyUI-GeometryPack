@@ -15,7 +15,7 @@ def _trimesh_taubin_smooth(mesh, iterations, lamb, mu):
     result = mesh.copy()
 
     from trimesh.smoothing import filter_taubin
-    filter_taubin(result, lamb=lamb, mu=mu, iterations=iterations)
+    filter_taubin(result, lamb=lamb, nu=mu, iterations=iterations)
 
     return result
 

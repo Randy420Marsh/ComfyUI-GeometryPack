@@ -26,7 +26,7 @@ class ReconstructAlphaShapeNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("points"),
-                io.Float.Input("alpha", default=0.0, min=0.0, max=100.0, step=0.01),
+                io.Float.Input("alpha", default=0.0, min=0.0, max=100.0, step=0.01, tooltip="Radius threshold controlling which Delaunay tetrahedra are kept. Only tetrahedra with longest edge < 2*alpha are included. Larger = coarser shape with more fill, smaller = tighter fit with more holes. 0 = auto (10% of bounding box diagonal)."),
             ],
             outputs=[
                 io.Custom("TRIMESH").Output(display_name="reconstructed_mesh"),

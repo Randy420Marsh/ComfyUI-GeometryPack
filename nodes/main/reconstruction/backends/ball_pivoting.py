@@ -24,9 +24,9 @@ class ReconstructBallPivotingNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("points"),
-                io.Float.Input("ball_radius", default=0.0, min=0.0, max=100.0, step=0.01),
-                io.Combo.Input("estimate_normals", options=["true", "false"], default="true"),
-                io.Float.Input("normal_radius", default=0.1, min=0.001, max=10.0, step=0.01),
+                io.Float.Input("ball_radius", default=0.0, min=0.0, max=100.0, step=0.01, tooltip="Radius of the virtual ball rolled over the point cloud to form triangles. Smaller = finer detail but more holes, larger = smoother but loses detail. 0 = auto (PyMeshLab estimates from point spacing)."),
+                io.Combo.Input("estimate_normals", options=["true", "false"], default="true", tooltip="Re-estimate point normals using k-nearest neighbors. Enable if the input has no normals or unreliable normals."),
+                io.Float.Input("normal_radius", default=0.1, min=0.001, max=10.0, step=0.01, tooltip="Search radius for normal estimation via k-nearest neighbors. Should be 2-3x the average point spacing. Only used when estimate_normals is true."),
             ],
             outputs=[
                 io.Custom("TRIMESH").Output(display_name="reconstructed_mesh"),

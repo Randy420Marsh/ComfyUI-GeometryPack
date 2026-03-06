@@ -31,7 +31,7 @@ class BooleanNode(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(
             node_id="GeomPackBoolean",
-            display_name="Boolean",
+            display_name="Boolean Operations",
             category="geompack/boolean",
             enable_expand=True,
             is_output_node=True,
@@ -91,5 +91,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackBoolean": "Boolean",
+    "GeomPackBoolean": "Boolean Operations",
 }

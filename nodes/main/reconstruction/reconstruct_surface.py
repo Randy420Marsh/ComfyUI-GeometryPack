@@ -55,18 +55,18 @@ class ReconstructSurfaceNode(io.ComfyNode):
                     "alpha_wrap=shrink wrap (CGAL)"
                 ), options=[
                     io.DynamicCombo.Option("poisson", [
-                        io.Int.Input("poisson_depth", default=8, min=1, max=12, step=1, tooltip="Octree depth for Poisson reconstruction. Higher = more detail, slower."),
-                        io.Float.Input("poisson_scale", default=1.1, min=1.0, max=2.0, step=0.1, tooltip="Scale factor for reconstruction grid."),
-                        io.Combo.Input("estimate_normals", options=["true", "false"], default="true", tooltip="Estimate normals from point cloud."),
-                        io.Float.Input("normal_radius", default=0.1, min=0.001, max=10.0, step=0.01, tooltip="Search radius for normal estimation."),
+                        io.Int.Input("poisson_depth", default=8, min=1, max=12, step=1, tooltip="Octree depth for the Poisson solver. Higher values capture finer detail but use exponentially more memory and time. 6=coarse, 8=balanced, 10+=high detail."),
+                        io.Float.Input("poisson_scale", default=1.1, min=1.0, max=2.0, step=0.1, tooltip="Scale factor for the reconstruction grid relative to the bounding box. Values >1.0 add padding to avoid boundary artifacts. 1.1 is usually sufficient."),
+                        io.Combo.Input("estimate_normals", options=["true", "false"], default="true", tooltip="Re-estimate point normals using k-nearest neighbors. Poisson reconstruction requires oriented normals — enable this if the input has no normals or unreliable normals."),
+                        io.Float.Input("normal_radius", default=0.1, min=0.001, max=10.0, step=0.01, tooltip="Search radius for normal estimation via k-nearest neighbors. Should be 2-3x the average point spacing. Only used when estimate_normals is true."),
                     ]),
                     io.DynamicCombo.Option("ball_pivoting", [
-                        io.Float.Input("ball_radius", default=0.0, min=0.0, max=100.0, step=0.01, tooltip="Ball radius for pivoting. 0 = auto."),
-                        io.Combo.Input("estimate_normals", options=["true", "false"], default="true", tooltip="Estimate normals from point cloud."),
-                        io.Float.Input("normal_radius", default=0.1, min=0.001, max=10.0, step=0.01, tooltip="Search radius for normal estimation."),
+                        io.Float.Input("ball_radius", default=0.0, min=0.0, max=100.0, step=0.01, tooltip="Radius of the virtual ball rolled over the point cloud to form triangles. Smaller = finer detail but more holes, larger = smoother but loses detail. 0 = auto (PyMeshLab estimates from point spacing)."),
+                        io.Combo.Input("estimate_normals", options=["true", "false"], default="true", tooltip="Re-estimate point normals using k-nearest neighbors. Enable if the input has no normals or unreliable normals."),
+                        io.Float.Input("normal_radius", default=0.1, min=0.001, max=10.0, step=0.01, tooltip="Search radius for normal estimation via k-nearest neighbors. Should be 2-3x the average point spacing. Only used when estimate_normals is true."),
                     ]),
                     io.DynamicCombo.Option("alpha_shape", [
-                        io.Float.Input("alpha", default=0.0, min=0.0, max=100.0, step=0.01, tooltip="Alpha value. 0 = auto (10%% of bbox diagonal)."),
+                        io.Float.Input("alpha", default=0.0, min=0.0, max=100.0, step=0.01, tooltip="Radius threshold controlling which Delaunay tetrahedra are kept. Only tetrahedra with longest edge < 2*alpha are included. Larger = coarser shape with more fill, smaller = tighter fit with more holes. 0 = auto (10%% of bounding box diagonal)."),
                     ]),
                     io.DynamicCombo.Option("convex_hull", []),
                     io.DynamicCombo.Option("delaunay_2d", []),
