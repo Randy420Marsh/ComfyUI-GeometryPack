@@ -40,7 +40,7 @@ class FillHolesNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("mesh"),
-                io.DynamicCombo.Input("method", tooltip="Hole filling algorithm and backend", options=[
+                io.DynamicCombo.Input("backend", tooltip="Hole filling algorithm and backend", options=[
                     io.DynamicCombo.Option("trimesh", []),
                     io.DynamicCombo.Option("pymeshlab", [
                         io.Int.Input("maxholesize", default=0, min=0, max=100000,
@@ -71,20 +71,20 @@ class FillHolesNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, mesh, method):
+    def execute(cls, mesh, backend):
         from comfy_execution.graph_utils import GraphBuilder
 
         if cls.SCHEMA is None:
             cls.GET_SCHEMA()
 
-        selected = method["method"]
+        selected = backend["backend"]
         node_id = cls.BACKEND_MAP[selected]
 
         log.info("Fill Holes dispatch: %s -> %s", selected, node_id)
 
         kwargs = {"mesh": mesh}
-        for k, v in method.items():
-            if k == "method":
+        for k, v in backend.items():
+            if k == "backend":
                 continue
             kwargs[k] = v
 

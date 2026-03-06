@@ -39,7 +39,7 @@ class FixNormalsNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
-                io.DynamicCombo.Input("method", tooltip="Normal fixing algorithm and backend", options=[
+                io.DynamicCombo.Input("backend", tooltip="Normal fixing algorithm and backend", options=[
                     io.DynamicCombo.Option("trimesh", []),
                     io.DynamicCombo.Option("igl_bfs", []),
                     io.DynamicCombo.Option("igl_winding", []),
@@ -54,20 +54,20 @@ class FixNormalsNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, trimesh, method):
+    def execute(cls, trimesh, backend):
         from comfy_execution.graph_utils import GraphBuilder
 
         if cls.SCHEMA is None:
             cls.GET_SCHEMA()
 
-        selected = method["method"]
+        selected = backend["backend"]
         node_id = cls.BACKEND_MAP[selected]
 
         log.info("Fix Normals dispatch: %s -> %s", selected, node_id)
 
         kwargs = {"trimesh": trimesh}
-        for k, v in method.items():
-            if k == "method":
+        for k, v in backend.items():
+            if k == "backend":
                 continue
             kwargs[k] = v
 

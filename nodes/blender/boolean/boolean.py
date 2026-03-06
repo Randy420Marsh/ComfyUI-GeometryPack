@@ -44,6 +44,12 @@ def _bpy_boolean_operation(vertices_a, faces_a, vertices_b, faces_b, operation):
     # Apply modifier
     bpy.ops.object.modifier_apply(modifier="Boolean")
 
+    # Triangulate to ensure uniform face arrays (Blender may produce n-gons)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.quads_convert_to_tris(quad_method='BEAUTY', ngon_method='BEAUTY')
+    bpy.ops.object.mode_set(mode='OBJECT')
+
     mesh_a = obj_a.data
     result_vertices = [list(v.co) for v in mesh_a.vertices]
     result_faces = [list(p.vertices) for p in mesh_a.polygons]

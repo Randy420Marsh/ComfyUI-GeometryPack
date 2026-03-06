@@ -11,7 +11,7 @@ from comfy_api.latest import io
 log = logging.getLogger("geometrypack")
 
 
-def _pymeshlab_hc_laplacian_smooth(mesh, selected_only):
+def _pymeshlab_hc_laplacian_smooth(mesh):
     """HC Laplacian smoothing via PyMeshLab (low shrinkage)."""
     import pymeshlab
 
@@ -23,10 +23,10 @@ def _pymeshlab_hc_laplacian_smooth(mesh, selected_only):
     ms.add_mesh(pml_mesh)
 
     try:
-        ms.apply_coord_hc_laplacian_smoothing(selected=selected_only)
+        ms.apply_coord_hc_laplacian_smoothing()
     except AttributeError:
         try:
-            ms.hc_laplacian_smooth(selected=selected_only)
+            ms.hc_laplacian_smooth()
         except AttributeError:
             raise RuntimeError(
                 "PyMeshLab HC Laplacian smoothing filter not available. "
@@ -69,7 +69,7 @@ class SmoothHCLaplacianNode(io.ComfyNode):
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        smoothed = _pymeshlab_hc_laplacian_smooth(trimesh, False)
+        smoothed = _pymeshlab_hc_laplacian_smooth(trimesh)
 
         if hasattr(trimesh, "metadata") and trimesh.metadata:
             smoothed.metadata = trimesh.metadata.copy()

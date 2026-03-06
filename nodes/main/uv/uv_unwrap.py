@@ -56,7 +56,7 @@ class UVUnwrapNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
-                io.DynamicCombo.Input("method", options=[
+                io.DynamicCombo.Input("backend", options=[
                     io.DynamicCombo.Option("xatlas", []),
                     io.DynamicCombo.Option("cumesh", [
                         io.Float.Input("chart_cone_angle", default=90.0, min=0.0, max=359.9, step=1.0),
@@ -94,22 +94,22 @@ class UVUnwrapNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, trimesh, method):
+    def execute(cls, trimesh, backend):
         from comfy_execution.graph_utils import GraphBuilder
 
         # Ensure SCHEMA is initialized (worker subprocess doesn't call GET_SCHEMA)
         if cls.SCHEMA is None:
             cls.GET_SCHEMA()
 
-        selected = method["method"]
+        selected = backend["backend"]
         node_id = cls.BACKEND_MAP[selected]
 
         log.info("UV Unwrap dispatch: %s -> %s", selected, node_id)
 
-        # Build kwargs for the backend node: mesh + method-specific params
+        # Build kwargs for the backend node: mesh + backend-specific params
         kwargs = {"trimesh": trimesh}
-        for k, v in method.items():
-            if k == "method":
+        for k, v in backend.items():
+            if k == "backend":
                 continue
             kwargs[k] = v
 

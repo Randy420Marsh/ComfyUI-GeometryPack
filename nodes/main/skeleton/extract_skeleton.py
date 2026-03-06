@@ -39,7 +39,7 @@ class ExtractSkeleton(io.ComfyNode):
                 io.Custom("TRIMESH").Input("trimesh"),
                 io.Boolean.Input("fix_mesh", default=True, tooltip="Fix mesh issues before skeletonization"),
                 io.Boolean.Input("normalize", default=False, tooltip="Normalize skeleton to [-1, 1] range (False preserves original mesh scale)"),
-                io.DynamicCombo.Input("algorithm", tooltip=(
+                io.DynamicCombo.Input("backend", tooltip=(
                         "Skeletonization algorithm. "
                         "wavefront=default, "
                         "vertex_clusters=fast clustering, "
@@ -70,13 +70,13 @@ class ExtractSkeleton(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, trimesh, fix_mesh, normalize, algorithm):
+    def execute(cls, trimesh, fix_mesh, normalize, backend):
         from comfy_execution.graph_utils import GraphBuilder
 
         if cls.SCHEMA is None:
             cls.GET_SCHEMA()
 
-        selected = algorithm["algorithm"]
+        selected = backend["backend"]
         node_id = cls.BACKEND_MAP[selected]
 
         log.info("Extract Skeleton dispatch: %s -> %s", selected, node_id)
@@ -86,8 +86,8 @@ class ExtractSkeleton(io.ComfyNode):
             "fix_mesh": fix_mesh,
             "normalize": normalize,
         }
-        for k, v in algorithm.items():
-            if k == "algorithm":
+        for k, v in backend.items():
+            if k == "backend":
                 continue
             kwargs[k] = v
 

@@ -45,7 +45,7 @@ class ReconstructSurfaceNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("points"),
-                io.DynamicCombo.Input("method", tooltip=(
+                io.DynamicCombo.Input("backend", tooltip=(
                     "Reconstruction algorithm. "
                     "poisson=smooth watertight, "
                     "ball_pivoting=preserves detail, "
@@ -83,13 +83,13 @@ class ReconstructSurfaceNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, points, method):
+    def execute(cls, points, backend):
         from comfy_execution.graph_utils import GraphBuilder
 
         if cls.SCHEMA is None:
             cls.GET_SCHEMA()
 
-        selected = method["method"]
+        selected = backend["backend"]
         node_id = cls.BACKEND_MAP[selected]
 
         log.info("Reconstruct dispatch: %s -> %s", selected, node_id)
@@ -97,8 +97,8 @@ class ReconstructSurfaceNode(io.ComfyNode):
         # Build kwargs, applying param remaps for cross-env backends
         remap = cls.PARAM_REMAP.get(selected, {})
         kwargs = {remap.get("points", "points"): points}
-        for k, v in method.items():
-            if k == "method":
+        for k, v in backend.items():
+            if k == "backend":
                 continue
             kwargs[remap.get(k, k)] = v
 
