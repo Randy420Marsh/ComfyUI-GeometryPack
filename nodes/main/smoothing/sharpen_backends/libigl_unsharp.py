@@ -11,16 +11,19 @@ from comfy_api.latest import io
 log = logging.getLogger("geometrypack")
 
 
-def _libigl_unsharp_sharpen(mesh, lambda_, iterations):
+def _libigl_unsharp_sharpen(mesh, weight, iterations):
     """Cotangent-weighted geometric unsharp mask via libigl.
 
-    V_sharp = V + lambda * M^{-1} * L * V
-    where L is the cotangent Laplacian and M is the Voronoi mass matrix.
+    Uses implicit Laplacian smoothing (backward Euler) to compute a stable
+    smooth reference, then amplifies the detail:
+        V_smooth = solve (M - dt*L) V_smooth = M @ V  (repeated)
+        V_sharp  = V + weight * (V - V_smooth)
     """
     try:
         import igl
     except ImportError:
         return None, "libigl is not installed. Install with: pip install libigl"
+    from scipy.sparse.linalg import spsolve
 
     V = np.asarray(mesh.vertices, dtype=np.float64)
     F = np.asarray(mesh.faces, dtype=np.int64)
@@ -31,19 +34,21 @@ def _libigl_unsharp_sharpen(mesh, lambda_, iterations):
     L = igl.cotmatrix(V, F)
     M = igl.massmatrix(V, F, igl.MASSMATRIX_TYPE_VORONOI)
 
-    # M is diagonal -- invert via element-wise reciprocal
-    M_diag = M.diagonal().copy()
-    M_diag[M_diag == 0] = 1e-12
-    M_inv = 1.0 / M_diag
-
+    # Implicit smoothing: solve (M - dt*L) V_smooth = M @ V
+    # dt=1.0 gives strong smoothing per iteration; always stable.
+    A = M - L
+    V_smooth = V.copy()
     for _ in range(iterations):
-        # L @ V gives curvature-weighted displacement (n, 3)
-        LV = L @ V
-        delta = M_inv[:, None] * LV
-        V = V + lambda_ * delta
+        for dim in range(3):
+            rhs = M @ V_smooth[:, dim]
+            V_smooth[:, dim] = spsolve(A, rhs)
+
+    # Unsharp mask: amplify the detail signal
+    detail = V - V_smooth
+    V_sharp = V + weight * detail
 
     result = trimesh_module.Trimesh(
-        vertices=V,
+        vertices=V_sharp,
         faces=np.asarray(mesh.faces, dtype=np.int32),
         process=False,
     )
@@ -63,15 +68,14 @@ class SharpenLibiglUnsharpNode(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Custom("TRIMESH").Input("trimesh"),
-                io.Float.Input("lambda_", default=0.5, min=0.01, max=5.0, step=0.01, tooltip=(
-                    "Unsharp mask strength. Controls how much the cotangent "
-                    "Laplacian displacement is amplified. Higher values produce "
-                    "stronger sharpening but may cause overshooting. "
-                    "Start with 0.3-0.5."
+                io.Float.Input("weight", default=0.5, min=0.01, max=5.0, step=0.01, tooltip=(
+                    "How much detail to add back. 0.5 = subtle sharpening, "
+                    "1.0 = double the detail, 2.0+ = aggressive."
                 )),
                 io.Int.Input("iterations", default=3, min=1, max=50, step=1, tooltip=(
-                    "Number of unsharp mask passes. Multiple light passes "
-                    "are more stable than a single heavy pass."
+                    "Smoothing iterations for the reference mesh. "
+                    "More iterations = smoother reference = sharpens broader features. "
+                    "Fewer iterations = sharpens fine detail."
                 )),
             ],
             outputs=[
@@ -81,16 +85,16 @@ class SharpenLibiglUnsharpNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, trimesh, lambda_=0.5, iterations=3):
+    def execute(cls, trimesh, weight=0.5, iterations=3):
         log.info("Backend: libigl_unsharp")
         log.info("Input: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
-        log.info("Parameters: lambda=%.3f, iterations=%d", lambda_, iterations)
+        log.info("Parameters: weight=%.3f, iterations=%d", weight, iterations)
 
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
         sharpened, error = _libigl_unsharp_sharpen(
-            trimesh, lambda_, iterations,
+            trimesh, weight, iterations,
         )
 
         if sharpened is None:
@@ -117,7 +121,7 @@ class SharpenLibiglUnsharpNode(io.ComfyNode):
         log.info("Avg vertex displacement: %.6f, max: %.6f", avg_disp, max_disp)
 
         param_text = (
-            f"Lambda: {lambda_}\n"
+            f"Weight: {weight}\n"
             f"Iterations: {iterations}"
         )
 

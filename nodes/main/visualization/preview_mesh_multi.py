@@ -147,10 +147,8 @@ class PreviewMeshMultiNode(io.ComfyNode):
             # Export mesh
             if mode == "texture":
                 filename = f"preview_multi_{i+1}_{preview_id}.glb"
-            elif mesh_has_fields or mesh_is_pc:
-                filename = f"preview_multi_{i+1}_{preview_id}.vtp"
             else:
-                filename = f"preview_multi_{i+1}_{preview_id}.stl"
+                filename = f"preview_multi_{i+1}_{preview_id}.vtp"
 
             if COMFYUI_OUTPUT_FOLDER:
                 filepath = os.path.join(COMFYUI_OUTPUT_FOLDER, filename)
@@ -161,12 +159,9 @@ class PreviewMeshMultiNode(io.ComfyNode):
                 if mode == "texture":
                     mesh.export(filepath, file_type='glb', include_normals=True)
                     log.info("Exported GLB: %s", filepath)
-                elif mesh_has_fields or mesh_is_pc:
+                else:
                     export_mesh_with_scalars_vtp(mesh, filepath)
                     log.info("Exported VTP: %s", filepath)
-                else:
-                    mesh.export(filepath, file_type='stl')
-                    log.info("Exported STL: %s", filepath)
             except Exception as e:
                 log.error("Export failed: %s, trying OBJ fallback", e)
                 filename = f"preview_multi_{i+1}_{preview_id}.obj"

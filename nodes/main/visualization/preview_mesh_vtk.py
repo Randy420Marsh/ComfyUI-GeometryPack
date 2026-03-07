@@ -129,16 +129,9 @@ class PreviewMeshVTKNode(io.ComfyNode):
             viewer_type = "texture"
             log.info("Using texture mode - GLB export")
         else:
-            # Fields mode: Export VTP/STL for scalar field visualization
-            if has_fields or is_pc:
-                # Export to VTP for: scalar fields OR point clouds (STL doesn't support point clouds)
-                filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.vtp"
-                log.info("Using VTP format (fields=%s, point_cloud=%s)", has_fields, is_pc)
-            else:
-                # Export to STL (compact format for simple surface meshes)
-                filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.stl"
+            filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.vtp"
             viewer_type = "fields"
-            log.info("Using fields mode - VTP/STL export")
+            log.info("Using fields mode - VTP export")
 
         # Use ComfyUI's output directory
         if COMFYUI_OUTPUT_FOLDER:
@@ -166,14 +159,9 @@ class PreviewMeshVTKNode(io.ComfyNode):
                 # Export GLB for texture/PBR rendering
                 trimesh.export(filepath, file_type='glb', include_normals=True)
                 log.info("Exported GLB to: %s", filepath)
-            elif has_fields or is_pc:
-                # Use VTP exporter for fields or point clouds
+            else:
                 export_mesh_with_scalars_vtp(trimesh, filepath)
                 log.info("Exported VTP to: %s", filepath)
-            else:
-                # Use STL for simple surface meshes
-                trimesh.export(filepath, file_type='stl')
-                log.info("Exported STL to: %s", filepath)
         except Exception as e:
             log.error("Export failed: %s", e)
             # Fallback to OBJ

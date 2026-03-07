@@ -35,7 +35,6 @@ class RemeshNode(io.ComfyNode):
         "quadwild":            "GeomPackRemesh_QuadWild",
         "cgal_isotropic":      "GeomPackRemesh_CGAL",
         "blender_voxel":       "GeomPackRemesh_BlenderVoxel",
-        "blender_smooth":      "GeomPackRemesh_BlenderSmooth",
         "blender_sharp":       "GeomPackRemesh_BlenderSharp",
         "blender_blocks":      "GeomPackRemesh_BlenderBlocks",
         "gpu_cumesh":          "GeomPackRemesh_GPU",
@@ -122,10 +121,6 @@ class RemeshNode(io.ComfyNode):
                     # ---- Blender backends ----
                     io.DynamicCombo.Option("blender_voxel", [
                         io.Float.Input("voxel_size", default=1, min=0.001, max=1.0, step=0.01, display_mode="number", tooltip="Voxel size. Smaller = more detail. Output is always watertight."),
-                    ]),
-                    io.DynamicCombo.Option("blender_smooth", [
-                        io.Int.Input("octree_depth", default=6, min=1, max=10, step=1, tooltip="Resolution. Higher = more detail, more faces."),
-                        io.Float.Input("scale", default=0.9, min=0.0, max=1.0, step=0.05, display_mode="number", tooltip="Ratio of output size to input bounding box."),
                     ]),
                     io.DynamicCombo.Option("blender_sharp", [
                         io.Int.Input("octree_depth", default=6, min=1, max=10, step=1, tooltip="Resolution. Higher = more detail, more faces."),

@@ -24,10 +24,6 @@ Available backends:
 - guided_normal: Guided mesh normal filtering (Zhang et al. 2015). Uses a
   min-range-metric guidance signal to drive bilateral normal filtering while
   preserving sharp edges. Interleaves vertex updates within normal iterations.
-- vsa_snap: Variational Shape Approximation face clustering with vertex
-  snapping. Clusters faces into proxy plane groups via Lloyd iteration, then
-  snaps vertices to proxy planes (interior), plane intersection lines (edges),
-  or plane intersection points (corners).
 - fast_effective: Fast and Effective Feature-Preserving Mesh Denoising
   (Sun et al. TVCG 2007). Uses thresholded cosine-similarity weights for
   normal filtering: w = max(0, dot(ni,nj) - T)^2. Simple and fast.
@@ -56,7 +52,6 @@ class SharpenMeshNode(io.ComfyNode):
         "libigl_unsharp": "GeomPackSharpen_LibiglUnsharp",
         "l0_minimize":    "GeomPackSharpen_L0Minimize",
         "guided_normal":  "GeomPackSharpen_GuidedNormal",
-        "vsa_snap":       "GeomPackSharpen_VSASnap",
         "fast_effective":  "GeomPackSharpen_FastEffective",
         "non_iterative":  "GeomPackSharpen_NonIterative",
     }
@@ -78,7 +73,6 @@ class SharpenMeshNode(io.ComfyNode):
                         "libigl_unsharp=cotangent-weighted unsharp (geometry-aware), "
                         "l0_minimize=piecewise-flat L0 optimization (aggressive CAD prep), "
                         "guided_normal=guided normal filtering with min-range-metric (controllable), "
-                        "vsa_snap=face clustering + vertex snapping (explicit patch control), "
                         "fast_effective=thresholded cosine weight normal filtering (fast), "
                         "non_iterative=mollified normal single-pass bilateral (non-iterative)"
                     ), options=[
@@ -105,15 +99,14 @@ class SharpenMeshNode(io.ComfyNode):
                         )),
                     ]),
                     io.DynamicCombo.Option("libigl_unsharp", [
-                        io.Float.Input("lambda_", default=0.5, min=0.01, max=5.0, step=0.01, tooltip=(
-                            "Unsharp mask strength. Controls how much the cotangent "
-                            "Laplacian displacement is amplified. Higher values produce "
-                            "stronger sharpening but may cause overshooting. "
-                            "Start with 0.3-0.5."
+                        io.Float.Input("weight", default=0.5, min=0.01, max=5.0, step=0.01, tooltip=(
+                            "How much detail to add back. 0.5 = subtle sharpening, "
+                            "1.0 = double the detail, 2.0+ = aggressive."
                         )),
                         io.Int.Input("iterations", default=3, min=1, max=50, step=1, tooltip=(
-                            "Number of unsharp mask passes. Multiple light passes "
-                            "are more stable than a single heavy pass."
+                            "Smoothing iterations for the reference mesh. "
+                            "More iterations = smoother reference = sharpens broader features. "
+                            "Fewer iterations = sharpens fine detail."
                         )),
                     ]),
                     io.DynamicCombo.Option("l0_minimize", [
@@ -154,23 +147,6 @@ class SharpenMeshNode(io.ComfyNode):
                             "averaged together. Smaller = more aggressive edge "
                             "preservation. 0.35 corresponds to roughly 40 degree "
                             "dihedral angle threshold."
-                        )),
-                    ]),
-                    io.DynamicCombo.Option("vsa_snap", [
-                        io.Int.Input("num_proxies", default=20, min=2, max=500, step=1, tooltip=(
-                            "Number of proxy planes (face clusters). More proxies "
-                            "preserve more detail. Fewer proxies create a more "
-                            "abstract/simplified appearance. 10-50 for simple shapes, "
-                            "50-200 for complex shapes."
-                        )),
-                        io.Int.Input("lloyd_iterations", default=10, min=1, max=100, step=1, tooltip=(
-                            "Number of Lloyd clustering iterations. 10 is usually "
-                            "sufficient for convergence."
-                        )),
-                        io.Float.Input("snap_strength", default=1.0, min=0.0, max=1.0, step=0.01, tooltip=(
-                            "How aggressively to snap vertices to proxy planes. "
-                            "0.0 = no change, 1.0 = full snap. "
-                            "Values like 0.5-0.8 give a subtle sharpening effect."
                         )),
                     ]),
                     io.DynamicCombo.Option("fast_effective", [
