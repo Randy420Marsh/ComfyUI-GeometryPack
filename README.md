@@ -51,6 +51,38 @@ Each of these nodes presents a single UI with a backend selector dropdown. Under
 | **Extract Skeleton** | wavefront, vertex_clusters, edge_collapse, teasar |
 | **Boolean** | libigl_cgal, blender_exact |
 
+## Workflow Screenshots
+
+### Boolean Operations
+![Boolean Operations](docs/boolean_ops_all_executed.png)
+
+### Decimation
+![Decimation](docs/decimate_all_executed.png)
+
+### Fill Holes
+![Fill Holes](docs/fill_holes_all_executed.png)
+
+### Fix Normals
+![Fix Normals](docs/fix_normals_all_executed.png)
+
+### Surface Reconstruction
+![Surface Reconstruction](docs/reconstruct_all_executed.png)
+
+### Remeshing
+![Remeshing](docs/remeshing_all_executed.png)
+
+### Sharpening
+![Sharpening](docs/sharpen_all_executed.png)
+
+### Skeleton Extraction
+![Skeleton Extraction](docs/skeleton_all_executed.png)
+
+### Smoothing
+![Smoothing](docs/smooth_all_executed.png)
+
+### UV Unwrap
+![UV Unwrap](docs/uv_unwrap_all_executed.png)
+
 ## Credits
 
 Built on [trimesh](https://trimesh.org/), [libigl](https://libigl.github.io/), [PyMeshLab](https://pymeshlab.readthedocs.io/), and [CGAL](https://www.cgal.org/).
