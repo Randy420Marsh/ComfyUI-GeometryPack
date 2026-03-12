@@ -1,5 +1,5 @@
 [dependencies]
-ffmpeg = "*"
+av = "*"
 
 [cuda]
 packages = ["cumesh", "torch", "torchvision"]
@@ -12,7 +12,6 @@ psutil = "*"
 safetensors = "*"
 comfy-aimdo = "*"
 einops = "*"
-av = "*"
 
 [target.win-64.pypi-dependencies]
 msvc-runtime = "*"
