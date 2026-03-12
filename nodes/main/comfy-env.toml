@@ -29,6 +29,7 @@ matplotlib = ">=3.5.0"
 mmgpy = ">=0.5.2"
 pillow = ">=9.0.0"
 pyvista = ">=0.43.0"
+pyopengl = ">=3.1.10"
 
 [target.win-64.pypi-dependencies]
 embreex = "*"
