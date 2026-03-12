@@ -1,3 +1,6 @@
+[dependencies]
+ffmpeg = "*"
+
 [cuda]
 packages = ["cumesh", "torch", "torchvision"]
 

@@ -1,5 +1,8 @@
 python = "3.11"
 
+[dependencies]
+ffmpeg = "*"
+
 [pypi-dependencies]
 bpy = ">=4.2"
 trimesh = { version = "*", extras = ["easy"] }
