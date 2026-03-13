@@ -37,7 +37,12 @@ class RemeshMMGNode(io.ComfyNode):
 
     @classmethod
     def execute(cls, trimesh, hausd=0.01, hmin=0.0, hmax=0.0, hgrad=1.3):
-        import mmgpy
+        try:
+            import mmgpy
+        except ImportError:
+            log.warning("mmgpy not available on Windows — returning input mesh unchanged")
+            info = "Remesh (MMG Adaptive): skipped — mmgpy not available on this platform"
+            return io.NodeOutput(trimesh, info, ui={"text": [info]})
 
         log.info("Backend: mmg_adaptive")
         log.info("Input: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
