@@ -3,6 +3,7 @@ packages = ["libgl1-mesa-glx", "libgl1", "libopengl0", "libglu1-mesa"]
 
 [dependencies]
 cgal = "*"
+libigl = "*"
 
 [pypi-dependencies]
 numpy = "*"
@@ -10,7 +11,6 @@ scipy = ">=1.7.0"
 tqdm = ">=4.60.0"
 requests = ">=2.25.0"
 trimesh = { version = ">=4.0.0", extras = ["easy"] }
-libigl = "==2.6.1"
 pymeshlab = ">=2025.7"
 rtree = "*"
 point-cloud-utils = ">=0.30.0"
