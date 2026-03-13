@@ -4,10 +4,10 @@ packages = ["libgl1-mesa-glx", "libgl1", "libopengl0", "libglu1-mesa"]
 [dependencies]
 cgal = "*"
 igl = "*"
+scipy = "*"
 
 [pypi-dependencies]
 numpy = "*"
-scipy = "*"
 tqdm = ">=4.60.0"
 requests = ">=2.25.0"
 trimesh = { version = ">=4.0.0", extras = ["easy"] }
