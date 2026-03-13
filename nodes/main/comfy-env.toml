@@ -3,7 +3,7 @@ packages = ["libgl1-mesa-glx", "libgl1", "libopengl0", "libglu1-mesa"]
 
 [dependencies]
 cgal = "*"
-libigl = "*"
+igl = "*"
 
 [pypi-dependencies]
 numpy = "*"
