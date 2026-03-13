@@ -7,7 +7,7 @@ igl = "*"
 
 [pypi-dependencies]
 numpy = "*"
-scipy = ">=1.7.0,<1.17"
+scipy = "*"
 tqdm = ">=4.60.0"
 requests = ">=2.25.0"
 trimesh = { version = ">=4.0.0", extras = ["easy"] }
