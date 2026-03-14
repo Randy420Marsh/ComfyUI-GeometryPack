@@ -25,7 +25,6 @@ pypmp = { version = ">=0.1.0", index = "https://pozzettiandrea.github.io/pypmp/s
 pyquadwild = { version = ">=0.1.0", index = "https://pozzettiandrea.github.io/pyquadwild/simple/" }
 pymesh2 = { version = ">=0.3", index = "https://pozzettiandrea.github.io/PyMesh/simple/" }
 matplotlib = ">=3.5.0"
-mmgpy = ">=0.5.2"
 pillow = ">=9.0.0"
 pyvista = ">=0.43.0"
 pyopengl = ">=3.1.10"
@@ -36,6 +35,10 @@ msvc-runtime = "*"
 
 [target.linux-64.pypi-dependencies]
 embreex = "*"
+mmgpy = ">=0.5.2"
+
+[target.osx-arm64.pypi-dependencies]
+mmgpy = ">=0.5.2"
 
 [env_vars]
 KMP_DUPLICATE_LIB_OK = "TRUE"
