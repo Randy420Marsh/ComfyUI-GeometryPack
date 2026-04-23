@@ -1,4 +1,4 @@
-comfy-env==0.2.62
+comfy-env==0.2.83
 comfy-3d-viewers==0.2.40
 trimesh[easy]>=4.0.0
 scipy>=1.7.0
