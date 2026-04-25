@@ -2,7 +2,7 @@
 av = "*"
 
 [cuda]
-packages = ["cumesh", "torch", "torchvision"]
+packages = ["cumesh"]
 
 [pypi-dependencies]
 numpy = "*"
