@@ -11,6 +11,30 @@ from comfy_api.latest import io
 log = logging.getLogger("geometrypack")
 
 
+def _estimate_oriented_normals(vertices: np.ndarray, radius: float) -> np.ndarray:
+    """Estimate consistently oriented per-point normals.
+
+    Uses Open3D when available (kNN + tangent-plane orientation propagation),
+    falls back to point-cloud-utils' kNN normal estimation. Either path returns
+    a (N, 3) float64 array.
+    """
+    try:
+        import open3d as o3d
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(vertices)
+        pcd.estimate_normals(
+            search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=radius, max_nn=30)
+        )
+        pcd.orient_normals_consistent_tangent_plane(k=10)
+        return np.asarray(pcd.normals, dtype=np.float64)
+    except ImportError:
+        pass
+
+    import point_cloud_utils as pcu
+    _, est_normals = pcu.estimate_point_cloud_normals_knn(vertices, num_neighbors=16)
+    return np.asarray(est_normals, dtype=np.float64)
+
+
 class ReconstructPoissonNode(io.ComfyNode):
     """Poisson surface reconstruction using Open3D or PyMeshLab."""
 
@@ -122,6 +146,8 @@ Poisson reconstruction creates smooth, watertight surfaces.
 
         except ImportError:
             pass
+        except (RuntimeError, ValueError) as err:
+            log.warning("Open3D Poisson failed: %s — falling back to PyMeshLab", err)
 
         # Fallback to PyMeshLab
         try:
@@ -129,20 +155,20 @@ Poisson reconstruction creates smooth, watertight surfaces.
 
             log.info("Using PyMeshLab Poisson reconstruction...")
 
-            ms = pymeshlab.MeshSet()
-
-            if normals is not None and not do_estimate:
-                pml_mesh = pymeshlab.Mesh(
-                    vertex_matrix=vertices,
-                    v_normals_matrix=normals
-                )
-            else:
-                pml_mesh = pymeshlab.Mesh(vertex_matrix=vertices)
-
-            ms.add_mesh(pml_mesh)
-
+            # Screened Poisson requires consistently oriented normals. PyMeshLab's
+            # compute_normal_for_point_clouds does not orient them, and on
+            # macOS-arm64 the CGAL plugin aborts the process via _exit(0) on
+            # unoriented input. Always estimate-and-orient up front.
             if normals is None or do_estimate:
-                ms.compute_normal_for_point_clouds(k=10)
+                oriented_normals = _estimate_oriented_normals(vertices, normal_radius)
+            else:
+                oriented_normals = normals
+
+            ms = pymeshlab.MeshSet()
+            ms.add_mesh(pymeshlab.Mesh(
+                vertex_matrix=vertices,
+                v_normals_matrix=oriented_normals,
+            ))
 
             ms.generate_surface_reconstruction_screened_poisson(
                 depth=depth,
