@@ -5,7 +5,6 @@ packages = ["libgl1-mesa-glx", "libgl1", "libopengl0", "libglu1-mesa"]
 cgal = "*"
 igl = "*"
 scipy = "*"
-pymeshlab = "*"
 
 [pypi-dependencies]
 numpy = "*"
@@ -33,16 +32,18 @@ torch = "*"
 [target.win-64.pypi-dependencies]
 embreex = "*"
 msvc-runtime = "*"
+pymeshlab = "==2025.7"
+
+[target.linux-64.dependencies]
+pymeshlab = "*"
 
 [target.linux-64.pypi-dependencies]
 embreex = "*"
 mmgpy = ">=0.5.2"
 
-[target.linux-64.system-requirements]
-libc = { family = "glibc", version = "2.35" }
-
 [target.osx-arm64.pypi-dependencies]
 mmgpy = ">=0.5.2"
+pymeshlab = "==2025.7"
 
 [env_vars]
 KMP_DUPLICATE_LIB_OK = "TRUE"
