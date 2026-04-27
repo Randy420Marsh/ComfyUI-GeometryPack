@@ -71,7 +71,7 @@ class LoadMesh(io.ComfyNode):
                     for file in files:
                         if any(file.lower().endswith(ext) for ext in cls.SUPPORTED_EXTENSIONS):
                             rel = os.path.relpath(os.path.join(root, file), COMFYUI_INPUT_FOLDER)
-                            mesh_files.append(rel)
+                            mesh_files.append(rel.replace(os.sep, "/"))
 
             # Then scan input root (non-recursive, top-level files only)
             for file in os.listdir(COMFYUI_INPUT_FOLDER):
@@ -189,6 +189,8 @@ class LoadMesh(io.ComfyNode):
                 error_msg = f"File not found: '{file_path}'\nSearched in:"
                 for path in searched_paths:
                     error_msg += f"\n  - {path}"
+                available = cls.get_mesh_files()
+                error_msg += f"\nAvailable mesh files ({len(available)}): {available}"
                 raise ValueError(error_msg)
 
         # Load the mesh

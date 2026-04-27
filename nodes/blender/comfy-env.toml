@@ -1,7 +1,4 @@
-python = "3.11"
-
-[dependencies]
-av = "*"
+python = "3.13"
 
 [pypi-dependencies]
 bpy = ">=4.2"
