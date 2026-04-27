@@ -38,6 +38,9 @@ msvc-runtime = "*"
 embreex = "*"
 mmgpy = ">=0.5.2"
 
+[target.linux-64.system-requirements]
+libc = { family = "glibc", version = "2.35" }
+
 [target.osx-arm64.pypi-dependencies]
 mmgpy = ">=0.5.2"
 
