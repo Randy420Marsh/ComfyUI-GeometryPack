@@ -6,9 +6,14 @@ Remesh GPU Node - GPU-accelerated remeshing using CuMesh
 Requires CUDA, torch, and cumesh.
 """
 
+import logging
+from typing import Tuple, Optional
+
 import numpy as np
 import trimesh as trimesh_module
-from typing import Tuple, Optional
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
 def cumesh_dc_remesh(
@@ -27,12 +32,15 @@ def cumesh_dc_remesh(
     import cumesh as CuMesh
 
     try:
-        print(f"[cumesh_dc_remesh] Input: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
-        print(f"[cumesh_dc_remesh] Grid resolution: {grid_resolution}, band: {band}")
+        log.info("Input: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
+        log.info("Grid resolution: %d, band: %s", grid_resolution, band)
 
         # Convert to GPU tensors
-        vertices = torch.tensor(mesh.vertices, dtype=torch.float32).cuda()
-        faces = torch.tensor(mesh.faces, dtype=torch.int32).cuda()
+        import comfy.model_management
+        device = comfy.model_management.get_torch_device()
+        assert device.type == "cuda", f"CuMesh requires CUDA but got device '{device}' — cumesh is GPU-only, no CPU fallback"
+        vertices = torch.tensor(mesh.vertices, dtype=torch.float32).to(device)
+        faces = torch.tensor(mesh.faces, dtype=torch.int32).to(device)
 
         # Calculate bounding box and scale
         bbox_min = vertices.min(dim=0).values
@@ -54,7 +62,7 @@ def cumesh_dc_remesh(
         # Optionally fill holes
         if fill_holes_first:
             cumesh.fill_holes()
-            print(f"[cumesh_dc_remesh] Filled holes")
+            log.info("Filled holes")
 
         # Read current state after preprocessing
         curr_verts, curr_faces = cumesh.read()
@@ -63,7 +71,7 @@ def cumesh_dc_remesh(
         bvh = CuMesh.cuBVH(curr_verts, curr_faces)
 
         # Run dual-contouring remesh
-        print(f"[cumesh_dc_remesh] Running dual-contouring remesh...")
+        log.info("Running dual-contouring remesh...")
         new_verts, new_faces = CuMesh.remeshing.remesh_narrow_band_dc(
             curr_verts, curr_faces,
             center=torch.zeros(3, device='cuda'),
@@ -78,7 +86,7 @@ def cumesh_dc_remesh(
         # Clean up BVH
         del bvh, curr_verts, curr_faces
 
-        print(f"[cumesh_dc_remesh] After remesh: {len(new_verts)} vertices, {len(new_faces)} faces")
+        log.info("After remesh: %d vertices, %d faces", len(new_verts), len(new_faces))
 
         # Restore center offset
         final_verts = new_verts + center
@@ -93,17 +101,18 @@ def cumesh_dc_remesh(
         # Cleanup GPU memory
         del cumesh, vertices, faces, vertices_centered
         del new_verts, new_faces, final_verts
-        torch.cuda.empty_cache()
+        import comfy.model_management
+        comfy.model_management.soft_empty_cache()
 
         return remeshed_mesh, ""
 
     except Exception as e:
         import traceback
-        traceback.print_exc()
+        log.error("CuMesh remesh failed", exc_info=True)
         return None, f"Error during CuMesh remesh: {str(e)}"
 
 
-class RemeshGPUNode:
+class RemeshGPUNode(io.ComfyNode):
     """
     Remesh GPU - GPU-accelerated dual-contouring remeshing using CuMesh.
 
@@ -111,37 +120,28 @@ class RemeshGPUNode:
     Requires CUDA-capable GPU, torch, and cumesh package.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-            "optional": {
-                "target_face_count": ("INT", {
-                    "default": 500000,
-                    "min": 1000,
-                    "max": 5000000,
-                    "step": 1000,
-                    "tooltip": "Target number of output faces after simplification.",
-                }),
-                "remesh_band": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 5.0,
-                    "step": 0.1,
-                    "tooltip": "Band width for dual-contouring. Affects surface detail capture. Higher = smoother but may lose fine details.",
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackRemesh_GPU",
+            display_name="Remesh GPU (backend)",
+            category="geompack/remeshing",
+            is_dev_only=True,
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Int.Input("target_face_count", default=500000, min=1000, max=5000000, step=1000, tooltip="Target number of output faces after simplification.", optional=True),
+                io.Float.Input("remesh_band", default=1.0, min=0.1, max=5.0, step=0.1, tooltip="Band width for dual-contouring. Affects surface detail capture. Higher = smoother but may lose fine details.", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="remeshed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("remeshed_mesh", "info")
-    FUNCTION = "remesh"
-    CATEGORY = "geompack/remeshing"
-    OUTPUT_NODE = True
-
-    def remesh(self, trimesh, target_face_count=500000, remesh_band=1.0):
+    @classmethod
+    def execute(cls, trimesh, target_face_count=500000, remesh_band=1.0):
         """Apply GPU-accelerated CuMesh remeshing."""
         import torch
         import cumesh as CuMesh
@@ -149,11 +149,9 @@ class RemeshGPUNode:
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        print(f"\n{'='*60}")
-        print(f"[Remesh GPU] Backend: cumesh (CUDA)")
-        print(f"[Remesh GPU] Input: {initial_vertices:,} vertices, {initial_faces:,} faces")
-        print(f"[Remesh GPU] Parameters: target_face_count={target_face_count:,}, remesh_band={remesh_band}")
-        print(f"{'='*60}\n")
+        log.info("Backend: cumesh (CUDA)")
+        log.info("Input: %s vertices, %s faces", f"{initial_vertices:,}", f"{initial_faces:,}")
+        log.info("Parameters: target_face_count=%s, remesh_band=%s", f"{target_face_count:,}", remesh_band)
 
         # Hardcoded resolution = 512 (same as TRELLIS2)
         grid_resolution = 512
@@ -165,8 +163,11 @@ class RemeshGPUNode:
             raise ValueError(f"CuMesh remeshing failed: {error}")
 
         pre_simplify_faces = len(remeshed_mesh.faces)
-        vertices = torch.tensor(remeshed_mesh.vertices, dtype=torch.float32).cuda()
-        faces = torch.tensor(remeshed_mesh.faces, dtype=torch.int32).cuda()
+        import comfy.model_management
+        device = comfy.model_management.get_torch_device()
+        assert device.type == "cuda", f"CuMesh requires CUDA but got device '{device}' — cumesh is GPU-only, no CPU fallback"
+        vertices = torch.tensor(remeshed_mesh.vertices, dtype=torch.float32).to(device)
+        faces = torch.tensor(remeshed_mesh.faces, dtype=torch.int32).to(device)
 
         cumesh_obj = CuMesh.CuMesh()
         cumesh_obj.init(vertices, faces)
@@ -174,17 +175,17 @@ class RemeshGPUNode:
         # Skip pre-simplify unify on large meshes - CuMesh crashes on >2M faces
         if len(faces) < 2_000_000:
             cumesh_obj.unify_face_orientations()
-            print(f"[Remesh GPU] Unified face orientations (pre-simplify)")
+            log.info("Unified face orientations (pre-simplify)")
         else:
-            print(f"[Remesh GPU] Skipping pre-simplify unify (mesh too large: {len(faces):,} faces)")
+            log.info("Skipping pre-simplify unify (mesh too large: %s faces)", f"{len(faces):,}")
 
         # Simplify to target
         cumesh_obj.simplify(target_face_count, verbose=True)
-        print(f"[Remesh GPU] After simplify: {cumesh_obj.num_faces:,} faces")
+        log.info("After simplify: %s faces", f"{cumesh_obj.num_faces:,}")
 
         # Unify after simplify (on smaller mesh, should work)
         cumesh_obj.unify_face_orientations()
-        print(f"[Remesh GPU] Unified face orientations (post-simplify)")
+        log.info("Unified face orientations (post-simplify)")
 
         final_verts, final_faces = cumesh_obj.read()
         remeshed_mesh = trimesh_module.Trimesh(
@@ -206,8 +207,9 @@ class RemeshGPUNode:
         vertex_change = len(remeshed_mesh.vertices) - initial_vertices
         face_change = len(remeshed_mesh.faces) - initial_faces
 
-        print(f"[Remesh GPU] Output: {len(remeshed_mesh.vertices)} vertices ({vertex_change:+d}), "
-              f"{len(remeshed_mesh.faces)} faces ({face_change:+d})")
+        log.info("Output: %d vertices (%+d), %d faces (%+d)",
+                 len(remeshed_mesh.vertices), vertex_change,
+                 len(remeshed_mesh.faces), face_change)
 
         info = f"""Remesh Results (CuMesh GPU):
 
@@ -223,13 +225,13 @@ After Simplify: {len(remeshed_mesh.faces):,} faces
 
 GPU-accelerated dual contouring (same algorithm as TRELLIS2).
 """
-        return {"ui": {"text": [info]}, "result": (remeshed_mesh, info)}
+        return io.NodeOutput(remeshed_mesh, info, ui={"text": [info]})
 
 
 NODE_CLASS_MAPPINGS = {
-    "GeomPackRemeshGPU": RemeshGPUNode,
+    "GeomPackRemesh_GPU": RemeshGPUNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackRemeshGPU": "Remesh GPU",
+    "GeomPackRemesh_GPU": "Remesh GPU (backend)",
 }

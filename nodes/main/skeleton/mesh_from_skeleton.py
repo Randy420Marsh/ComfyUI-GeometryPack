@@ -5,33 +5,41 @@
 Mesh from Skeleton Node - Convert skeleton to solid mesh
 """
 
+import logging
+
 import numpy as np
 import trimesh
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
-class SkeletonToMesh:
+class SkeletonToMesh(io.ComfyNode):
     """
     Convert skeleton to solid mesh with cylinders (bones) and spheres (joints).
 
     High-quality visualization with adjustable geometry.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "skeleton": ("SKELETON",),
-                "joint_radius": ("FLOAT", {"default": 0.02, "min": 0.001, "max": 0.1, "step": 0.001}),
-                "bone_radius": ("FLOAT", {"default": 0.01, "min": 0.001, "max": 0.05, "step": 0.001}),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackMeshFromSkeleton",
+            display_name="Mesh from Skeleton",
+            category="geompack/skeleton",
+            inputs=[
+                io.Custom("SKELETON").Input("skeleton"),
+                io.Float.Input("joint_radius", default=0.02, min=0.001, max=0.1, step=0.001),
+                io.Float.Input("bone_radius", default=0.01, min=0.001, max=0.05, step=0.001),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="trimesh"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("trimesh",)
-    FUNCTION = "convert"
-    CATEGORY = "geompack/skeleton"
-
-    def convert(self, skeleton, joint_radius, bone_radius):
+    @classmethod
+    def execute(cls, skeleton, joint_radius, bone_radius):
         """Convert skeleton to solid geometry."""
         vertices = skeleton["vertices"]
         edges = skeleton["edges"]
@@ -41,20 +49,20 @@ class SkeletonToMesh:
         center = skeleton.get("center", None)
         is_normalized = skeleton.get("normalized", True)  # Assume old skeletons were normalized
 
-        print(f"[SkeletonToMesh] Creating solid mesh: {len(vertices)} joints, {len(edges)} bones")
+        log.info("Creating solid mesh: %d joints, %d bones", len(vertices), len(edges))
         if scale is not None:
-            print(f"[SkeletonToMesh] Skeleton metadata: scale={scale:.3f}, normalized={is_normalized}")
+            log.info("Skeleton metadata: scale=%.3f, normalized=%s", scale, is_normalized)
 
         # Print input skeleton bounding box
         skel_min = vertices.min(axis=0)
         skel_max = vertices.max(axis=0)
         skel_size = skel_max - skel_min
         skel_center = (skel_min + skel_max) / 2
-        print(f"[SkeletonToMesh] Input skeleton bounding box:")
-        print(f"  Min: [{skel_min[0]:.3f}, {skel_min[1]:.3f}, {skel_min[2]:.3f}]")
-        print(f"  Max: [{skel_max[0]:.3f}, {skel_max[1]:.3f}, {skel_max[2]:.3f}]")
-        print(f"  Size: [{skel_size[0]:.3f}, {skel_size[1]:.3f}, {skel_size[2]:.3f}]")
-        print(f"  Center: [{skel_center[0]:.3f}, {skel_center[1]:.3f}, {skel_center[2]:.3f}]")
+        log.info("Input skeleton bounding box:")
+        log.info("  Min: [%.3f, %.3f, %.3f]", skel_min[0], skel_min[1], skel_min[2])
+        log.info("  Max: [%.3f, %.3f, %.3f]", skel_max[0], skel_max[1], skel_max[2])
+        log.info("  Size: [%.3f, %.3f, %.3f]", skel_size[0], skel_size[1], skel_size[2])
+        log.info("  Center: [%.3f, %.3f, %.3f]", skel_center[0], skel_center[1], skel_center[2])
 
         meshes = []
 
@@ -112,21 +120,20 @@ class SkeletonToMesh:
 
         combined_mesh = trimesh.util.concatenate(meshes)
 
-        print(f"[SkeletonToMesh] Created mesh: {len(combined_mesh.vertices)} vertices, "
-              f"{len(combined_mesh.faces)} faces")
+        log.info("Created mesh: %d vertices, %d faces", len(combined_mesh.vertices), len(combined_mesh.faces))
 
         # Print output mesh bounding box
         mesh_min = combined_mesh.bounds[0]
         mesh_max = combined_mesh.bounds[1]
         mesh_size = mesh_max - mesh_min
         mesh_center = (mesh_min + mesh_max) / 2
-        print(f"[SkeletonToMesh] Output mesh bounding box:")
-        print(f"  Min: [{mesh_min[0]:.3f}, {mesh_min[1]:.3f}, {mesh_min[2]:.3f}]")
-        print(f"  Max: [{mesh_max[0]:.3f}, {mesh_max[1]:.3f}, {mesh_max[2]:.3f}]")
-        print(f"  Size: [{mesh_size[0]:.3f}, {mesh_size[1]:.3f}, {mesh_size[2]:.3f}]")
-        print(f"  Center: [{mesh_center[0]:.3f}, {mesh_center[1]:.3f}, {mesh_center[2]:.3f}]")
+        log.info("Output mesh bounding box:")
+        log.info("  Min: [%.3f, %.3f, %.3f]", mesh_min[0], mesh_min[1], mesh_min[2])
+        log.info("  Max: [%.3f, %.3f, %.3f]", mesh_max[0], mesh_max[1], mesh_max[2])
+        log.info("  Size: [%.3f, %.3f, %.3f]", mesh_size[0], mesh_size[1], mesh_size[2])
+        log.info("  Center: [%.3f, %.3f, %.3f]", mesh_center[0], mesh_center[1], mesh_center[2])
 
-        return (combined_mesh,)
+        return io.NodeOutput(combined_mesh)
 
 
 # Node mappings

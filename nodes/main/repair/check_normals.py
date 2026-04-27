@@ -5,11 +5,16 @@
 Analyze mesh normal consistency and quality.
 """
 
+import logging
+
 import numpy as np
 import trimesh
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
-class CheckNormalsNode:
+class CheckNormalsNode(io.ComfyNode):
     """
     Analyze mesh normal consistency and quality.
 
@@ -17,21 +22,24 @@ class CheckNormalsNode:
     diagnostic information about mesh topology issues.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackCheckNormals",
+            display_name="Check Normals",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+            outputs=[
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("info",)
-    FUNCTION = "check_normals"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def check_normals(self, trimesh):
+    @classmethod
+    def execute(cls, trimesh):
         """
         Analyze mesh normal consistency.
 
@@ -41,7 +49,7 @@ class CheckNormalsNode:
         Returns:
             tuple: (report_string,)
         """
-        print(f"[CheckNormals] Analyzing mesh with {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        log.info("Analyzing mesh with %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
 
         # Check winding consistency
         is_winding_consistent = trimesh.is_winding_consistent
@@ -97,9 +105,9 @@ Recommendations:
         if is_winding_consistent and is_watertight and degenerate_faces == 0:
             report += "  [OK] Mesh normals are in excellent condition!\n"
 
-        print(f"[CheckNormals] Winding: {is_winding_consistent}, Watertight: {is_watertight}, Degenerate: {degenerate_faces}")
+        log.info("Winding: %s, Watertight: %s, Degenerate: %d", is_winding_consistent, is_watertight, degenerate_faces)
 
-        return {"ui": {"text": [report]}, "result": (report,)}
+        return io.NodeOutput(report, ui={"text": [report]})
 
 
 NODE_CLASS_MAPPINGS = {

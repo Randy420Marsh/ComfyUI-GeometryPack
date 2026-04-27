@@ -2,129 +2,94 @@
 # Copyright (C) 2025 ComfyUI-GeometryPack Contributors
 
 """
-Boolean CGAL Node - CSG operations using libigl+CGAL
-Requires igl.copyleft.cgal.
+Unified Boolean Node - Single frontend with backend selector.
+
+Uses ComfyUI's node expansion (GraphBuilder) to dispatch to hidden
+backend-specific nodes, each running in its own isolation env.
 """
 
-import numpy as np
-import trimesh as trimesh_module
+import logging
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
-class BooleanCGALNode:
+class BooleanNode(io.ComfyNode):
     """
-    Boolean CGAL - Union, Difference, and Intersection of meshes using CGAL.
+    Boolean - Unified CSG operations with backend selection.
 
-    Performs Constructive Solid Geometry (CSG) operations:
-    - union: Combine two meshes into one
-    - difference: Subtract mesh_b from mesh_a
-    - intersection: Keep only overlapping parts
-
-    Uses libigl with CGAL backend for robust boolean operations.
-    For Blender-based booleans, use "Boolean Blender" node.
+    Dispatches to hidden backend nodes via node expansion.
+    Backends span multiple isolation envs (main, blender).
     """
+
+    BACKEND_MAP = {
+        "libigl_cgal":   "GeomPackBoolean_LibiglCGAL",
+        "blender_exact": "GeomPackBoolean_BlenderExact",
+    }
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh_a": ("TRIMESH",),
-                "mesh_b": ("TRIMESH",),
-                "operation": (["union", "difference", "intersection"],),
-            },
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackBoolean",
+            display_name="Boolean Operations",
+            category="geompack/boolean",
+            enable_expand=True,
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh_a"),
+                io.Custom("TRIMESH").Input("mesh_b"),
+                io.Combo.Input("operation", options=["union", "difference", "intersection"]),
+                io.DynamicCombo.Input("backend", tooltip=(
+                        "Boolean engine. "
+                        "libigl_cgal=robust CGAL-based (best), "
+                        "blender_exact=Blender EXACT solver"
+                    ), options=[
+                    io.DynamicCombo.Option("libigl_cgal", []),
+                    io.DynamicCombo.Option("blender_exact", []),
+                ]),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="result_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, mesh_a, mesh_b, operation, backend):
+        from comfy_execution.graph_utils import GraphBuilder
+
+        if cls.SCHEMA is None:
+            cls.GET_SCHEMA()
+
+        selected = backend["backend"]
+        node_id = cls.BACKEND_MAP[selected]
+
+        log.info("Boolean dispatch: %s -> %s", selected, node_id)
+
+        kwargs = {
+            "mesh_a": mesh_a,
+            "mesh_b": mesh_b,
+            "operation": operation,
         }
+        # Add any backend-specific params (currently none)
+        for k, v in backend.items():
+            if k == "backend":
+                continue
+            kwargs[k] = v
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("result_mesh", "info")
-    FUNCTION = "boolean_op"
-    CATEGORY = "geompack/boolean"
-    OUTPUT_NODE = True
+        graph = GraphBuilder()
+        backend_node = graph.node(node_id, **kwargs)
 
-    def boolean_op(self, mesh_a, mesh_b, operation):
-        """
-        Perform boolean operation on two meshes using libigl+CGAL.
-
-        Args:
-            mesh_a: First mesh (base mesh for difference)
-            mesh_b: Second mesh (subtracted mesh for difference)
-            operation: Boolean operation type
-
-        Returns:
-            tuple: (result_mesh, info_string)
-        """
-        print(f"[Boolean CGAL] Mesh A: {len(mesh_a.vertices)} vertices, {len(mesh_a.faces)} faces")
-        print(f"[Boolean CGAL] Mesh B: {len(mesh_b.vertices)} vertices, {len(mesh_b.faces)} faces")
-        print(f"[Boolean CGAL] Operation: {operation}")
-
-        try:
-            import igl.copyleft.cgal as cgal
-            print(f"[Boolean CGAL] Using libigl+CGAL backend...")
-
-            # Convert trimesh to numpy arrays
-            VA = np.asarray(mesh_a.vertices, dtype=np.float64)
-            FA = np.asarray(mesh_a.faces, dtype=np.int64)
-            VB = np.asarray(mesh_b.vertices, dtype=np.float64)
-            FB = np.asarray(mesh_b.faces, dtype=np.int64)
-
-            # Map operation to igl type_str
-            op_map = {
-                "union": "union",
-                "difference": "difference",
-                "intersection": "intersection"
-            }
-
-            if operation not in op_map:
-                raise ValueError(f"Unknown operation: {operation}")
-
-            # Perform boolean operation using CGAL
-            VC, FC, J = cgal.mesh_boolean(VA, FA, VB, FB, op_map[operation])
-
-            # Create result trimesh
-            result = trimesh_module.Trimesh(vertices=VC, faces=FC, process=False)
-
-            # Preserve metadata from mesh_a
-            result.metadata = mesh_a.metadata.copy()
-            result.metadata['boolean'] = {
-                'operation': operation,
-                'engine': 'libigl_cgal',
-                'mesh_a_vertices': len(mesh_a.vertices),
-                'mesh_a_faces': len(mesh_a.faces),
-                'mesh_b_vertices': len(mesh_b.vertices),
-                'mesh_b_faces': len(mesh_b.faces),
-                'result_vertices': len(result.vertices),
-                'result_faces': len(result.faces)
-            }
-
-            info = f"""Boolean Operation Results:
-
-Operation: {operation.upper()}
-Engine: libigl + CGAL
-
-Mesh A:
-  Vertices: {len(mesh_a.vertices):,}
-  Faces: {len(mesh_a.faces):,}
-
-Mesh B:
-  Vertices: {len(mesh_b.vertices):,}
-  Faces: {len(mesh_b.faces):,}
-
-Result:
-  Vertices: {len(result.vertices):,}
-  Faces: {len(result.faces):,}
-
-Watertight: {result.is_watertight}
-"""
-
-            print(f"[Boolean CGAL] Success: {len(result.vertices)} vertices, {len(result.faces)} faces")
-            return {"ui": {"text": [info]}, "result": (result, info)}
-
-        except Exception as e:
-            raise RuntimeError(f"Boolean CGAL operation failed: {e}")
+        return {
+            "result": (backend_node.out(0), backend_node.out(1)),
+            "expand": graph.finalize(),
+        }
 
 
 NODE_CLASS_MAPPINGS = {
-    "GeomPackBooleanCGAL": BooleanCGALNode,
+    "GeomPackBoolean": BooleanNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackBooleanCGAL": "Boolean CGAL",
+    "GeomPackBoolean": "Boolean Operations",
 }

@@ -6,11 +6,16 @@ Merge duplicate vertices in mesh with configurable tolerance.
 Useful for fixing disconnected mesh components from CAD meshing or other sources.
 """
 
+import logging
+
 import trimesh
 import numpy as np
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
-class MergeVerticesNode:
+class MergeVerticesNode(io.ComfyNode):
     """
     Merge duplicate vertices in a mesh with configurable tolerance.
 
@@ -26,28 +31,26 @@ class MergeVerticesNode:
     - 1e-3: Loose (for coarse meshes)
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh": ("TRIMESH",),
-                "tolerance": ("FLOAT", {
-                    "default": 1e-5,
-                    "min": 1e-8,
-                    "max": 1e-2,
-                    "step": 1e-6,
-                    "tooltip": "Distance tolerance for merging vertices (1e-5 recommended for CAD meshes)"
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackMergeVertices",
+            display_name="Merge Vertices",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh"),
+                io.Float.Input("tolerance", default=1e-5, min=1e-8, max=1e-2, step=1e-6, tooltip="Distance tolerance for merging vertices (1e-5 recommended for CAD meshes)"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="merged_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("merged_mesh", "info")
-    FUNCTION = "merge_vertices"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def merge_vertices(self, mesh, tolerance=1e-5):
+    @classmethod
+    def execute(cls, mesh, tolerance=1e-5):
         """
         Merge duplicate vertices within tolerance.
 
@@ -58,8 +61,8 @@ class MergeVerticesNode:
         Returns:
             tuple: (merged_trimesh, info_string)
         """
-        print(f"[MergeVertices] Input: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
-        print(f"[MergeVertices] Tolerance: {tolerance:.2e}")
+        log.info("Input: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
+        log.info("Tolerance: %.2e", tolerance)
 
         # Check initial state
         verts_before = len(mesh.vertices)
@@ -76,7 +79,7 @@ class MergeVerticesNode:
 
         # Convert tolerance to digits for trimesh: 1e-5 -> 5 digits
         digits = max(0, -int(np.floor(np.log10(tolerance))))
-        print(f"[MergeVertices] Using {digits} decimal places for vertex matching")
+        log.debug("Using %d decimal places for vertex matching", digits)
 
         # Merge vertices with specified precision
         merged_mesh.merge_vertices(digits_vertex=digits)
@@ -120,11 +123,11 @@ After:
 {'[WARN] Mesh still has multiple disconnected components.' if components_after is not None and components_after > 1 else ''}
 """
 
-        print(f"[MergeVertices] Removed {verts_removed} duplicate vertices")
+        log.info("Removed %d duplicate vertices", verts_removed)
         if components_change is not None:
-            print(f"[MergeVertices] Components: {components_before} -> {components_after}")
+            log.info("Components: %d -> %d", components_before, components_after)
 
-        return {"ui": {"text": [info]}, "result": (merged_mesh, info)}
+        return io.NodeOutput(merged_mesh, info, ui={"text": [info]})
 
 
 NODE_CLASS_MAPPINGS = {

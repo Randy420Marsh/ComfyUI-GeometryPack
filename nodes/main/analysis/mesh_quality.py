@@ -5,10 +5,14 @@
 Mesh Quality Node - Analyze mesh quality metrics
 """
 
+import logging
+
 import numpy as np
+from comfy_api.latest import io
 
+log = logging.getLogger("geometrypack")
 
-class MeshQualityNode:
+class MeshQualityNode(io.ComfyNode):
     """
     Mesh Quality - Compute quality metrics for mesh analysis.
 
@@ -23,24 +27,26 @@ class MeshQualityNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-            "optional": {
-                "include_face_quality": ("BOOLEAN", {"default": True}),
-                "include_edge_stats": ("BOOLEAN", {"default": True}),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackMeshQuality",
+            display_name="Mesh Quality",
+            category="geompack/analysis",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Boolean.Input("include_face_quality", default=True, optional=True),
+                io.Boolean.Input("include_edge_stats", default=True, optional=True),
+            ],
+            outputs=[
+                io.Float.Output(display_name="min_quality"),
+                io.Float.Output(display_name="mean_quality"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("FLOAT", "FLOAT", "STRING")
-    RETURN_NAMES = ("min_quality", "mean_quality", "info")
-    OUTPUT_NODE = True
-    FUNCTION = "analyze_quality"
-    CATEGORY = "geompack/analysis"
-
-    def analyze_quality(self, trimesh, include_face_quality=True, include_edge_stats=True):
+    @classmethod
+    def execute(cls, trimesh, include_face_quality=True, include_edge_stats=True):
         """
         Analyze mesh quality metrics.
 
@@ -52,7 +58,7 @@ class MeshQualityNode:
         Returns:
             tuple: (min_quality, mean_quality, report_string)
         """
-        print(f"[MeshQuality] Analyzing mesh: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        log.info("Analyzing mesh: %d vertices, %d faces", len(trimesh.vertices), len(trimesh.faces))
 
         report_sections = []
 
@@ -72,7 +78,7 @@ class MeshQualityNode:
         # Face quality metrics
         face_qualities = None
         if include_face_quality:
-            face_qualities = self._compute_face_quality(trimesh)
+            face_qualities = cls._compute_face_quality(trimesh)
 
             min_quality = float(np.min(face_qualities))
             max_quality = float(np.max(face_qualities))
@@ -96,7 +102,7 @@ class MeshQualityNode:
 
         # Edge length statistics
         if include_edge_stats:
-            edge_lengths = self._compute_edge_lengths(trimesh)
+            edge_lengths = cls._compute_edge_lengths(trimesh)
 
             min_edge = float(np.min(edge_lengths))
             max_edge = float(np.max(edge_lengths))
@@ -134,7 +140,7 @@ class MeshQualityNode:
 
         # Angle analysis
         if include_face_quality:
-            angles = self._compute_face_angles(trimesh)
+            angles = cls._compute_face_angles(trimesh)
             min_angle = float(np.min(angles))
             max_angle = float(np.max(angles))
             mean_angle = float(np.mean(angles))
@@ -167,14 +173,12 @@ class MeshQualityNode:
         if recommendations:
             report += "\n\nRecommendations:\n" + "\n".join(recommendations)
 
-        print(f"[MeshQuality] Analysis complete")
+        log.info("Analysis complete")
 
-        return {
-            "result": (min_quality, mean_quality, report),
-            "ui": {"text": [report]}
-        }
+        return io.NodeOutput(min_quality, mean_quality, report, ui={"text": [report]})
 
-    def _compute_face_quality(self, mesh):
+    @staticmethod
+    def _compute_face_quality(mesh):
         """
         Compute face quality metric based on aspect ratio.
 
@@ -214,7 +218,8 @@ class MeshQualityNode:
 
         return quality
 
-    def _compute_edge_lengths(self, mesh):
+    @staticmethod
+    def _compute_edge_lengths(mesh):
         """Compute all edge lengths"""
         edges = mesh.edges_unique
         vertices = mesh.vertices
@@ -224,7 +229,8 @@ class MeshQualityNode:
 
         return edge_lengths
 
-    def _compute_face_angles(self, mesh):
+    @staticmethod
+    def _compute_face_angles(mesh):
         """Compute all face angles in degrees"""
         vertices = mesh.vertices
         faces = mesh.faces
@@ -260,7 +266,6 @@ class MeshQualityNode:
         ])
 
         return angles
-
 
 # Node mappings
 NODE_CLASS_MAPPINGS = {

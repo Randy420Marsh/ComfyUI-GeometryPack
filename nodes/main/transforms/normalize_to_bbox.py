@@ -14,11 +14,16 @@ Useful for:
 - Ensuring normals are estimated in the correct coordinate space
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
-class NormalizeMeshToBBox:
+class NormalizeMeshToBBox(io.ComfyNode):
     """
     Normalize mesh/pointcloud to bounding box.
 
@@ -26,33 +31,27 @@ class NormalizeMeshToBBox:
     Stores normalization parameters in metadata for potential denormalization.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH", {
-                    "tooltip": "Input mesh or pointcloud to normalize"
-                }),
-            },
-            "optional": {
-                "target_size": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.001,
-                    "max": 100.0,
-                    "step": 0.1,
-                    "tooltip": "Target bounding box size. 1.0 = [-0.5, 0.5] box (default for TripoSF)"
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackNormalizeMeshToBBox",
+            display_name="Normalize to BBox",
+            category="geompack/transforms",
+            description='Center and scale mesh isotropically to fit target bounding box. Use before estimating normals for TripoSF.',
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh", tooltip="Input mesh or pointcloud to normalize"),
+                io.Float.Input("target_size", default=1.0, min=0.001, max=100.0, step=0.1, tooltip="Target bounding box size. 1.0 = [-0.5, 0.5] box (default for TripoSF)", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="normalized_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("normalized_mesh", "info")
-    FUNCTION = "normalize_to_bbox"
-    CATEGORY = "geompack/transforms"
-    OUTPUT_NODE = True
-    DESCRIPTION = "Center and scale mesh isotropically to fit target bounding box. Use before estimating normals for TripoSF."
-
-    def normalize_to_bbox(self, trimesh, target_size=1.0):
+    @classmethod
+    def execute(cls, trimesh, target_size=1.0):
         """
         Normalize mesh to target bounding box.
 
@@ -63,8 +62,8 @@ class NormalizeMeshToBBox:
         Returns:
             Tuple of (normalized_mesh, info_string)
         """
-        print(f"[NormalizeToBBox] Input: {len(trimesh.vertices)} vertices")
-        print(f"[NormalizeToBBox] Target size: {target_size} (bbox: [{-target_size/2:.2f}, {target_size/2:.2f}])")
+        log.info("Input: %d vertices", len(trimesh.vertices))
+        log.info("Target size: %s (bbox: [%.2f, %.2f])", target_size, -target_size / 2, target_size / 2)
 
         # Get input bounds
         input_bounds = trimesh.bounds
@@ -82,9 +81,9 @@ class NormalizeMeshToBBox:
         center = (input_bounds[0] + input_bounds[1]) / 2
         max_extent = max(input_extents)
 
-        print(f"[NormalizeToBBox] Original center: [{center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f}]")
-        print(f"[NormalizeToBBox] Original extents: [{input_extents[0]:.3f}, {input_extents[1]:.3f}, {input_extents[2]:.3f}]")
-        print(f"[NormalizeToBBox] Max extent: {max_extent:.3f}")
+        log.info("Original center: [%.3f, %.3f, %.3f]", center[0], center[1], center[2])
+        log.info("Original extents: [%.3f, %.3f, %.3f]", input_extents[0], input_extents[1], input_extents[2])
+        log.info("Max extent: %.3f", max_extent)
 
         # Copy to avoid modifying original
         result = trimesh.copy()
@@ -96,8 +95,8 @@ class NormalizeMeshToBBox:
         scale_factor = target_size / max_extent
         result.apply_scale(scale_factor)
 
-        print(f"[NormalizeToBBox] Scale factor: {scale_factor:.6f}")
-        print(f"[NormalizeToBBox] [OK] Normalized to [{-target_size/2:.2f}, {target_size/2:.2f}] bbox")
+        log.info("Scale factor: %.6f", scale_factor)
+        log.info("[OK] Normalized to [%.2f, %.2f] bbox", -target_size / 2, target_size / 2)
 
         # Preserve existing metadata
         if hasattr(trimesh, 'metadata'):
@@ -133,7 +132,7 @@ New Bounds:
 Note: Use this BEFORE AddNormalsToPointCloud for TripoSF workflows.
 """
 
-        return {"ui": {"text": [info]}, "result": (result, info)}
+        return io.NodeOutput(result, info, ui={"text": [info]})
 
 
 # Node registration

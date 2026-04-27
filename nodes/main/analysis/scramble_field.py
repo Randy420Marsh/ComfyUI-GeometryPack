@@ -6,12 +6,16 @@ Scramble integer field values to maximize contrast between adjacent faces.
 Uses graph coloring to ensure neighboring segments get visually distinct values.
 """
 
-import numpy as np
-import trimesh
+import logging
 from collections import defaultdict
 
+import numpy as np
+import trimesh
+from comfy_api.latest import io
 
-class ScrambleIntField:
+log = logging.getLogger("geometrypack")
+
+class ScrambleIntField(io.ComfyNode):
     """
     Reassigns integer field values to maximize contrast between adjacent faces.
     Useful for visualizing segmentation results where adjacent segments
@@ -21,32 +25,24 @@ class ScrambleIntField:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh": ("TRIMESH",),
-                "field_name": ("STRING", {
-                    "default": "seg",
-                    "tooltip": "Name of the integer face field to scramble."
-                }),
-            },
-            "optional": {
-                "seed": ("INT", {
-                    "default": 0,
-                    "min": 0,
-                    "max": 0xffffffff,
-                    "tooltip": "Random seed for color assignment order."
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="ScrambleIntField",
+            display_name="Scramble Int Field",
+            category="geometrypack/analysis",
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh"),
+                io.String.Input("field_name", default="seg", tooltip="Name of the integer face field to scramble."),
+                io.Int.Input("seed", default=0, min=0, max=0xffffffff, tooltip="Random seed for color assignment order.", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("mesh",)
-    FUNCTION = "scramble"
-    CATEGORY = "geometrypack/analysis"
-
-    def scramble(
-        self,
+    @classmethod
+    def execute(
+        cls,
         mesh: trimesh.Trimesh,
         field_name: str,
         seed: int = 0,
@@ -59,12 +55,12 @@ class ScrambleIntField:
             if hasattr(mesh, 'metadata') and face_data_key in mesh.metadata:
                 labels = np.array(mesh.metadata[face_data_key])
             else:
-                print(f"[ScrambleIntField] Field '{field_name}' not found, returning unchanged")
-                return (mesh,)
+                log.warning("Field '%s' not found, returning unchanged", field_name)
+                return io.NodeOutput(mesh)
         else:
             labels = np.array(mesh.face_attributes[face_data_key])
 
-        print(f"[ScrambleIntField] Input field '{field_name}': {len(np.unique(labels))} unique values")
+        log.info("Input field '%s': %d unique values", field_name, len(np.unique(labels)))
 
         # Build face adjacency (which faces share edges)
         face_adjacency = mesh.face_adjacency  # Nx2 array of adjacent face pairs
@@ -83,7 +79,7 @@ class ScrambleIntField:
                 segment_adj[l1].add(l2)
                 segment_adj[l2].add(l1)
 
-        print(f"[ScrambleIntField] Built segment adjacency graph: {n_labels} nodes")
+        log.debug("Built segment adjacency graph: %d nodes", n_labels)
 
         # Greedy graph coloring to assign new values
         # Goal: adjacent segments get maximally different values
@@ -136,10 +132,9 @@ class ScrambleIntField:
             output_mesh.metadata = {}
         output_mesh.metadata[face_data_key] = new_labels
 
-        print(f"[ScrambleIntField] Output: scrambled {n_labels} segments using {max_color} colors")
+        log.info("Output: scrambled %d segments using %d colors", n_labels, max_color)
 
-        return (output_mesh,)
-
+        return io.NodeOutput(output_mesh)
 
 NODE_CLASS_MAPPINGS = {
     "ScrambleIntField": ScrambleIntField,

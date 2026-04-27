@@ -5,13 +5,17 @@
 Split By Field Node - Split point cloud/mesh by discrete vertex attribute
 """
 
+import logging
 from typing import Tuple
 
 import numpy as np
 import trimesh
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
-class SplitByFieldNode:
+class SplitByFieldNode(io.ComfyNode):
     """
     Split a point cloud or mesh by a discrete vertex attribute field.
 
@@ -19,30 +23,28 @@ class SplitByFieldNode:
     Works with any integer-valued vertex attribute (e.g., labels, primitive types).
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "geometry": ("TRIMESH,POINT_CLOUD", {
-                    "tooltip": "Input point cloud or mesh with vertex_attributes."
-                }),
-                "field_name": ("STRING", {
-                    "default": "label",
-                    "tooltip": "Name of the discrete field to split by (e.g., 'label', 'primitive_type', 'cluster')."
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackSplitByField",
+            display_name="Split By Field",
+            category="geompack/combine",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH,POINT_CLOUD").Input("geometry", tooltip="Input point cloud or mesh with vertex_attributes."),
+                io.String.Input("field_name", default="label", tooltip="Name of the discrete field to split by (e.g., 'label', 'primitive_type', 'cluster')."),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="geometries", is_output_list=True),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("geometries", "info")
-    OUTPUT_IS_LIST = (True, False)
-    FUNCTION = "split"
-    CATEGORY = "geompack/combine"
-    OUTPUT_NODE = True
-
-    def split(self, geometry, field_name: str) -> Tuple:
+    @classmethod
+    def execute(cls, geometry, field_name: str) -> Tuple:
         """Split geometry by a discrete field."""
-        print(f"[SplitByField] Splitting by field: '{field_name}'")
+        log.info("Splitting by field: '%s'", field_name)
 
         # Check field exists
         if not hasattr(geometry, 'vertex_attributes') or geometry.vertex_attributes is None:
@@ -63,7 +65,7 @@ class SplitByFieldNode:
         if len(unique_values) > 100:
             raise ValueError(f"Too many unique values ({len(unique_values)}). Maximum allowed: 100")
 
-        print(f"   Found {len(unique_values)} unique values: {unique_values}")
+        log.info("Found %d unique values: %s", len(unique_values), unique_values)
 
         # Determine if input is a point cloud or mesh
         is_point_cloud = (
@@ -129,10 +131,10 @@ class SplitByFieldNode:
 
             result.append(subset)
             summary_lines.append(f"  {field_name}={val}: {num_points} points")
-            print(f"   {field_name}={val}: {num_points} points")
+            log.info("%s=%s: %d points", field_name, val, num_points)
 
         summary = "\n".join(summary_lines)
-        return {"ui": {"text": [summary]}, "result": (result, summary)}
+        return io.NodeOutput(result, summary, ui={"text": [summary]})
 
 
 # Node mappings

@@ -1,10 +1,17 @@
+[dependencies]
+av = "*"
+
 [cuda]
-packages = ["cumesh", "torch", "torchvision"]
+packages = ["cumesh"]
 
 [pypi-dependencies]
 numpy = "*"
 trimesh = { version = ">=4.0.0", extras = ["easy"] }
 tqdm = "*"
+psutil = "*"
+safetensors = "*"
+comfy-aimdo = "*"
+einops = "*"
 
 [target.win-64.pypi-dependencies]
 msvc-runtime = "*"

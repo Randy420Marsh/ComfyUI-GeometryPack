@@ -5,7 +5,10 @@
 Load Mesh Batch Node - Load multiple meshes from a folder (batch loading)
 """
 
+import logging
 import os
+
+log = logging.getLogger("geometrypack")
 
 # ComfyUI folder paths
 try:
@@ -21,45 +24,38 @@ except (ImportError, AttributeError):
     COMFYUI_ROOT = None
 
 from . import mesh_io
+from comfy_api.latest import io
 
 
-class LoadMeshBatch:
+class LoadMeshBatch(io.ComfyNode):
     """
     Load multiple meshes from a folder (batch loading).
     Similar to ComfyUI's image batch loading, with start_index and max_meshes controls.
     """
 
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackLoadMeshBatch",
+            display_name="Load Mesh Batch",
+            category="geompack/io",
+            inputs=[
+                io.String.Input("folder_path", default="3d", multiline=False),
+                io.Int.Input("start_index", default=0, min=0, max=100000),
+                io.Int.Input("max_meshes", default=-1, min=-1, max=100000),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="meshes", is_output_list=True),
+            ],
+        )
+
     # Supported mesh file extensions
     SUPPORTED_EXTENSIONS = ['.obj', '.ply', '.stl', '.off', '.gltf', '.glb', '.fbx', '.dae', '.3ds', '.vtp']
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "folder_path": ("STRING", {
-                    "default": "3d",
-                    "multiline": False
-                }),
-                "start_index": ("INT", {
-                    "default": 0,
-                    "min": 0,
-                    "max": 100000
-                }),
-                "max_meshes": ("INT", {
-                    "default": -1,
-                    "min": -1,
-                    "max": 100000
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("meshes",)
-    FUNCTION = "load_mesh_batch"
-    CATEGORY = "geompack/io"
-    OUTPUT_IS_LIST = (True,)
-
-    def load_mesh_batch(self, folder_path, start_index, max_meshes):
+    def execute(cls, folder_path, start_index, max_meshes):
         """
         Load multiple meshes from a folder.
 
@@ -85,7 +81,7 @@ class LoadMeshBatch:
             searched_paths.append(f"{root_path} (ComfyUI root)")
             if os.path.exists(root_path) and os.path.isdir(root_path):
                 full_folder_path = root_path
-                print(f"[LoadMeshBatch] Found folder relative to ComfyUI root: {folder_path}")
+                log.info("Found folder relative to ComfyUI root: %s", folder_path)
 
         # 2. Try in ComfyUI input folder
         if full_folder_path is None and COMFYUI_INPUT_FOLDER is not None:
@@ -93,7 +89,7 @@ class LoadMeshBatch:
             searched_paths.append(f"{input_path} (input folder)")
             if os.path.exists(input_path) and os.path.isdir(input_path):
                 full_folder_path = input_path
-                print(f"[LoadMeshBatch] Found folder in input: {folder_path}")
+                log.info("Found folder in input: %s", folder_path)
 
         # 3. Try in ComfyUI output folder
         if full_folder_path is None and COMFYUI_OUTPUT_FOLDER is not None:
@@ -101,14 +97,14 @@ class LoadMeshBatch:
             searched_paths.append(f"{output_path} (output folder)")
             if os.path.exists(output_path) and os.path.isdir(output_path):
                 full_folder_path = output_path
-                print(f"[LoadMeshBatch] Found folder in output: {folder_path}")
+                log.info("Found folder in output: %s", folder_path)
 
         # 4. Try as absolute path
         if full_folder_path is None:
             searched_paths.append(f"{folder_path} (absolute)")
             if os.path.exists(folder_path) and os.path.isdir(folder_path):
                 full_folder_path = folder_path
-                print(f"[LoadMeshBatch] Using absolute path: {folder_path}")
+                log.info("Using absolute path: %s", folder_path)
             else:
                 error_msg = f"Folder not found: '{folder_path}'\nSearched in:"
                 for path in searched_paths:
@@ -119,7 +115,7 @@ class LoadMeshBatch:
         mesh_files = []
         for filename in os.listdir(full_folder_path):
             file_lower = filename.lower()
-            if any(file_lower.endswith(ext) for ext in self.SUPPORTED_EXTENSIONS):
+            if any(file_lower.endswith(ext) for ext in cls.SUPPORTED_EXTENSIONS):
                 mesh_files.append(filename)
 
         # Sort files alphabetically for consistent ordering
@@ -127,20 +123,20 @@ class LoadMeshBatch:
 
         if len(mesh_files) == 0:
             raise ValueError(f"No mesh files found in folder: {full_folder_path}\n"
-                           f"Supported extensions: {', '.join(self.SUPPORTED_EXTENSIONS)}")
+                           f"Supported extensions: {', '.join(cls.SUPPORTED_EXTENSIONS)}")
 
-        print(f"[LoadMeshBatch] Found {len(mesh_files)} mesh files")
+        log.info("Found %d mesh files", len(mesh_files))
 
         # Apply start_index and max_meshes
         if start_index > 0:
             if start_index >= len(mesh_files):
                 raise ValueError(f"start_index ({start_index}) is >= number of mesh files ({len(mesh_files)})")
             mesh_files = mesh_files[start_index:]
-            print(f"[LoadMeshBatch] Skipping first {start_index} files")
+            log.info("Skipping first %d files", start_index)
 
         if max_meshes > 0:
             mesh_files = mesh_files[:max_meshes]
-            print(f"[LoadMeshBatch] Loading up to {max_meshes} meshes")
+            log.info("Loading up to %d meshes", max_meshes)
 
         # Load all meshes
         loaded_meshes = []
@@ -149,22 +145,23 @@ class LoadMeshBatch:
             try:
                 loaded_mesh, error = mesh_io.load_mesh_file(file_path)
                 if loaded_mesh is None:
-                    print(f"[LoadMeshBatch] Warning: Failed to load {filename}: {error}")
+                    log.warning("Failed to load %s: %s", filename, error)
                     continue
 
                 loaded_meshes.append(loaded_mesh)
-                print(f"[LoadMeshBatch] [{i+1}/{len(mesh_files)}] Loaded {filename}: "
-                      f"{len(loaded_mesh.vertices)} vertices, {len(loaded_mesh.faces)} faces")
+                log.info("[%d/%d] Loaded %s: %d vertices, %d faces",
+                         i + 1, len(mesh_files), filename,
+                         len(loaded_mesh.vertices), len(loaded_mesh.faces))
             except Exception as e:
-                print(f"[LoadMeshBatch] Warning: Error loading {filename}: {e}")
+                log.warning("Error loading %s: %s", filename, e)
                 continue
 
         if len(loaded_meshes) == 0:
             raise ValueError(f"Failed to load any meshes from folder: {full_folder_path}")
 
-        print(f"[LoadMeshBatch] Successfully loaded {len(loaded_meshes)} meshes")
+        log.info("Successfully loaded %d meshes", len(loaded_meshes))
 
-        return (loaded_meshes,)
+        return io.NodeOutput(loaded_meshes)
 
 
 # Node mappings

@@ -5,9 +5,19 @@
 Load Mesh FBX Node - Load FBX files using bpy.
 """
 
+import logging
 import os
+
+# Import bpy first so its bundled tbb12.dll wins the loader race against
+# trimesh[easy]'s embreex.libs/tbb12.dll. Reverse order produces
+# STATUS_ENTRYPOINT_NOT_FOUND when bpy's C extension calls into the wrong
+# tbb build.
+import bpy  # noqa: F401  (loaded for DLL-ordering side-effect)
+
 import numpy as np
 import trimesh as trimesh_module
+
+log = logging.getLogger("geometrypack")
 
 # ComfyUI folder paths
 try:
@@ -16,6 +26,7 @@ try:
 except (ImportError, AttributeError):
     # Fallback if folder_paths not available (e.g., during testing)
     COMFYUI_INPUT_FOLDER = None
+from comfy_api.latest import io
 
 
 def _bpy_import_fbx(fbx_path):
@@ -69,32 +80,32 @@ def _bpy_import_fbx(fbx_path):
     }
 
 
-class LoadMeshFBX:
+class LoadMeshFBX(io.ComfyNode):
     """
     Load FBX files using bpy.
 
     Uses the bpy Python module to directly import FBX files and extract mesh data.
     """
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        # Get list of FBX files only
-        fbx_files = cls.get_fbx_files()
 
+    @classmethod
+    def define_schema(cls):
+        fbx_files = cls.get_fbx_files()
         if not fbx_files:
             fbx_files = ["No FBX files found in input/3d or input folders"]
-
-        return {
-            "required": {
-                "file_path": (fbx_files, ),
-            },
-        }
-
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("mesh", "info")
-    FUNCTION = "load_fbx"
-    CATEGORY = "geompack/io"
-    OUTPUT_NODE = True
+        return io.Schema(
+            node_id="GeomPackLoadMeshFBX",
+            display_name="Load Mesh (FBX)",
+            category="geompack/io",
+            is_output_node=True,
+            inputs=[
+                io.Combo.Input("file_path", options=fbx_files),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
     @classmethod
     def get_fbx_files(cls):
@@ -118,7 +129,7 @@ class LoadMeshFBX:
         return sorted(fbx_files)
 
     @classmethod
-    def IS_CHANGED(cls, file_path):
+    def fingerprint_inputs(cls, file_path):
         """Force re-execution when file changes."""
         if COMFYUI_INPUT_FOLDER is not None:
             # Check file modification time
@@ -136,7 +147,8 @@ class LoadMeshFBX:
 
         return file_path
 
-    def load_fbx(self, file_path):
+    @classmethod
+    def execute(cls, file_path):
         """
         Load FBX file using bpy.
 
@@ -159,7 +171,7 @@ class LoadMeshFBX:
             searched_paths.append(input_3d_path)
             if os.path.exists(input_3d_path):
                 full_path = input_3d_path
-                print(f"[LoadMeshFBX] Found FBX in input/3d folder: {file_path}")
+                log.info("Found FBX in input/3d folder: %s", file_path)
 
             # Second, try in ComfyUI input folder
             if full_path is None:
@@ -167,14 +179,14 @@ class LoadMeshFBX:
                 searched_paths.append(input_path)
                 if os.path.exists(input_path):
                     full_path = input_path
-                    print(f"[LoadMeshFBX] Found FBX in input folder: {file_path}")
+                    log.info("Found FBX in input folder: %s", file_path)
 
         # If not found in input folders, try as absolute path
         if full_path is None:
             searched_paths.append(file_path)
             if os.path.exists(file_path):
                 full_path = file_path
-                print(f"[LoadMeshFBX] Loading from absolute path: {file_path}")
+                log.info("Loading from absolute path: %s", file_path)
             else:
                 # Generate error message with all searched paths
                 error_msg = f"File not found: '{file_path}'\nSearched in:"
@@ -183,7 +195,7 @@ class LoadMeshFBX:
                 raise ValueError(error_msg)
 
         # Load FBX file using bpy directly
-        print(f"[LoadMeshFBX] Loading via bpy: {full_path}")
+        log.info("Loading via bpy: %s", full_path)
         try:
             result = _bpy_import_fbx(full_path)
         except Exception as e:
@@ -211,9 +223,9 @@ class LoadMeshFBX:
         info += f"Vertices: {len(loaded_mesh.vertices):,}\n"
         info += f"Faces: {len(loaded_mesh.faces):,}"
 
-        print(f"[LoadMeshFBX] Loaded: {len(loaded_mesh.vertices)} vertices, {len(loaded_mesh.faces)} faces")
+        log.info("Loaded: %d vertices, %d faces", len(loaded_mesh.vertices), len(loaded_mesh.faces))
 
-        return {"ui": {"text": [info]}, "result": (loaded_mesh, info)}
+        return io.NodeOutput(loaded_mesh, info, ui={"text": [info]})
 
 
 # Node mappings

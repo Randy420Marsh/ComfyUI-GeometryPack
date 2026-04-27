@@ -1,5 +1,7 @@
-python = "3.11"
+python = "3.13"
 
 [pypi-dependencies]
 bpy = ">=4.2"
 trimesh = { version = "*", extras = ["easy"] }
+torch = "*"
+tqdm = "*"

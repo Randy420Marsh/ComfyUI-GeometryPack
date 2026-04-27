@@ -8,10 +8,14 @@ Similar to CADGetFilename in CADabra, this extracts the original filename
 from meshes loaded via LoadMesh or LoadMeshBatch.
 """
 
+import logging
 import os
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
-class GetMeshFilename:
+class GetMeshFilename(io.ComfyNode):
     """
     Extract filename (without extension) from a mesh's metadata.
 
@@ -23,21 +27,23 @@ class GetMeshFilename:
 
     INPUT_IS_LIST = True
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackGetMeshFilename",
+            display_name="Get Mesh Filename",
+            category="geompack/io",
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh"),
+            ],
+            outputs=[
+                io.String.Output(display_name="filename", is_output_list=True),
+            ],
+        )
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("filename",)
-    OUTPUT_IS_LIST = (True,)
-    FUNCTION = "get_filename"
-    CATEGORY = "geompack/io"
-
-    def get_filename(self, mesh):
+    @classmethod
+    def execute(cls, mesh):
         """
         Extract filename from mesh metadata.
 
@@ -61,8 +67,8 @@ class GetMeshFilename:
                 name = "unknown"
             filenames.append(name)
 
-        print(f"[GetMeshFilename] Extracted {len(filenames)} filename(s)")
-        return (filenames,)
+        log.info("Extracted %d filename(s)", len(filenames))
+        return io.NodeOutput(filenames)
 
 
 # Node mappings for ComfyUI

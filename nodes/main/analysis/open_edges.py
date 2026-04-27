@@ -10,11 +10,15 @@ that contain these edges. Useful for detecting holes and mesh boundaries.
 Supports batch processing: input a list of meshes, get a list of results.
 """
 
+import logging
 import os
+
 import numpy as np
+from comfy_api.latest import io
 
+log = logging.getLogger("geometrypack")
 
-class OpenEdgesNode:
+class OpenEdgesNode(io.ComfyNode):
     """
     Detect and label faces with open/boundary edges.
 
@@ -27,21 +31,23 @@ class OpenEdgesNode:
     INPUT_IS_LIST = True
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackOpenEdges",
+            display_name="Open Edges",
+            category="geompack/analysis",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="trimesh", is_output_list=True),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("trimesh", "info")
-    OUTPUT_IS_LIST = (True, False)  # TRIMESH is list, STRING is single summary
-    OUTPUT_NODE = True  # Enable UI output for dynamic display
-    FUNCTION = "find_open_edges"
-    CATEGORY = "geompack/analysis"
-
-    def find_open_edges(self, trimesh):
+    @classmethod
+    def execute(cls, trimesh):
         """
         Find faces with open/boundary edges.
 
@@ -148,11 +154,11 @@ class OpenEdgesNode:
             })
 
             # Print to console
-            print(f"[OpenEdges] {mesh_name_short}: {num_boundary_edges} open edges, {num_boundary_faces} faces with open edges")
+            log.info("%s: %d open edges, %d faces with open edges", mesh_name_short, num_boundary_edges, num_boundary_faces)
             for info in face_edge_info[:5]:
-                print(f"[OpenEdges]   Face {info['face_id']}: {info['num_open_edges']} open edge(s)")
+                log.info("  Face %d: %d open edge(s)", info['face_id'], info['num_open_edges'])
             if len(face_edge_info) > 5:
-                print(f"[OpenEdges]   ... and {len(face_edge_info) - 5} more faces")
+                log.info("  ... and %d more faces", len(face_edge_info) - 5)
 
             # Create face attribute for visualization
             # 0 = interior face, 1+ = number of open edges on that face
@@ -176,16 +182,9 @@ class OpenEdgesNode:
         # Create summary string
         summary = "\n\n".join(summary_lines)
 
-        print(f"[OpenEdges] Processed {len(meshes)} mesh(es)")
+        log.info("Processed %d mesh(es)", len(meshes))
 
-        return {
-            "result": (result_meshes, summary),
-            "ui": {
-                "text": [summary],
-                "open_edges_data": ui_data
-            }
-        }
-
+        return io.NodeOutput(result_meshes, summary, ui={ "text": [summary], "open_edges_data": ui_data })
 
 # Node mappings for ComfyUI
 NODE_CLASS_MAPPINGS = {
