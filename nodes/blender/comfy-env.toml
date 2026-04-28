@@ -3,6 +3,9 @@ python = "3.11"
 [target.linux-64.dependencies]
 xorg-libsm = "*"     # libSM.so.6 required by bpy
 
+[dependencies]
+av = "*"
+
 [pypi-dependencies]
 bpy = ">=4.2"
 trimesh = { version = "*", extras = ["easy"] }
