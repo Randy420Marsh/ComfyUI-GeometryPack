@@ -1,6 +1,3 @@
-[apt]
-packages = ["libgl1-mesa-glx", "libgl1", "libopengl0", "libglu1-mesa"]
-
 [dependencies]
 cgal = "*"
 igl = "*"
@@ -35,6 +32,9 @@ msvc-runtime = "*"
 pymeshlab = "==2025.7"
 
 [target.linux-64.dependencies]
+mesalib = "*"        # replaces apt: libgl1-mesa-glx, libgl1
+libglu = "*"         # replaces apt: libglu1-mesa
+libglvnd = "*"       # replaces apt: libopengl0
 pymeshlab = "*"
 
 [target.linux-64.pypi-dependencies]
