@@ -2,13 +2,17 @@
 cgal = "*"
 igl = "*"
 scipy = "*"
+numpy = "*"
+pillow = ">=9.0.0"
+matplotlib = ">=3.5.0"
+pyvista = ">=0.43.0"
+pyopengl = ">=3.1.10"
+rtree = "*"
+tqdm = ">=4.60.0"
 
 [pypi-dependencies]
-numpy = "*"
-tqdm = ">=4.60.0"
 requests = ">=2.25.0"
 trimesh = { version = ">=4.0.0", extras = ["easy"] }
-rtree = "*"
 point-cloud-utils = ">=0.30.0"
 fast-simplification = ">=0.1.5"
 pymeshfix = ">=0.17.0"
@@ -20,10 +24,6 @@ pygeogram-ap = { version = ">=0.1.0", index = "https://pozzettiandrea.github.io/
 pypmp = { version = ">=0.1.0", index = "https://pozzettiandrea.github.io/pypmp/simple/" }
 pyquadwild = { version = ">=0.1.0", index = "https://pozzettiandrea.github.io/pyquadwild/simple/" }
 pymesh2 = { version = ">=0.3", index = "https://pozzettiandrea.github.io/PyMesh/simple/" }
-matplotlib = ">=3.5.0"
-pillow = ">=9.0.0"
-pyvista = ">=0.43.0"
-pyopengl = ">=3.1.10"
 
 [target.win-64.pypi-dependencies]
 embreex = "*"
