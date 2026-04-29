@@ -8,11 +8,15 @@ Closes holes, removes self-intersections, and creates watertight meshes
 with light touch-ups.
 """
 
+import logging
+
 import numpy as np
 import trimesh
+from comfy_api.latest import io
 
+log = logging.getLogger("geometrypack")
 
-class MeshFixNode:
+class MeshFixNode(io.ComfyNode):
     """
     Automatic mesh repair using MeshFix algorithm.
 
@@ -26,64 +30,32 @@ class MeshFixNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "input_mesh": ("TRIMESH",),
-            },
-            "optional": {
-                "remove_small_components": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Remove small isolated mesh fragments before repair"
-                }),
-                "join_components": (["true", "false"], {
-                    "default": "false",
-                    "tooltip": "Attempt to join nearby disconnected components"
-                }),
-                "fill_holes": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Fill boundary holes in the mesh"
-                }),
-                "max_hole_edges": ("INT", {
-                    "default": 0,
-                    "min": 0,
-                    "max": 10000,
-                    "step": 10,
-                    "tooltip": "Max edges for holes to fill. 0 = fill all holes regardless of size"
-                }),
-                "refine_holes": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Refine triangulation when filling holes for better quality"
-                }),
-                "clean_mesh": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Remove self-intersections and degenerate faces"
-                }),
-                "clean_iterations": ("INT", {
-                    "default": 10,
-                    "min": 1,
-                    "max": 100,
-                    "step": 1,
-                    "tooltip": "Max iterations for self-intersection removal"
-                }),
-                "inner_loops": ("INT", {
-                    "default": 3,
-                    "min": 1,
-                    "max": 10,
-                    "step": 1,
-                    "tooltip": "Inner loops per clean iteration"
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackMeshFix",
+            display_name="MeshFix",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("input_mesh"),
+                io.Combo.Input("remove_small_components", options=["true", "false"], default="true", tooltip="Remove small isolated mesh fragments before repair", optional=True),
+                io.Combo.Input("join_components", options=["true", "false"], default="false", tooltip="Attempt to join nearby disconnected components", optional=True),
+                io.Combo.Input("fill_holes", options=["true", "false"], default="true", tooltip="Fill boundary holes in the mesh", optional=True),
+                io.Int.Input("max_hole_edges", default=0, min=0, max=10000, step=10, tooltip="Max edges for holes to fill. 0 = fill all holes regardless of size", optional=True),
+                io.Combo.Input("refine_holes", options=["true", "false"], default="true", tooltip="Refine triangulation when filling holes for better quality", optional=True),
+                io.Combo.Input("clean_mesh", options=["true", "false"], default="true", tooltip="Remove self-intersections and degenerate faces", optional=True),
+                io.Int.Input("clean_iterations", default=10, min=1, max=100, step=1, tooltip="Max iterations for self-intersection removal", optional=True),
+                io.Int.Input("inner_loops", default=3, min=1, max=10, step=1, tooltip="Inner loops per clean iteration", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="repaired_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("repaired_mesh", "info")
-    FUNCTION = "repair_mesh"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def repair_mesh(
-        self,
+    @classmethod
+    def execute(
+        cls,
         input_mesh,
         remove_small_components="true",
         join_components="false",
@@ -119,10 +91,9 @@ class MeshFixNode:
         clean_mesh = clean_mesh == "true"
 
         # Log input
-        print(f"\n{'='*60}")
-        print(f"[MeshFix] Input: {len(input_mesh.vertices):,} vertices, {len(input_mesh.faces):,} faces")
-        print(f"[MeshFix] Options: remove_small={remove_small_components}, join={join_components}, fill_holes={fill_holes}, clean={clean_mesh}")
-        print(f"{'='*60}\n")
+        log.info("Input: %d vertices, %d faces", len(input_mesh.vertices), len(input_mesh.faces))
+        log.info("Options: remove_small=%s, join=%s, fill_holes=%s, clean=%s",
+                 remove_small_components, join_components, fill_holes, clean_mesh)
 
         # Track initial state
         initial_vertices = len(input_mesh.vertices)
@@ -148,36 +119,38 @@ class MeshFixNode:
         # Get initial boundary count
         try:
             initial_boundaries = tin.boundaries()
-        except:
+        except Exception as e:
+            log.debug("Failed to get initial boundary count: %s", e)
             initial_boundaries = -1
 
         # Apply repairs in order
         if remove_small_components:
-            print("[MeshFix] Removing small components...")
+            log.info("Removing small components...")
             tin.remove_smallest_components()
             operations.append("Removed small components")
 
         if join_components:
-            print("[MeshFix] Joining nearby components...")
+            log.info("Joining nearby components...")
             tin.join_closest_components()
             operations.append("Joined nearby components")
 
         if fill_holes:
             # 0 means fill all holes - use large number since pymeshfix requires int
             nbe = max_hole_edges if max_hole_edges > 0 else 100000
-            print(f"[MeshFix] Filling holes (max_edges={nbe}, refine={refine_holes})...")
+            log.info("Filling holes (max_edges=%d, refine=%s)...", nbe, refine_holes)
             tin.fill_small_boundaries(nbe=nbe, refine=refine_holes)
             operations.append(f"Filled holes (max_edges={'all' if max_hole_edges == 0 else nbe})")
 
         if clean_mesh:
-            print(f"[MeshFix] Cleaning mesh (iterations={clean_iterations}, inner_loops={inner_loops})...")
+            log.info("Cleaning mesh (iterations=%d, inner_loops=%d)...", clean_iterations, inner_loops)
             tin.clean(max_iters=clean_iterations, inner_loops=inner_loops)
             operations.append(f"Cleaned (iters={clean_iterations})")
 
         # Get final boundary count
         try:
             final_boundaries = tin.boundaries()
-        except:
+        except Exception as e:
+            log.debug("Failed to get final boundary count: %s", e)
             final_boundaries = -1
 
         # Extract result
@@ -224,11 +197,10 @@ After:
 Status: {'Mesh is now watertight!' if is_watertight and not was_watertight else 'Mesh was already watertight.' if was_watertight else 'Mesh still has open boundaries.'}
 """
 
-        print(f"[MeshFix] Result: {final_vertices:,} vertices, {final_faces:,} faces")
-        print(f"[MeshFix] Watertight: {was_watertight} -> {is_watertight}")
+        log.info("Result: %d vertices, %d faces", final_vertices, final_faces)
+        log.info("Watertight: %s -> %s", was_watertight, is_watertight)
 
-        return {"ui": {"text": [report]}, "result": (result_mesh, report)}
-
+        return io.NodeOutput(result_mesh, report, ui={"text": [report]})
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackMeshFix": MeshFixNode,

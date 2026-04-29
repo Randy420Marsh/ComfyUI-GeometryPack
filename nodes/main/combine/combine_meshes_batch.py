@@ -5,11 +5,16 @@
 Combine Meshes from Batch Node - Concatenate a batch/list of meshes into one
 """
 
+import logging
+
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
-class CombineMeshesBatchNode:
+class CombineMeshesBatchNode(io.ComfyNode):
     """
     Combine Meshes from Batch - Concatenate a list of meshes into one.
 
@@ -21,22 +26,26 @@ class CombineMeshesBatchNode:
 
     INPUT_IS_LIST = True
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "meshes": ("TRIMESH", {"tooltip": "List of meshes to combine"}),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackCombineMeshesBatch",
+            display_name="Combine Meshes (Batch)",
+            category="geompack/combine",
+            description='Combine a batch of meshes into a single mesh.',
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("meshes", tooltip="List of meshes to combine"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="combined_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("combined_mesh", "info")
-    FUNCTION = "combine"
-    CATEGORY = "geompack/combine"
-    OUTPUT_NODE = True
-    DESCRIPTION = "Combine a batch of meshes into a single mesh."
-
-    def combine(self, meshes):
+    @classmethod
+    def execute(cls, meshes):
         """
         Combine a list of meshes into one.
 
@@ -56,7 +65,7 @@ class CombineMeshesBatchNode:
         if not meshes:
             raise ValueError("No valid meshes provided to combine")
 
-        print(f"[CombineMeshesBatch] Combining {len(meshes)} meshes")
+        log.info("Combining %d meshes", len(meshes))
 
         # Track input stats
         input_stats = []
@@ -73,7 +82,7 @@ class CombineMeshesBatchNode:
             })
             total_vertices += vertex_count
             total_faces += face_count
-            print(f"[CombineMeshesBatch] Mesh {i+1}: {vertex_count} vertices, {face_count} faces")
+            log.info("Mesh %d: %d vertices, %d faces", i+1, vertex_count, face_count)
 
         # Concatenate meshes
         if len(meshes) == 1:
@@ -121,8 +130,8 @@ Note: Meshes are concatenated without boolean operations.
 Components remain separate within the combined mesh.
 """
 
-        print(f"[CombineMeshesBatch] Result: {len(result.vertices)} vertices, {len(result.faces)} faces")
-        return {"ui": {"text": [info]}, "result": (result, info)}
+        log.info("Result: %d vertices, %d faces", len(result.vertices), len(result.faces))
+        return io.NodeOutput(result, info, ui={"text": [info]})
 
 
 # Node mappings

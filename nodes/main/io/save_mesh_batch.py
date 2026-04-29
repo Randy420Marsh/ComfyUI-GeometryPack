@@ -5,8 +5,11 @@
 Save Mesh Batch Node - Save multiple meshes to a folder with sequential numbering.
 """
 
+import logging
 import os
 import math
+
+log = logging.getLogger("geometrypack")
 
 # ComfyUI folder paths
 try:
@@ -17,9 +20,10 @@ except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
 
 from . import mesh_io
+from comfy_api.latest import io
 
 
-class SaveMeshBatch:
+class SaveMeshBatch(io.ComfyNode):
     """
     Save multiple meshes to a folder with sequential numbering.
 
@@ -30,39 +34,32 @@ class SaveMeshBatch:
     - 100-999 meshes: _001, _002, ...
     """
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "folder_name": ("STRING", {
-                    "default": "mesh_output",
-                    "multiline": False,
-                    "tooltip": "Name of the folder to create in the output directory"
-                }),
-                "base_name": ("STRING", {
-                    "default": "mesh",
-                    "multiline": False,
-                    "tooltip": "Base name for files (e.g., 'mesh' becomes 'mesh_001.obj'). Ignored if names provided."
-                }),
-                "format": (["obj", "ply", "stl", "off", "glb", "gltf", "vtp"],),
-            },
-            "optional": {
-                "names": ("STRING", {
-                    "forceInput": True,
-                    "tooltip": "Optional list of custom filenames (without extension). If provided, overrides base_name."
-                }),
-            },
-        }
 
-    RETURN_TYPES = ("STRING", "INT")
-    RETURN_NAMES = ("output_folder", "saved_count")
-    FUNCTION = "save_mesh_batch"
-    CATEGORY = "geompack/io"
-    OUTPUT_NODE = True
     INPUT_IS_LIST = True
 
-    def save_mesh_batch(self, trimesh, folder_name, base_name, format, names=None):
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackSaveMeshBatch",
+            display_name="Save Meshes to Folder",
+            category="geompack/io",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.String.Input("folder_name", default="mesh_output", multiline=False, tooltip="Name of the folder to create in the output directory"),
+                io.String.Input("base_name", default="mesh", multiline=False, tooltip="Base name for files (e.g., 'mesh' becomes 'mesh_001.obj'). Ignored if names provided."),
+                io.Combo.Input("format", options=["obj", "ply", "stl", "off", "glb", "gltf", "vtp"]),
+                io.String.Input("names", tooltip="Optional list of custom filenames (without extension). If provided, overrides base_name.", force_input=True, optional=True),
+            ],
+            outputs=[
+                io.String.Output(display_name="output_folder"),
+                io.Int.Output(display_name="saved_count"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, trimesh, folder_name, base_name, format, names=None):
         """
         Save batch of meshes to folder with sequential numbering or custom names.
 
@@ -101,9 +98,9 @@ class SaveMeshBatch:
         batch_size = len(trimesh)
         use_custom_names = names_list is not None and len(names_list) >= batch_size
         if use_custom_names:
-            print(f"[SaveMeshBatch] Saving {batch_size} meshes with custom names to folder '{folder_name_val}'")
+            log.info("Saving %d meshes with custom names to folder '%s'", batch_size, folder_name_val)
         else:
-            print(f"[SaveMeshBatch] Saving {batch_size} meshes to folder '{folder_name_val}'")
+            log.info("Saving %d meshes to folder '%s'", batch_size, folder_name_val)
 
         # Determine output folder path
         if COMFYUI_OUTPUT_FOLDER is not None:
@@ -113,12 +110,12 @@ class SaveMeshBatch:
 
         # Create folder if it doesn't exist
         os.makedirs(output_folder, exist_ok=True)
-        print(f"[SaveMeshBatch] Output folder: {output_folder}")
+        log.info("Output folder: %s", output_folder)
 
         # Calculate number of digits needed based on batch size
         # For 1-9: 1 digit, 10-99: 2 digits, 100-999: 3 digits, etc.
         num_digits = max(1, math.ceil(math.log10(batch_size + 1)))
-        print(f"[SaveMeshBatch] Using {num_digits} digits for numbering (batch size: {batch_size})")
+        log.debug("Using %d digits for numbering (batch size: %d)", num_digits, batch_size)
 
         saved_count = 0
         errors = []
@@ -153,7 +150,7 @@ class SaveMeshBatch:
                 if success:
                     saved_count += 1
                     if (i + 1) % 10 == 0 or i == 0 or i == batch_size - 1:
-                        print(f"[SaveMeshBatch] Saved {filename} ({vertex_count} verts, {face_count} faces)")
+                        log.info("Saved %s (%d verts, %d faces)", filename, vertex_count, face_count)
                 else:
                     errors.append(f"Mesh {i + 1}: {error}")
 
@@ -161,19 +158,19 @@ class SaveMeshBatch:
                 errors.append(f"Mesh {i + 1}: {str(e)}")
 
         # Report results
-        print(f"[SaveMeshBatch] Saved {saved_count}/{batch_size} meshes to {output_folder}")
+        log.info("Saved %d/%d meshes to %s", saved_count, batch_size, output_folder)
 
         if errors:
-            print(f"[SaveMeshBatch] Errors ({len(errors)}):")
+            log.warning("Errors (%d):", len(errors))
             for error in errors[:5]:  # Show first 5 errors
-                print(f"  - {error}")
+                log.warning("  - %s", error)
             if len(errors) > 5:
-                print(f"  ... and {len(errors) - 5} more errors")
+                log.warning("  ... and %d more errors", len(errors) - 5)
 
         if saved_count == 0:
             raise ValueError(f"Failed to save any meshes. Errors: {'; '.join(errors[:3])}")
 
-        return (output_folder, saved_count)
+        return io.NodeOutput(output_folder, saved_count)
 
 
 # Node mappings

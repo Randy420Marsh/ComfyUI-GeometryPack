@@ -5,9 +5,12 @@
 Load Mesh (Glob) Node - Load meshes matching a glob pattern
 """
 
+import logging
 import os
 import glob as glob_module
 import numpy as np
+
+log = logging.getLogger("geometrypack")
 
 from . import mesh_io
 
@@ -16,40 +19,36 @@ try:
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
+from comfy_api.latest import io
 
 
-class LoadMeshGlob:
+class LoadMeshGlob(io.ComfyNode):
     """
     Load meshes matching a glob pattern (e.g., /path/*.glb, /path/**/*.obj)
     Returns a list of meshes sorted by filename.
     """
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "glob_pattern": ("STRING", {
-                    "default": "",
-                    "tooltip": "Glob pattern to match mesh files (e.g., /path/to/folder/*.glb)"
-                }),
-            },
-            "optional": {
-                "sort_by": (["name", "modified_time"], {
-                    "default": "name",
-                    "tooltip": "How to sort matched files"
-                }),
-            }
-        }
-
-    RETURN_TYPES = ("TRIMESH", "IMAGE", "STRING")
-    RETURN_NAMES = ("meshes", "textures", "file_paths")
-    OUTPUT_IS_LIST = (True, True, True)
-    FUNCTION = "load_meshes"
-    CATEGORY = "geompack/io"
-    DESCRIPTION = "Load all meshes matching a glob pattern"
 
     @classmethod
-    def IS_CHANGED(cls, glob_pattern, sort_by="name"):
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackLoadMeshGlob",
+            display_name="Load Mesh Batch (Glob)",
+            category="geompack/io",
+            description='Load all meshes matching a glob pattern',
+            inputs=[
+                io.String.Input("glob_pattern", default="", tooltip="Glob pattern to match mesh files (e.g., /path/to/folder/*.glb)"),
+                io.Combo.Input("sort_by", options=["name", "modified_time"], default="name", tooltip="How to sort matched files", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="meshes", is_output_list=True),
+                io.Image.Output(display_name="textures", is_output_list=True),
+                io.String.Output(display_name="file_paths", is_output_list=True),
+            ],
+        )
+
+    @classmethod
+    def fingerprint_inputs(cls, glob_pattern, sort_by="name"):
         """Force re-execution when any matched file changes."""
         matched_files = glob_module.glob(glob_pattern, recursive=True)
         mtimes = []
@@ -58,10 +57,11 @@ class LoadMeshGlob:
                 mtimes.append(f"{path}:{os.path.getmtime(path)}")
         return "_".join(sorted(mtimes))
 
-    def _extract_texture_image(self, mesh):
+    @staticmethod
+    def _extract_texture_image(mesh):
         """Extract texture from mesh and convert to ComfyUI IMAGE format."""
         if not PIL_AVAILABLE:
-            return self._placeholder_texture()
+            return LoadMeshGlob._placeholder_texture()
 
         texture_image = None
 
@@ -86,17 +86,19 @@ class LoadMeshGlob:
                         texture_image = Image.open(img)
 
         if texture_image is None:
-            return self._placeholder_texture()
+            return LoadMeshGlob._placeholder_texture()
 
         # Convert to ComfyUI IMAGE format (BHWC with values 0-1)
         img_array = np.array(texture_image.convert("RGB")).astype(np.float32) / 255.0
         return img_array[np.newaxis, ...]
 
-    def _placeholder_texture(self):
+    @staticmethod
+    def _placeholder_texture():
         """Return a black 64x64 placeholder texture."""
         return np.zeros((1, 64, 64, 3), dtype=np.float32)
 
-    def load_meshes(self, glob_pattern, sort_by="name"):
+    @classmethod
+    def execute(cls, glob_pattern, sort_by="name"):
         """
         Load meshes matching the glob pattern.
 
@@ -116,8 +118,8 @@ class LoadMeshGlob:
         matched_files = glob_module.glob(glob_pattern, recursive=True)
 
         if not matched_files:
-            print(f"[LoadMeshGlob] No files matched pattern: {glob_pattern}")
-            return ([], [], [])
+            log.warning("No files matched pattern: %s", glob_pattern)
+            return io.NodeOutput([], [], [])
 
         # Sort files
         if sort_by == "name":
@@ -125,7 +127,7 @@ class LoadMeshGlob:
         else:
             matched_files.sort(key=os.path.getmtime)
 
-        print(f"[LoadMeshGlob] Found {len(matched_files)} files matching pattern")
+        log.info("Found %d files matching pattern", len(matched_files))
 
         meshes = []
         textures = []
@@ -133,29 +135,29 @@ class LoadMeshGlob:
 
         for path in matched_files:
             try:
-                print(f"[LoadMeshGlob] Loading: {path}")
+                log.info("Loading: %s", path)
                 mesh, error = mesh_io.load_mesh_file(path)
 
                 if mesh is None:
-                    print(f"[LoadMeshGlob] Failed to load {path}: {error}")
+                    log.warning("Failed to load %s: %s", path, error)
                     continue
 
                 # Handle both meshes and pointclouds
                 if hasattr(mesh, 'faces') and mesh.faces is not None:
-                    print(f"[LoadMeshGlob] Loaded: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+                    log.info("Loaded: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
                 else:
-                    print(f"[LoadMeshGlob] Loaded pointcloud: {len(mesh.vertices)} points")
+                    log.info("Loaded pointcloud: %d points", len(mesh.vertices))
 
                 meshes.append(mesh)
-                textures.append(self._extract_texture_image(mesh))
+                textures.append(cls._extract_texture_image(mesh))
                 file_paths.append(path)
 
             except Exception as e:
-                print(f"[LoadMeshGlob] Error loading {path}: {e}")
+                log.error("Error loading %s: %s", path, e)
                 continue
 
-        print(f"[LoadMeshGlob] Successfully loaded {len(meshes)} mesh(es)")
-        return (meshes, textures, file_paths)
+        log.info("Successfully loaded %d mesh(es)", len(meshes))
+        return io.NodeOutput(meshes, textures, file_paths)
 
 
 # Node mappings

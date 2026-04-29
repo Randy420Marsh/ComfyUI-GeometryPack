@@ -10,11 +10,15 @@ and assigns a unique part_id to each face based on which component it belongs to
 Supports batch processing: input a list of meshes, get a list of results.
 """
 
+import logging
 import os
+
 import numpy as np
+from comfy_api.latest import io
 
+log = logging.getLogger("geometrypack")
 
-class ConnectedComponentsNode:
+class ConnectedComponentsNode(io.ComfyNode):
     """
     Label disconnected mesh components with a part_id face attribute.
 
@@ -28,21 +32,23 @@ class ConnectedComponentsNode:
     INPUT_IS_LIST = True
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackConnectedComponents",
+            display_name="Connected Components",
+            category="geompack/analysis",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="trimesh", is_output_list=True),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("trimesh", "info")
-    OUTPUT_IS_LIST = (True, False)  # TRIMESH is list, STRING is single summary
-    OUTPUT_NODE = True  # Enable UI output for dynamic display
-    FUNCTION = "label_components"
-    CATEGORY = "geompack/analysis"
-
-    def label_components(self, trimesh):
+    @classmethod
+    def execute(cls, trimesh):
         """
         Label each face with its connected component ID.
 
@@ -116,11 +122,11 @@ class ConnectedComponentsNode:
             })
 
             # Print to console
-            print(f"[ConnectedComponents] {mesh_name_short}: {num_components} component(s)")
+            log.info("%s: %d component(s)", mesh_name_short, num_components)
             for comp in component_details[:10]:  # Limit console output
-                print(f"[ConnectedComponents]   #{comp['id']}: {comp['faces']:,} faces, {comp['vertices']:,} vertices")
+                log.info("  #%d: %s faces, %s vertices", comp['id'], f"{comp['faces']:,}", f"{comp['vertices']:,}")
             if len(component_details) > 10:
-                print(f"[ConnectedComponents]   ... and {len(component_details) - 10} more components")
+                log.info("  ... and %d more components", len(component_details) - 10)
 
             # Store as face attribute
             result_mesh = mesh.copy()
@@ -138,17 +144,10 @@ class ConnectedComponentsNode:
         # Create summary string
         summary = "\n\n".join(summary_lines)
 
-        print(f"[ConnectedComponents] Processed {len(meshes)} mesh(es)")
+        log.info("Processed %d mesh(es)", len(meshes))
 
         # Return both outputs and UI data
-        return {
-            "result": (result_meshes, summary),
-            "ui": {
-                "text": [summary],
-                "component_data": ui_components
-            }
-        }
-
+        return io.NodeOutput(result_meshes, summary, ui={ "text": [summary], "component_data": ui_components })
 
 # Node mappings for ComfyUI
 NODE_CLASS_MAPPINGS = {

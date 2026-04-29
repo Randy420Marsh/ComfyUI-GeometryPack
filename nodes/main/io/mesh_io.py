@@ -1,7 +1,10 @@
+import logging
 import numpy as np
 import trimesh
 import os
 from typing import Tuple, Optional
+
+log = logging.getLogger("geometrypack")
 
 
 def _load_vtk_mesh(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
@@ -23,7 +26,7 @@ def _load_vtk_mesh(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
         )
 
     try:
-        print(f"[load_mesh_file] Loading VTK format: {file_path}")
+        log.info("Loading VTK format: %s", file_path)
 
         # Load with pyvista
         pv_mesh = pv.read(file_path)
@@ -62,7 +65,7 @@ def _load_vtk_mesh(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
         if len(vertices) == 0 or len(faces) == 0:
             return None, f"VTK file is empty: {file_path}"
 
-        print(f"[load_mesh_file] VTK mesh: {len(vertices)} vertices, {len(faces)} faces")
+        log.info("VTK mesh: %d vertices, %d faces", len(vertices), len(faces))
 
         # Create trimesh
         mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=True)
@@ -74,7 +77,7 @@ def _load_vtk_mesh(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
                     data = np.array(pv_mesh.point_data[name])
                     if len(data) == len(vertices):
                         mesh.vertex_attributes[name] = data.astype(np.float32)
-                        print(f"[load_mesh_file] Transferred vertex attribute: {name}")
+                        log.debug("Transferred vertex attribute: %s", name)
                 except Exception:
                     pass
 
@@ -84,7 +87,7 @@ def _load_vtk_mesh(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
                     data = np.array(pv_mesh.cell_data[name])
                     if len(data) == len(faces):
                         mesh.face_attributes[name] = data.astype(np.float32)
-                        print(f"[load_mesh_file] Transferred face attribute: {name}")
+                        log.debug("Transferred face attribute: %s", name)
                 except Exception:
                     pass
 
@@ -93,12 +96,12 @@ def _load_vtk_mesh(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
         mesh.metadata['file_name'] = os.path.basename(file_path)
         mesh.metadata['file_format'] = os.path.splitext(file_path)[1].lower()
 
-        print(f"[load_mesh_file] [OK] Successfully loaded VTK: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        log.info("Successfully loaded VTK: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
         return mesh, ""
 
     except Exception as e:
         import traceback
-        traceback.print_exc()
+        log.error("Error loading VTK file", exc_info=True)
         return None, f"Error loading VTK file: {str(e)}"
 
 
@@ -123,28 +126,28 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
         return _load_vtk_mesh(file_path)
 
     try:
-        print(f"[load_mesh_file] Loading: {file_path}")
+        log.info("Loading: %s", file_path)
 
         # Try to load with trimesh first (supports many formats)
         # Don't force='mesh' so we can also load pointclouds
         loaded = trimesh.load(file_path)
 
-        print(f"[load_mesh_file] Loaded type: {type(loaded).__name__}")
+        log.debug("Loaded type: %s", type(loaded).__name__)
 
         # Handle pointclouds (PLY files with only vertices, no faces)
         if isinstance(loaded, trimesh.PointCloud):
-            print(f"[load_mesh_file] Loaded pointcloud: {len(loaded.vertices)} points")
+            log.info("Loaded pointcloud: %d points", len(loaded.vertices))
             # Store file metadata
             loaded.metadata['file_path'] = file_path
             loaded.metadata['file_name'] = os.path.basename(file_path)
             loaded.metadata['file_format'] = os.path.splitext(file_path)[1].lower()
             loaded.metadata['is_pointcloud'] = True
-            print(f"[load_mesh_file] [OK] Successfully loaded pointcloud: {len(loaded.vertices)} points")
+            log.info("Successfully loaded pointcloud: %d points", len(loaded.vertices))
             return loaded, ""
 
         # Handle case where trimesh.load returns a Scene instead of a mesh
         if isinstance(loaded, trimesh.Scene):
-            print(f"[load_mesh_file] Converting Scene to single mesh (scene has {len(loaded.geometry)} geometries)")
+            log.info("Converting Scene to single mesh (scene has %d geometries)", len(loaded.geometry))
             # If it's a scene, dump it to a single mesh
             mesh = loaded.dump(concatenate=True)
         else:
@@ -161,10 +164,10 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
             pointcloud.metadata['file_name'] = os.path.basename(file_path)
             pointcloud.metadata['file_format'] = os.path.splitext(file_path)[1].lower()
             pointcloud.metadata['is_pointcloud'] = True
-            print(f"[load_mesh_file] [OK] Successfully loaded as pointcloud: {len(pointcloud.vertices)} points")
+            log.info("Successfully loaded as pointcloud: %d points", len(pointcloud.vertices))
             return pointcloud, ""
 
-        print(f"[load_mesh_file] Initial mesh: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        log.info("Initial mesh: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
 
         # Ensure mesh is properly triangulated
         # Trimesh should handle this, but some file formats might have issues
@@ -172,10 +175,10 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
             # Check if faces are triangular
             if mesh.faces.shape[1] != 3:
                 # Need to triangulate - this shouldn't normally happen but handle it
-                print(f"[load_mesh_file] Warning: Mesh has non-triangular faces, triangulating...")
+                log.warning("Mesh has non-triangular faces, triangulating...")
                 # trimesh.Trimesh constructor should triangulate automatically with process=True
                 mesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces, process=True)
-                print(f"[load_mesh_file] After triangulation: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+                log.info("After triangulation: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
 
         # Count before cleanup
         verts_before = len(mesh.vertices)
@@ -205,19 +208,19 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
         faces_after = len(mesh.faces)
 
         if verts_before != verts_after or faces_before != faces_after:
-            print(f"[load_mesh_file] Cleanup: {verts_before}->{verts_after} vertices, {faces_before}->{faces_after} faces")
-            print(f"[load_mesh_file]   Removed: {verts_before - verts_after} duplicate vertices, {faces_before - faces_after} bad faces")
+            log.info("Cleanup: %d->%d vertices, %d->%d faces", verts_before, verts_after, faces_before, faces_after)
+            log.info("Removed: %d duplicate vertices, %d bad faces", verts_before - verts_after, faces_before - faces_after)
 
         # Store file metadata
         mesh.metadata['file_path'] = file_path
         mesh.metadata['file_name'] = os.path.basename(file_path)
         mesh.metadata['file_format'] = os.path.splitext(file_path)[1].lower()
 
-        print(f"[load_mesh_file] Successfully loaded: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        log.info("Successfully loaded: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
         return mesh, ""
 
     except Exception as e:
-        print(f"[load_mesh_file] Trimesh failed: {str(e)}, trying libigl fallback...")
+        log.warning("Trimesh failed: %s, trying libigl fallback...", e)
         # Fallback to libigl
         try:
             import igl
@@ -228,7 +231,7 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
             if v is None or f is None or len(v) == 0 or len(f) == 0:
                 return None, f"Failed to read mesh: {file_path}"
 
-            print(f"[load_mesh_file] libigl loaded: {len(v)} vertices, {len(f)} faces")
+            log.info("libigl loaded: %d vertices, %d faces", len(v), len(f))
 
             mesh = trimesh.Trimesh(vertices=v, faces=f, process=True)
 
@@ -254,17 +257,17 @@ def load_mesh_file(file_path: str) -> Tuple[Optional[trimesh.Trimesh], str]:
             faces_after = len(mesh.faces)
 
             if verts_before != verts_after or faces_before != faces_after:
-                print(f"[load_mesh_file] Cleanup: {verts_before}->{verts_after} vertices, {faces_before}->{faces_after} faces")
+                log.info("Cleanup: %d->%d vertices, %d->%d faces", verts_before, verts_after, faces_before, faces_after)
 
             # Store metadata
             mesh.metadata['file_path'] = file_path
             mesh.metadata['file_name'] = os.path.basename(file_path)
             mesh.metadata['file_format'] = os.path.splitext(file_path)[1].lower()
 
-            print(f"[load_mesh_file] Successfully loaded via libigl: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+            log.info("Successfully loaded via libigl: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
             return mesh, ""
         except Exception as e2:
-            print(f"[load_mesh_file] Both loaders failed!")
+            log.error("Both loaders failed!")
             return None, f"Error loading mesh: {str(e)}; Fallback error: {str(e2)}"
 
 

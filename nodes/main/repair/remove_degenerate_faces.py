@@ -10,10 +10,14 @@ Degenerate faces can be created by:
 - Import from poorly-constructed mesh files
 """
 
+import logging
 import numpy as np
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
-class RemoveDegenerateFacesNode:
+class RemoveDegenerateFacesNode(io.ComfyNode):
     """
     Remove degenerate faces from a mesh.
 
@@ -25,30 +29,26 @@ class RemoveDegenerateFacesNode:
     or for fixing meshes imported from CAD systems that create sliver triangles.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh": ("TRIMESH",),
-            },
-            "optional": {
-                "min_area": ("FLOAT", {
-                    "default": 1e-10,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 1e-10,
-                    "tooltip": "Minimum face area threshold (faces below this are removed)"
-                }),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackRemoveDegenerateFaces",
+            display_name="Remove Degenerate Faces",
+            category="geompack/repair",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh"),
+                io.Float.Input("min_area", default=1e-10, min=0.0, max=1.0, step=1e-10, tooltip="Minimum face area threshold (faces below this are removed)", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="cleaned_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("cleaned_mesh", "info")
-    FUNCTION = "remove_degenerate"
-    CATEGORY = "geompack/repair"
-    OUTPUT_NODE = True
-
-    def remove_degenerate(self, mesh, min_area=1e-10):
+    @classmethod
+    def execute(cls, mesh, min_area=1e-10):
         """
         Remove degenerate faces from mesh.
 
@@ -59,7 +59,7 @@ class RemoveDegenerateFacesNode:
         Returns:
             tuple: (cleaned_mesh, info_string)
         """
-        print(f"[RemoveDegenerateFaces] Input: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
+        log.info("Input: %d vertices, %d faces", len(mesh.vertices), len(mesh.faces))
 
         faces_before = len(mesh.faces)
         verts_before = len(mesh.vertices)
@@ -73,7 +73,7 @@ class RemoveDegenerateFacesNode:
         num_duplicate = np.sum(~duplicate_mask)
 
         if num_duplicate > 0:
-            print(f"[RemoveDegenerateFaces] Found {num_duplicate} faces with duplicate vertex indices")
+            log.info("Found %d faces with duplicate vertex indices", num_duplicate)
             cleaned_mesh.update_faces(duplicate_mask)
 
         # Method 2: Remove faces with zero/tiny area using trimesh's built-in
@@ -81,7 +81,7 @@ class RemoveDegenerateFacesNode:
             area_mask = cleaned_mesh.nondegenerate_faces()
             num_zero_area = np.sum(~area_mask)
             if num_zero_area > 0:
-                print(f"[RemoveDegenerateFaces] Found {num_zero_area} faces with zero area")
+                log.info("Found %d faces with zero area", num_zero_area)
                 cleaned_mesh.update_faces(area_mask)
 
         # Method 3: Remove faces below min_area threshold
@@ -90,7 +90,7 @@ class RemoveDegenerateFacesNode:
             area_threshold_mask = face_areas >= min_area
             num_tiny = np.sum(~area_threshold_mask)
             if num_tiny > 0:
-                print(f"[RemoveDegenerateFaces] Found {num_tiny} faces below area threshold {min_area:.2e}")
+                log.info("Found %d faces below area threshold %.2e", num_tiny, min_area)
                 cleaned_mesh.update_faces(area_threshold_mask)
 
         # Remove unreferenced vertices
@@ -115,9 +115,9 @@ After:
 {'[OK] Removed ' + str(faces_removed) + ' degenerate faces' if faces_removed > 0 else '[INFO] No degenerate faces found'}
 """
 
-        print(f"[RemoveDegenerateFaces] Removed {faces_removed} degenerate faces, {verts_removed} unreferenced vertices")
+        log.info("Removed %d degenerate faces, %d unreferenced vertices", faces_removed, verts_removed)
 
-        return {"ui": {"text": [info]}, "result": (cleaned_mesh, info)}
+        return io.NodeOutput(cleaned_mesh, info, ui={"text": [info]})
 
 
 NODE_CLASS_MAPPINGS = {

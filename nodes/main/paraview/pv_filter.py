@@ -8,8 +8,12 @@ Applies VTK analysis filters to meshes, producing scalar fields
 for visualization in the Preview Mesh (VTK) viewer.
 """
 
+import logging
 import numpy as np
 import trimesh
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
 def _trimesh_to_pyvista(mesh):
@@ -79,59 +83,42 @@ def _pyvista_to_trimesh(pv_mesh):
     return result
 
 
-class ParaViewFilterNode:
+class ParaViewFilterNode(io.ComfyNode):
     """
     Apply VTK/ParaView analysis filters to meshes using PyVista.
 
     Produces scalar fields for visualization in Preview Mesh (fields mode).
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "filter_type": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackParaViewFilter",
+            display_name="ParaView Filter",
+            category="geompack/paraview",
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("filter_type", options=[
                     "curvature_gaussian",
                     "curvature_mean",
                     "cell_sizes",
                     "elevation",
                     "feature_edges",
                     "warp_by_scalar",
-                ], {"default": "curvature_gaussian"}),
-            },
-            "optional": {
-                "axis": (["X", "Y", "Z"], {
-                    "default": "Z",
-                    "tooltip": "Axis for elevation or warp direction"
-                }),
-                "factor": ("FLOAT", {
-                    "default": 1.0,
-                    "min": -100.0,
-                    "max": 100.0,
-                    "step": 0.1,
-                    "tooltip": "Scale factor for warp_by_scalar"
-                }),
-                "scalar_field": ("STRING", {
-                    "default": "",
-                    "tooltip": "Vertex attribute name for warp_by_scalar"
-                }),
-                "angle": ("FLOAT", {
-                    "default": 30.0,
-                    "min": 0.0,
-                    "max": 180.0,
-                    "step": 1.0,
-                    "tooltip": "Feature edge angle threshold (degrees)"
-                }),
-            },
-        }
+                ], default="curvature_gaussian"),
+                io.Combo.Input("axis", options=["X", "Y", "Z"], default="Z", tooltip="Axis for elevation or warp direction", optional=True),
+                io.Float.Input("factor", default=1.0, min=-100.0, max=100.0, step=0.1, tooltip="Scale factor for warp_by_scalar", optional=True),
+                io.String.Input("scalar_field", default="", tooltip="Vertex attribute name for warp_by_scalar", optional=True),
+                io.Float.Input("angle", default=30.0, min=0.0, max=180.0, step=1.0, tooltip="Feature edge angle threshold (degrees)", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="filtered_mesh"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH",)
-    RETURN_NAMES = ("filtered_mesh",)
-    FUNCTION = "apply_filter"
-    CATEGORY = "geompack/paraview"
-
-    def apply_filter(self, trimesh, filter_type, axis="Z", factor=1.0, scalar_field="", angle=30.0):
+    @classmethod
+    def execute(cls, trimesh, filter_type, axis="Z", factor=1.0, scalar_field="", angle=30.0):
         """
         Apply a VTK filter via PyVista.
 
@@ -157,8 +144,8 @@ class ParaViewFilterNode:
         if not hasattr(trimesh, 'faces') or len(trimesh.faces) == 0:
             raise ValueError("ParaView Filter requires a mesh with faces, not a point cloud")
 
-        print(f"[ParaViewFilter] Applying '{filter_type}' to mesh: "
-              f"{len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
+        log.info("Applying '%s' to mesh: %d vertices, %d faces",
+                 filter_type, len(trimesh.vertices), len(trimesh.faces))
 
         # Convert to pyvista
         pv_mesh = _trimesh_to_pyvista(trimesh)
@@ -171,19 +158,19 @@ class ParaViewFilterNode:
             # Rename to friendlier name
             if 'Gauss_Curvature' in result.vertex_attributes:
                 result.vertex_attributes['curvature'] = result.vertex_attributes.pop('Gauss_Curvature')
-            print(f"[ParaViewFilter] Computed Gaussian curvature")
+            log.info("Computed Gaussian curvature")
 
         elif filter_type == "curvature_mean":
             pv_result = pv_mesh.curvature('mean')
             result = _pyvista_to_trimesh(pv_result)
             if 'Mean_Curvature' in result.vertex_attributes:
                 result.vertex_attributes['curvature'] = result.vertex_attributes.pop('Mean_Curvature')
-            print(f"[ParaViewFilter] Computed mean curvature")
+            log.info("Computed mean curvature")
 
         elif filter_type == "cell_sizes":
             pv_result = pv_mesh.compute_cell_sizes(length=False, volume=False, area=True)
             result = _pyvista_to_trimesh(pv_result)
-            print(f"[ParaViewFilter] Computed cell sizes (face areas)")
+            log.info("Computed cell sizes (face areas)")
 
         elif filter_type == "elevation":
             axis_map = {"X": 0, "Y": 1, "Z": 2}
@@ -199,7 +186,7 @@ class ParaViewFilterNode:
                 set_active_scalars=True
             )
             result = _pyvista_to_trimesh(pv_result)
-            print(f"[ParaViewFilter] Computed elevation along {axis} axis")
+            log.info("Computed elevation along %s axis", axis)
 
         elif filter_type == "feature_edges":
             pv_result = pv_mesh.extract_feature_edges(
@@ -209,13 +196,13 @@ class ParaViewFilterNode:
                 manifold_edges=False,
             )
             if pv_result.n_points == 0:
-                print(f"[ParaViewFilter] Warning: No feature edges found at angle={angle}")
+                log.warning("No feature edges found at angle=%s", angle)
                 # Return original mesh with an empty marker attribute
                 result = trimesh.copy()
                 result.vertex_attributes['feature_edge'] = np.zeros(len(result.vertices), dtype=np.float32)
             else:
                 result = _pyvista_to_trimesh(pv_result)
-                print(f"[ParaViewFilter] Extracted feature edges: {pv_result.n_points} points, {pv_result.n_lines} lines")
+                log.info("Extracted feature edges: %d points, %d lines", pv_result.n_points, pv_result.n_lines)
 
         elif filter_type == "warp_by_scalar":
             if not scalar_field:
@@ -235,22 +222,22 @@ class ParaViewFilterNode:
                 factor=factor,
             )
             result = _pyvista_to_trimesh(pv_result)
-            print(f"[ParaViewFilter] Warped by '{scalar_field}' with factor={factor}")
+            log.info("Warped by '%s' with factor=%s", scalar_field, factor)
 
         else:
             raise ValueError(f"Unknown filter type: {filter_type}")
 
-        print(f"[ParaViewFilter] Result: {len(result.vertices)} vertices, {len(result.faces)} faces")
+        log.info("Result: %d vertices, %d faces", len(result.vertices), len(result.faces))
 
         # List output fields
         v_attrs = list(result.vertex_attributes.keys()) if hasattr(result, 'vertex_attributes') else []
         f_attrs = list(result.face_attributes.keys()) if hasattr(result, 'face_attributes') else []
         if v_attrs:
-            print(f"[ParaViewFilter] Vertex attributes: {v_attrs}")
+            log.info("Vertex attributes: %s", v_attrs)
         if f_attrs:
-            print(f"[ParaViewFilter] Face attributes: {f_attrs}")
+            log.info("Face attributes: %s", f_attrs)
 
-        return (result,)
+        return io.NodeOutput(result)
 
 
 NODE_CLASS_MAPPINGS = {

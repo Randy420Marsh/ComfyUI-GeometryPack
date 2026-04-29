@@ -11,11 +11,15 @@ Degenerate faces have:
 Also shows the 30 smallest faces by area (for informational purposes).
 """
 
+import logging
 import os
+
 import numpy as np
+from comfy_api.latest import io
 
+log = logging.getLogger("geometrypack")
 
-class DegenerateFacesNode:
+class DegenerateFacesNode(io.ComfyNode):
     """
     Detect degenerate faces and show smallest faces by area.
 
@@ -29,21 +33,23 @@ class DegenerateFacesNode:
     INPUT_IS_LIST = True
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackDegenerateFaces",
+            display_name="Degenerate Faces",
+            category="geompack/analysis",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="trimesh", is_output_list=True),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("trimesh", "info")
-    OUTPUT_IS_LIST = (True, False)
-    OUTPUT_NODE = True
-    FUNCTION = "find_degenerate_faces"
-    CATEGORY = "geompack/analysis"
-
-    def find_degenerate_faces(self, trimesh):
+    @classmethod
+    def execute(cls, trimesh):
         """
         Find truly degenerate faces and smallest faces by area.
 
@@ -160,13 +166,13 @@ class DegenerateFacesNode:
             })
 
             # Console output
-            print(f"[DegenerateFaces] {mesh_name_short}: {num_degenerate} degenerate faces ({duplicate_count} duplicate verts, {zero_count} zero area)")
+            log.info("%s: %d degenerate faces (%d duplicate verts, %d zero area)", mesh_name_short, num_degenerate, duplicate_count, zero_count)
             if num_degenerate > 0:
                 for info in degenerate_faces[:5]:
-                    print(f"[DegenerateFaces]   Face {info['id']}: {info['reason']}")
+                    log.info("  Face %d: %s", info['id'], info['reason'])
                 if num_degenerate > 5:
-                    print(f"[DegenerateFaces]   ... and {num_degenerate - 5} more")
-            print(f"[DegenerateFaces] Smallest face area: {smallest_faces[0]['area']:.2e}")
+                    log.info("  ... and %d more", num_degenerate - 5)
+            log.info("Smallest face area: %.2e", smallest_faces[0]['area'])
 
             # Store result
             result_mesh = mesh.copy()
@@ -181,16 +187,9 @@ class DegenerateFacesNode:
 
         summary = "\n\n".join(summary_lines)
 
-        print(f"[DegenerateFaces] Processed {len(meshes)} mesh(es)")
+        log.info("Processed %d mesh(es)", len(meshes))
 
-        return {
-            "result": (result_meshes, summary),
-            "ui": {
-                "text": [summary],
-                "degenerate_data": ui_data
-            }
-        }
-
+        return io.NodeOutput(result_meshes, summary, ui={ "text": [summary], "degenerate_data": ui_data })
 
 NODE_CLASS_MAPPINGS = {
     "GeomPackDegenerateFaces": DegenerateFacesNode,

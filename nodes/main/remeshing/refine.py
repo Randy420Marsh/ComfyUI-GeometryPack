@@ -5,10 +5,13 @@
 Refine Mesh Node - Non-destructive mesh refinement operations
 """
 
+import logging
 import trimesh as trimesh_module
+from comfy_api.latest import io
 
+log = logging.getLogger("geometrypack")
 
-class RefineMeshNode:
+class RefineMeshNode(io.ComfyNode):
     """
     Refine Mesh - Unified non-destructive mesh refinement operations.
 
@@ -22,56 +25,34 @@ class RefineMeshNode:
     """
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-                "operation": ([
+    def define_schema(cls):
+        return io.Schema(
+            node_id="RefineMesh",
+            display_name="Refine Mesh",
+            category="geompack/remeshing",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Combo.Input("operation", options=[
                     "decimation",
                     "subdivision_loop",
                     "subdivision_midpoint",
                     "laplacian_smoothing"
-                ], {"default": "decimation"}),
-            },
-            "optional": {
-                # Decimation
-                "target_face_count": ("INT", {
-                    "default": 5000,
-                    "min": 4,
-                    "max": 10000000,
-                    "step": 100
-                }),
-                "decimation_method": (["trimesh", "pymeshlab"], {"default": "trimesh"}),
-                # Subdivision
-                "subdivision_iterations": ("INT", {
-                    "default": 1,
-                    "min": 1,
-                    "max": 5,
-                    "step": 1
-                }),
-                # Smoothing
-                "smoothing_iterations": ("INT", {
-                    "default": 5,
-                    "min": 1,
-                    "max": 100,
-                    "step": 1
-                }),
-                "lambda_factor": ("FLOAT", {
-                    "default": 0.5,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.1
-                }),
-            }
-        }
+                ], default="decimation"),
+                io.Int.Input("target_face_count", default=5000, min=4, max=10000000, step=100, optional=True),
+                io.Combo.Input("decimation_method", options=["trimesh", "pymeshlab"], default="trimesh", optional=True),
+                io.Int.Input("subdivision_iterations", default=1, min=1, max=5, step=1, optional=True),
+                io.Int.Input("smoothing_iterations", default=5, min=1, max=100, step=1, optional=True),
+                io.Float.Input("lambda_factor", default=0.5, min=0.0, max=1.0, step=0.1, optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="refined_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("refined_mesh", "info")
-    OUTPUT_NODE = True
-    FUNCTION = "refine"
-    CATEGORY = "geompack/remeshing"
-
-    def refine(self, trimesh, operation, target_face_count=5000, decimation_method="trimesh",
+    @classmethod
+    def execute(cls, trimesh, operation, target_face_count=5000, decimation_method="trimesh",
                subdivision_iterations=1, smoothing_iterations=5, lambda_factor=0.5):
         """
         Apply mesh refinement based on selected operation.
@@ -87,32 +68,30 @@ class RefineMeshNode:
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        print(f"[RefineMesh] Input: {initial_vertices} vertices, {initial_faces} faces")
-        print(f"[RefineMesh] Operation: {operation}")
+        log.info("Input: %d vertices, %d faces", initial_vertices, initial_faces)
+        log.info("Operation: %s", operation)
 
         if operation == "decimation":
-            refined_mesh, info = self._decimate(trimesh, target_face_count, decimation_method)
+            refined_mesh, info = cls._decimate(trimesh, target_face_count, decimation_method)
         elif operation == "subdivision_loop":
-            refined_mesh, info = self._subdivide(trimesh, subdivision_iterations, "loop")
+            refined_mesh, info = cls._subdivide(trimesh, subdivision_iterations, "loop")
         elif operation == "subdivision_midpoint":
-            refined_mesh, info = self._subdivide(trimesh, subdivision_iterations, "midpoint")
+            refined_mesh, info = cls._subdivide(trimesh, subdivision_iterations, "midpoint")
         elif operation == "laplacian_smoothing":
-            refined_mesh, info = self._smooth(trimesh, smoothing_iterations, lambda_factor)
+            refined_mesh, info = cls._smooth(trimesh, smoothing_iterations, lambda_factor)
         else:
             raise ValueError(f"Unknown operation: {operation}")
 
         vertex_change = len(refined_mesh.vertices) - initial_vertices
         face_change = len(refined_mesh.faces) - initial_faces
 
-        print(f"[RefineMesh] Output: {len(refined_mesh.vertices)} vertices ({vertex_change:+d}), "
-              f"{len(refined_mesh.faces)} faces ({face_change:+d})")
+        log.info("Output: %d vertices (%+d), %d faces (%+d)",
+                 len(refined_mesh.vertices), vertex_change, len(refined_mesh.faces), face_change)
 
-        return {
-            "result": (refined_mesh, info),
-            "ui": {"text": [info]}
-        }
+        return io.NodeOutput(refined_mesh, info, ui={"text": [info]})
 
-    def _decimate(self, trimesh, target_face_count, method):
+    @staticmethod
+    def _decimate(trimesh, target_face_count, method):
         """Decimate mesh to target face count."""
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
@@ -176,7 +155,8 @@ Reduction: {reduction_pct:.1f}%
 """
         return decimated, info
 
-    def _subdivide(self, trimesh, iterations, method):
+    @staticmethod
+    def _subdivide(trimesh, iterations, method):
         """Subdivide mesh to increase resolution."""
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
@@ -191,8 +171,8 @@ Reduction: {reduction_pct:.1f}%
             else:
                 raise ValueError(f"Unknown subdivision method: {method}")
 
-            print(f"[RefineMesh] Subdivision iteration {i+1}/{iterations}: "
-                  f"{len(subdivided.vertices)} vertices, {len(subdivided.faces)} faces")
+            log.info("Subdivision iteration %d/%d: %d vertices, %d faces",
+                     i+1, iterations, len(subdivided.vertices), len(subdivided.faces))
 
         # Preserve metadata
         subdivided.metadata = trimesh.metadata.copy()
@@ -221,7 +201,8 @@ Multiplier: {len(subdivided.faces) / initial_faces:.2f}x
 """
         return subdivided, info
 
-    def _smooth(self, trimesh, iterations, lambda_factor):
+    @staticmethod
+    def _smooth(trimesh, iterations, lambda_factor):
         """Apply Laplacian smoothing."""
         smoothed = trimesh.copy()
         smoothed = trimesh_module.smoothing.filter_laplacian(
@@ -249,7 +230,6 @@ Faces: {len(smoothed.faces):,}
 Smoothing reduces surface roughness and noise.
 """
         return smoothed, info
-
 
 NODE_CLASS_MAPPINGS = {
     "RefineMesh": RefineMeshNode,

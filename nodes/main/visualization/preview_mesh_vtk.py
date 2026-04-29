@@ -11,6 +11,8 @@ Supports scalar field visualization: automatically detects vertex and face
 attributes and exports to VTP format to preserve field data for visualization.
 """
 
+import logging
+
 import trimesh as trimesh_module
 import os
 import tempfile
@@ -19,14 +21,17 @@ import uuid
 from .mesh_helpers import is_point_cloud, get_face_count, get_geometry_type
 from ._vtp_export import export_mesh_with_scalars_vtp
 
+log = logging.getLogger("geometrypack")
+
 try:
     import folder_paths
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
 except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
+from comfy_api.latest import io
 
 
-class PreviewMeshVTKNode:
+class PreviewMeshVTKNode(io.ComfyNode):
     """
     Preview mesh with VTK.js scientific visualization viewer.
 
@@ -34,24 +39,23 @@ class PreviewMeshVTKNode:
     Better for scientific visualization, mesh analysis, and large datasets.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mode": (["fields", "texture", "texture (PBR)"], {"default": "fields"}),
-            },
-            "optional": {
-                "trimesh": ("TRIMESH",),
-                "voxelgrid": ("VOXELGRID",),
-            },
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPreviewMeshVTK",
+            display_name="Preview Mesh",
+            category="geompack/visualization",
+            is_output_node=True,
+            inputs=[
+                io.Combo.Input("mode", options=["fields", "texture", "texture (PBR)"], default="fields"),
+                io.Custom("TRIMESH").Input("trimesh", optional=True),
+                io.Custom("VOXELGRID").Input("voxelgrid", optional=True),
+            ],
+        )
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "preview_mesh_vtk"
-    CATEGORY = "geompack/visualization"
-
-    def preview_mesh_vtk(self, mode="fields", trimesh=None, voxelgrid=None):
+    @classmethod
+    def execute(cls, mode="fields", trimesh=None, voxelgrid=None):
         """
         Export mesh and prepare for VTK.js preview.
 
@@ -77,28 +81,28 @@ class PreviewMeshVTKNode:
         if hasattr(mesh_input, 'as_boxes'):  # It's a trimesh.VoxelGrid
             voxel_shape = mesh_input.matrix.shape
             trimesh = mesh_input.as_boxes()
-            print(f"[PreviewMeshVTK] Converted voxel grid {voxel_shape} to box mesh: {len(trimesh.vertices)} vertices")
+            log.info("Converted voxel grid %s to box mesh: %d vertices", voxel_shape, len(trimesh.vertices))
         else:
             trimesh = mesh_input
 
-        print(f"[PreviewMeshVTK] Preparing preview: {get_geometry_type(trimesh)} - {len(trimesh.vertices)} vertices, {get_face_count(trimesh)} faces")
+        log.info("Preparing preview: %s - %d vertices, %d faces", get_geometry_type(trimesh), len(trimesh.vertices), get_face_count(trimesh))
 
         # Check for scalar fields (vertex/face attributes)
         has_vertex_attrs = hasattr(trimesh, 'vertex_attributes') and len(trimesh.vertex_attributes) > 0
         has_face_attrs = hasattr(trimesh, 'face_attributes') and len(trimesh.face_attributes) > 0
         has_fields = has_vertex_attrs or has_face_attrs
 
-        print(f"[PreviewMeshVTK] DEBUG - hasattr vertex_attributes: {hasattr(trimesh, 'vertex_attributes')}")
-        print(f"[PreviewMeshVTK] DEBUG - hasattr face_attributes: {hasattr(trimesh, 'face_attributes')}")
+        log.debug("hasattr vertex_attributes: %s", hasattr(trimesh, 'vertex_attributes'))
+        log.debug("hasattr face_attributes: %s", hasattr(trimesh, 'face_attributes'))
         if hasattr(trimesh, 'vertex_attributes'):
-            print(f"[PreviewMeshVTK] DEBUG - vertex_attributes: {trimesh.vertex_attributes}")
-            print(f"[PreviewMeshVTK] DEBUG - len(vertex_attributes): {len(trimesh.vertex_attributes)}")
+            log.debug("vertex_attributes: %s", trimesh.vertex_attributes)
+            log.debug("len(vertex_attributes): %d", len(trimesh.vertex_attributes))
         if hasattr(trimesh, 'face_attributes'):
-            print(f"[PreviewMeshVTK] DEBUG - face_attributes: {trimesh.face_attributes}")
-            print(f"[PreviewMeshVTK] DEBUG - len(face_attributes): {len(trimesh.face_attributes)}")
-        print(f"[PreviewMeshVTK] DEBUG - has_vertex_attrs: {has_vertex_attrs}")
-        print(f"[PreviewMeshVTK] DEBUG - has_face_attrs: {has_face_attrs}")
-        print(f"[PreviewMeshVTK] DEBUG - has_fields: {has_fields}")
+            log.debug("face_attributes: %s", trimesh.face_attributes)
+            log.debug("len(face_attributes): %d", len(trimesh.face_attributes))
+        log.debug("has_vertex_attrs: %s", has_vertex_attrs)
+        log.debug("has_face_attrs: %s", has_face_attrs)
+        log.debug("has_fields: %s", has_fields)
 
         # Check for visual data (textures/vertex colors)
         has_visual = hasattr(trimesh, 'visual') and trimesh.visual is not None
@@ -107,8 +111,8 @@ class PreviewMeshVTKNode:
         has_vertex_colors = visual_kind == 'vertex' if has_visual else False
         has_material = has_texture
 
-        print(f"[PreviewMeshVTK] Mode: {mode}")
-        print(f"[PreviewMeshVTK] Visual data - has_visual: {has_visual}, kind: {visual_kind}, texture: {has_texture}, vertex_colors: {has_vertex_colors}")
+        log.info("Mode: %s", mode)
+        log.info("Visual data - has_visual: %s, kind: %s, texture: %s, vertex_colors: %s", has_visual, visual_kind, has_texture, has_vertex_colors)
 
         # Check if this is a point cloud
         is_pc = is_point_cloud(trimesh)
@@ -118,23 +122,16 @@ class PreviewMeshVTKNode:
             # PBR mode: Export GLB and use Three.js PBR viewer
             filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.glb"
             viewer_type = "pbr"
-            print(f"[PreviewMeshVTK] Using PBR mode - GLB export with Three.js PBR viewer")
+            log.info("Using PBR mode - GLB export with Three.js PBR viewer")
         elif mode == "texture":
             # Texture mode: Export GLB to preserve textures/materials/UVs
             filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.glb"
             viewer_type = "texture"
-            print(f"[PreviewMeshVTK] Using texture mode - GLB export")
+            log.info("Using texture mode - GLB export")
         else:
-            # Fields mode: Export VTP/STL for scalar field visualization
-            if has_fields or is_pc:
-                # Export to VTP for: scalar fields OR point clouds (STL doesn't support point clouds)
-                filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.vtp"
-                print(f"[PreviewMeshVTK] Using VTP format (fields={has_fields}, point_cloud={is_pc})")
-            else:
-                # Export to STL (compact format for simple surface meshes)
-                filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.stl"
+            filename = f"preview_vtk_{uuid.uuid4().hex[:8]}.vtp"
             viewer_type = "fields"
-            print(f"[PreviewMeshVTK] Using fields mode - VTP/STL export")
+            log.info("Using fields mode - VTP export")
 
         # Use ComfyUI's output directory
         if COMFYUI_OUTPUT_FOLDER:
@@ -148,35 +145,30 @@ class PreviewMeshVTKNode:
             if hasattr(trimesh, 'visual') and hasattr(trimesh.visual, 'material'):
                 if hasattr(trimesh.visual.material, 'alphaMode'):
                     trimesh.visual.material.alphaMode = 'OPAQUE'
-                    print(f"[PreviewMeshVTK] Set alphaMode to OPAQUE for texture mode")
+                    log.info("Set alphaMode to OPAQUE for texture mode")
         elif mode == "texture (PBR)":
             # PBR mode: use BLEND for transparency support
             if hasattr(trimesh, 'visual') and hasattr(trimesh.visual, 'material'):
                 if hasattr(trimesh.visual.material, 'alphaMode'):
                     trimesh.visual.material.alphaMode = 'BLEND'
-                    print(f"[PreviewMeshVTK] Set alphaMode to BLEND for PBR mode")
+                    log.info("Set alphaMode to BLEND for PBR mode")
 
         # Export mesh
         try:
             if mode in ("texture", "texture (PBR)"):
                 # Export GLB for texture/PBR rendering
                 trimesh.export(filepath, file_type='glb', include_normals=True)
-                print(f"[PreviewMeshVTK] Exported GLB to: {filepath}")
-            elif has_fields or is_pc:
-                # Use VTP exporter for fields or point clouds
-                export_mesh_with_scalars_vtp(trimesh, filepath)
-                print(f"[PreviewMeshVTK] Exported VTP to: {filepath}")
+                log.info("Exported GLB to: %s", filepath)
             else:
-                # Use STL for simple surface meshes
-                trimesh.export(filepath, file_type='stl')
-                print(f"[PreviewMeshVTK] Exported STL to: {filepath}")
+                export_mesh_with_scalars_vtp(trimesh, filepath)
+                log.info("Exported VTP to: %s", filepath)
         except Exception as e:
-            print(f"[PreviewMeshVTK] Export failed: {e}")
+            log.error("Export failed: %s", e)
             # Fallback to OBJ
             filename = filename.replace('.vtp', '.obj').replace('.stl', '.obj')
             filepath = filepath.replace('.vtp', '.obj').replace('.stl', '.obj')
             trimesh.export(filepath, file_type='obj')
-            print(f"[PreviewMeshVTK] Exported to OBJ: {filepath}")
+            log.info("Exported to OBJ: %s", filepath)
 
         # Calculate bounding box info for camera setup
         bounds = trimesh.bounds
@@ -208,16 +200,16 @@ class PreviewMeshVTKNode:
                     volume = float(trimesh.volume)
                 area = float(trimesh.area)
             except Exception as e:
-                print(f"[PreviewMeshVTK] Could not calculate volume/area: {e}")
+                log.info("Could not calculate volume/area: %s", e)
 
         # Get field names (vertex/face data arrays) - for field visualization UI
         field_names = []
         if has_vertex_attrs:
             field_names.extend(list(trimesh.vertex_attributes.keys()))
-            print(f"[PreviewMeshVTK] Vertex attributes: {list(trimesh.vertex_attributes.keys())}")
+            log.info("Vertex attributes: %s", list(trimesh.vertex_attributes.keys()))
         if has_face_attrs:
             field_names.extend([f"face.{k}" for k in trimesh.face_attributes.keys()])
-            print(f"[PreviewMeshVTK] Face attributes: {list(trimesh.face_attributes.keys())}")
+            log.info("Face attributes: %s", list(trimesh.face_attributes.keys()))
 
         # Return metadata for frontend widget
         ui_data = {
@@ -253,15 +245,15 @@ class PreviewMeshVTKNode:
             ui_data["area"] = [area]
 
         if viewer_type == "pbr":
-            print(f"[PreviewMeshVTK] PBR mode info: watertight={is_watertight}, volume={volume}, area={area}, texture={has_texture}, vertex_colors={has_vertex_colors}")
+            log.info("PBR mode info: watertight=%s, volume=%s, area=%s, texture=%s, vertex_colors=%s", is_watertight, volume, area, has_texture, has_vertex_colors)
         elif viewer_type == "texture":
-            print(f"[PreviewMeshVTK] Texture mode info: watertight={is_watertight}, volume={volume}, area={area}, texture={has_texture}, vertex_colors={has_vertex_colors}")
+            log.info("Texture mode info: watertight=%s, volume=%s, area=%s, texture=%s, vertex_colors=%s", is_watertight, volume, area, has_texture, has_vertex_colors)
         elif field_names:
-            print(f"[PreviewMeshVTK] Fields mode info: watertight={is_watertight}, volume={volume}, area={area}, fields={field_names}")
+            log.info("Fields mode info: watertight=%s, volume=%s, area=%s, fields=%s", is_watertight, volume, area, field_names)
         else:
-            print(f"[PreviewMeshVTK] Fields mode info: watertight={is_watertight}, volume={volume}, area={area}, no fields")
+            log.info("Fields mode info: watertight=%s, volume=%s, area=%s, no fields", is_watertight, volume, area)
 
-        return {"ui": ui_data}
+        return io.NodeOutput(ui=ui_data)
 
 
 NODE_CLASS_MAPPINGS = {

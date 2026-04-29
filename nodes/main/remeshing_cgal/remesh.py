@@ -6,8 +6,12 @@ Remesh CGAL Node - CGAL isotropic remeshing
 Requires CGAL Python bindings.
 """
 
+import logging
 import numpy as np
 import trimesh as trimesh_module
+from comfy_api.latest import io
+
+log = logging.getLogger("geometrypack")
 
 
 def _cgal_isotropic_remesh(vertices, faces, target_edge_length, iterations, protect_boundaries):
@@ -80,7 +84,7 @@ def _cgal_isotropic_remesh(vertices, faces, target_edge_length, iterations, prot
     return {'vertices': new_vertices, 'faces': new_faces}
 
 
-class RemeshCGALNode:
+class RemeshCGALNode(io.ComfyNode):
     """
     Remesh CGAL - High-quality isotropic remeshing using CGAL.
 
@@ -88,54 +92,40 @@ class RemeshCGALNode:
     Produces high-quality isotropic triangulations with good angle properties.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "trimesh": ("TRIMESH",),
-            },
-            "optional": {
-                "target_edge_length": ("FLOAT", {
-                    "default": 1.00,
-                    "min": 0.001,
-                    "max": 10.0,
-                    "step": 0.01,
-                    "display": "number",
-                    "tooltip": "Target edge length for output triangles. Value is relative to mesh scale.",
-                }),
-                "iterations": ("INT", {
-                    "default": 3,
-                    "min": 1,
-                    "max": 20,
-                    "step": 1,
-                    "tooltip": "Number of remeshing passes. More iterations = smoother result, slower processing.",
-                }),
-                "protect_boundaries": (["true", "false"], {
-                    "default": "true",
-                    "tooltip": "Lock boundary/open edges in place during remeshing. Prevents modification of mesh borders and holes.",
-                }),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackRemesh_CGAL",
+            display_name="Remesh CGAL (backend)",
+            category="geompack/remeshing",
+            is_dev_only=True,
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("trimesh"),
+                io.Float.Input("target_edge_length", default=1.00, min=0.001, max=10.0, step=0.01, display_mode="number", tooltip="Target edge length for output triangles. Value is relative to mesh scale.", optional=True),
+                io.Int.Input("iterations", default=3, min=1, max=20, step=1, tooltip="Number of remeshing passes. More iterations = smoother result, slower processing.", optional=True),
+                io.Combo.Input("protect_boundaries", options=["true", "false"], default="true", tooltip="Lock boundary/open edges in place during remeshing. Prevents modification of mesh borders and holes.", optional=True),
+            ],
+            outputs=[
+                io.Custom("TRIMESH").Output(display_name="remeshed_mesh"),
+                io.String.Output(display_name="info"),
+            ],
+        )
 
-    RETURN_TYPES = ("TRIMESH", "STRING")
-    RETURN_NAMES = ("remeshed_mesh", "info")
-    FUNCTION = "remesh"
-    CATEGORY = "geompack/remeshing"
-    OUTPUT_NODE = True
-
-    def remesh(self, trimesh, target_edge_length=1.0, iterations=3, protect_boundaries="true"):
+    @classmethod
+    def execute(cls, trimesh, target_edge_length=1.0, iterations=3, protect_boundaries="true"):
         """Apply CGAL isotropic remeshing."""
         initial_vertices = len(trimesh.vertices)
         initial_faces = len(trimesh.faces)
 
-        print(f"\n{'='*60}")
-        print(f"[Remesh CGAL] Backend: cgal_isotropic")
-        print(f"[Remesh CGAL] Input: {initial_vertices:,} vertices, {initial_faces:,} faces")
-        print(f"[Remesh CGAL] Parameters: target_edge_length={target_edge_length}, iterations={iterations}, protect_boundaries={protect_boundaries}")
-        print(f"{'='*60}\n")
+        log.info("Backend: cgal_isotropic")
+        log.info("Input: %s vertices, %s faces", f"{initial_vertices:,}", f"{initial_faces:,}")
+        log.info("Parameters: target_edge_length=%s, iterations=%s, protect_boundaries=%s",
+                 target_edge_length, iterations, protect_boundaries)
 
         protect = (protect_boundaries == "true")
-        print(f"[Remesh CGAL] Running CGAL isotropic remesh (target_edge_length={target_edge_length})...")
+        log.info("Running CGAL isotropic remesh (target_edge_length=%s)...", target_edge_length)
 
         result = _cgal_isotropic_remesh(
             vertices=np.asarray(trimesh.vertices, dtype=np.float64),
@@ -157,8 +147,8 @@ class RemeshCGALNode:
         vertex_change = len(remeshed_mesh.vertices) - initial_vertices
         face_change = len(remeshed_mesh.faces) - initial_faces
 
-        print(f"[Remesh CGAL] Output: {len(remeshed_mesh.vertices)} vertices ({vertex_change:+d}), "
-              f"{len(remeshed_mesh.faces)} faces ({face_change:+d})")
+        log.info("Output: %d vertices (%+d), %d faces (%+d)",
+                 len(remeshed_mesh.vertices), vertex_change, len(remeshed_mesh.faces), face_change)
 
         info = f"""Remesh Results (CGAL Isotropic):
 
@@ -174,13 +164,13 @@ After:
   Vertices: {len(remeshed_mesh.vertices):,}
   Faces: {len(remeshed_mesh.faces):,}
 """
-        return {"ui": {"text": [info]}, "result": (remeshed_mesh, info)}
+        return io.NodeOutput(remeshed_mesh, info, ui={"text": [info]})
 
 
 NODE_CLASS_MAPPINGS = {
-    "GeomPackRemeshCGAL": RemeshCGALNode,
+    "GeomPackRemesh_CGAL": RemeshCGALNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "GeomPackRemeshCGAL": "Remesh CGAL",
+    "GeomPackRemesh_CGAL": "Remesh CGAL (backend)",
 }

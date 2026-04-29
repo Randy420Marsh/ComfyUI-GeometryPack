@@ -13,6 +13,8 @@ Grid layouts:
 Supports scalar field visualization with synchronized cameras across viewports.
 """
 
+import logging
+
 import trimesh as trimesh_module
 import numpy as np
 import os
@@ -23,11 +25,14 @@ from .mesh_helpers import is_point_cloud, get_face_count, get_geometry_type
 
 from ._vtp_export import export_mesh_with_scalars_vtp
 
+log = logging.getLogger("geometrypack")
+
 try:
     import folder_paths
     COMFYUI_OUTPUT_FOLDER = folder_paths.get_output_directory()
 except (ImportError, AttributeError):
     COMFYUI_OUTPUT_FOLDER = None
+from comfy_api.latest import io
 
 
 def extract_field_names(mesh):
@@ -63,7 +68,7 @@ def get_texture_info(mesh):
     }
 
 
-class PreviewMeshMultiNode:
+class PreviewMeshMultiNode(io.ComfyNode):
     """
     Multi mesh preview with VTK.js - displays up to 4 meshes in a grid layout.
 
@@ -76,26 +81,25 @@ class PreviewMeshMultiNode:
     Supports scalar field visualization with synchronized cameras.
     """
 
+
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mesh_1": ("TRIMESH",),
-            },
-            "optional": {
-                "mesh_2": ("TRIMESH",),
-                "mesh_3": ("TRIMESH",),
-                "mesh_4": ("TRIMESH",),
-                "mode": (["fields", "texture"], {"default": "fields"}),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema(
+            node_id="GeomPackPreviewMeshMulti",
+            display_name="Preview Mesh Multi",
+            category="geompack/visualization",
+            is_output_node=True,
+            inputs=[
+                io.Custom("TRIMESH").Input("mesh_1"),
+                io.Custom("TRIMESH").Input("mesh_2", optional=True),
+                io.Custom("TRIMESH").Input("mesh_3", optional=True),
+                io.Custom("TRIMESH").Input("mesh_4", optional=True),
+                io.Combo.Input("mode", options=["fields", "texture"], default="fields", optional=True),
+            ],
+        )
 
-    RETURN_TYPES = ()
-    OUTPUT_NODE = True
-    FUNCTION = "preview_multi"
-    CATEGORY = "geompack/visualization"
-
-    def preview_multi(self, mesh_1, mesh_2=None, mesh_3=None, mesh_4=None, mode="fields"):
+    @classmethod
+    def execute(cls, mesh_1, mesh_2=None, mesh_3=None, mesh_4=None, mode="fields"):
         """
         Preview multiple meshes in a grid layout.
 
@@ -117,7 +121,7 @@ class PreviewMeshMultiNode:
             meshes.append(mesh_4)
 
         num_meshes = len(meshes)
-        print(f"[PreviewMeshMulti] Mode: {mode}, Meshes: {num_meshes}")
+        log.info("Mode: %s, Meshes: %d", mode, num_meshes)
 
         # Generate unique ID for this preview
         preview_id = uuid.uuid4().hex[:8]
@@ -133,7 +137,7 @@ class PreviewMeshMultiNode:
         texture_info_list = []
 
         for i, mesh in enumerate(meshes):
-            print(f"[PreviewMeshMulti] Mesh {i+1}: {get_geometry_type(mesh)} - {len(mesh.vertices)} vertices, {get_face_count(mesh)} faces")
+            log.info("Mesh %d: %s - %d vertices, %d faces", i + 1, get_geometry_type(mesh), len(mesh.vertices), get_face_count(mesh))
 
             # Check for field data and texture info
             mesh_has_fields = has_fields(mesh)
@@ -143,10 +147,8 @@ class PreviewMeshMultiNode:
             # Export mesh
             if mode == "texture":
                 filename = f"preview_multi_{i+1}_{preview_id}.glb"
-            elif mesh_has_fields or mesh_is_pc:
-                filename = f"preview_multi_{i+1}_{preview_id}.vtp"
             else:
-                filename = f"preview_multi_{i+1}_{preview_id}.stl"
+                filename = f"preview_multi_{i+1}_{preview_id}.vtp"
 
             if COMFYUI_OUTPUT_FOLDER:
                 filepath = os.path.join(COMFYUI_OUTPUT_FOLDER, filename)
@@ -156,15 +158,12 @@ class PreviewMeshMultiNode:
             try:
                 if mode == "texture":
                     mesh.export(filepath, file_type='glb', include_normals=True)
-                    print(f"[PreviewMeshMulti] Exported GLB: {filepath}")
-                elif mesh_has_fields or mesh_is_pc:
-                    export_mesh_with_scalars_vtp(mesh, filepath)
-                    print(f"[PreviewMeshMulti] Exported VTP: {filepath}")
+                    log.info("Exported GLB: %s", filepath)
                 else:
-                    mesh.export(filepath, file_type='stl')
-                    print(f"[PreviewMeshMulti] Exported STL: {filepath}")
+                    export_mesh_with_scalars_vtp(mesh, filepath)
+                    log.info("Exported VTP: %s", filepath)
             except Exception as e:
-                print(f"[PreviewMeshMulti] Export failed: {e}, trying OBJ fallback")
+                log.error("Export failed: %s, trying OBJ fallback", e)
                 filename = f"preview_multi_{i+1}_{preview_id}.obj"
                 filepath = os.path.join(COMFYUI_OUTPUT_FOLDER or tempfile.gettempdir(), filename)
                 mesh.export(filepath, file_type='obj')
@@ -213,8 +212,8 @@ class PreviewMeshMultiNode:
         else:
             ui_data["field_names_list"] = [field_names_list]
 
-        print(f"[PreviewMeshMulti] Grid: {grid_cols}x{grid_rows}, Preview ready")
-        return {"ui": ui_data}
+        log.info("Grid: %dx%d, Preview ready", grid_cols, grid_rows)
+        return io.NodeOutput(ui=ui_data)
 
 
 NODE_CLASS_MAPPINGS = {
