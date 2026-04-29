@@ -10,5 +10,4 @@ numpy = ">=1.23,<2"   # bpy 4.2 compiled against numpy 1.x
 [pypi-dependencies]
 bpy = ">=4.2"
 trimesh = { version = "*", extras = ["easy"] }
-torch = "*"
 tqdm = "*"
