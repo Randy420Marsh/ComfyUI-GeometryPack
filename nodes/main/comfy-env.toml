@@ -10,6 +10,7 @@ pyopengl = ">=3.1.10"
 rtree = "*"
 tqdm = ">=4.60.0"
 trimesh = "*"
+pymeshlab = "==2025.7"
 
 [pypi-dependencies]
 requests = ">=2.25.0"
@@ -28,21 +29,18 @@ pymesh2 = { version = ">=0.3", index = "https://pozzettiandrea.github.io/PyMesh/
 [target.win-64.pypi-dependencies]
 embreex = "*"
 msvc-runtime = "*"
-pymeshlab = "==2025.7"
 
 [target.linux-64.dependencies]
 mesalib = "*"        # replaces apt: libgl1-mesa-glx, libgl1
 libglu = "*"         # replaces apt: libglu1-mesa
 libglvnd = "*"       # replaces apt: libopengl0
-pymeshlab = "*"
+mmgpy = ">=0.5.2"
 
 [target.linux-64.pypi-dependencies]
 embreex = "*"
-mmgpy = ">=0.5.2"
 
-[target.osx-arm64.pypi-dependencies]
+[target.osx-arm64.dependencies]
 mmgpy = ">=0.5.2"
-pymeshlab = "==2025.7"
 
 [env_vars]
 KMP_DUPLICATE_LIB_OK = "TRUE"
