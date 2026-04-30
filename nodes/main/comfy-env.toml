@@ -1,7 +1,7 @@
 [dependencies]
 cgal = "*"
 igl = "*"
-scipy = "*"
+scipy = ">=1.11,<1.17"
 numpy = "*"
 pillow = ">=9.0.0"
 matplotlib = ">=3.5.0"
@@ -41,7 +41,6 @@ embreex = "*"
 
 [target.osx-arm64.pypi-dependencies]
 mmgpy = ">=0.5.2"
-scipy = ">=1.11,<1.17"
 
 [env_vars]
 KMP_DUPLICATE_LIB_OK = "TRUE"
