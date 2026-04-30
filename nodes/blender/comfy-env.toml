@@ -10,4 +10,4 @@ tqdm = "*"
 
 [pypi-dependencies]
 bpy = ">=4.2"
-trimesh = { version = "*", extras = ["easy"] }
+trimesh = "*"
