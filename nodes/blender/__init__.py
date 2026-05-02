@@ -1,3 +1,7 @@
+try:
+    import bpy
+except ImportError:
+    pass
 # Import submodules
 from . import blender_io
 from . import boolean
