@@ -1,5 +1,21 @@
 # ComfyUI-GeometryPack
 
+## Installation
+
+Three options, in order of speed → reliability:
+
+1. **ComfyUI Manager (nightly)** — search for `ComfyUI-GeometryPack` in the Manager and click Install. Fastest, but the Manager's nightly index can lag.
+2. **Manager via Git URL** — in ComfyUI Manager: "Install via Git URL" with `https://github.com/PozzettiAndrea/ComfyUI-GeometryPack.git`.
+3. **Manual (most reliable)**:
+   ```bash
+   cd ComfyUI/custom_nodes
+   git clone https://github.com/PozzettiAndrea/ComfyUI-GeometryPack.git
+   cd ComfyUI-GeometryPack
+   pip install -r requirements.txt --upgrade
+   python install.py
+   ```
+
+
 Professional geometry processing nodes for ComfyUI. Load, analyze, remesh, unwrap, and visualize 3D meshes directly in your workflows.
 
 <div align="center">
@@ -23,10 +39,6 @@ https://github.com/user-attachments/assets/607e6b29-a8d4-4346-873a-5bd6b140bdba
 
 
 https://github.com/user-attachments/assets/7718a5d7-cd5b-47d3-874c-29ada4320694
-
-## Installation
-
-Please always install from ComfyUI Manager.
 
 ## Community
 
