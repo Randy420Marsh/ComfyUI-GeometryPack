@@ -15,6 +15,9 @@ Three options, in order of speed → reliability:
    python install.py
    ```
 
+---
+
+
 
 Professional geometry processing nodes for ComfyUI. Load, analyze, remesh, unwrap, and visualize 3D meshes directly in your workflows.
 
@@ -26,7 +29,6 @@ Professional geometry processing nodes for ComfyUI. Load, analyze, remesh, unwra
 <b><a href="https://pozzettiandrea.github.io/ComfyUI-GeometryPack/">View Live Test Gallery →</a></b>
 </div>
 
----
 
 
 
