@@ -83,10 +83,6 @@ Each of these nodes presents a single UI with a backend selector dropdown. Under
 ### UV Unwrap
 ![UV Unwrap](docs/uv_unwrap_all_executed.png)
 
-## Credits
-
-Built on [trimesh](https://trimesh.org/), [libigl](https://libigl.github.io/), [PyMeshLab](https://pymeshlab.readthedocs.io/), and [CGAL](https://www.cgal.org/).
-
 ## License
 
 **GNU General Public License v3.0 or later (GPL-3.0-or-later)**
