@@ -26,6 +26,9 @@ Professional geometry processing nodes for ComfyUI. Load, analyze, remesh, unwra
 <b><a href="https://pozzettiandrea.github.io/ComfyUI-GeometryPack/">View Live Test Gallery →</a></b>
 </div>
 
+---
+
+
 
 ## Some previews
 
