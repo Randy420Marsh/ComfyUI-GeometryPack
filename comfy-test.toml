@@ -5,13 +5,11 @@ publish = true
 [test.workflows]
 timeout = 300
 cpu = [
-    "!remeshing_gpu",
     "!fill_holes_all",
     "!remeshing_all",
     "!uv_unwrap_all",
 ]
 gpu = [
-    "remeshing_gpu",
     "fill_holes_all",
     "remeshing_all",
     "uv_unwrap_all",
@@ -25,3 +23,6 @@ windows_portable = true
 linux_gpu = true
 windows_gpu = true
 windows_portable_gpu = true
+macos_desktop = true
+windows_desktop = true
+windows_desktop_gpu = true

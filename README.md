@@ -1,10 +1,13 @@
+> [!WARNING]
+> Warning, uses experimental package `comfy-env` to attempt a one click isolated install. Will download and use pixi package manager.
+
 # ComfyUI-GeometryPack
 
 ## Installation
 
 Three options, in order of speed → reliability:
 
-1. **ComfyUI Manager (nightly, recommended)** — search for `ComfyUI-GeometryPack` in the Manager and click Install **from the nightly version**. Do **NOT** use any numbered version like `0.2.4` — they are outdated.
+1. **ComfyUI Manager (recommended)** — search for `GeometryPack` in the Manager and click Install from the highest version displayed. If that doesn't work, try nightly.
 2. **Manager via Git URL** — in ComfyUI Manager: "Install via Git URL" with `https://github.com/PozzettiAndrea/ComfyUI-GeometryPack.git`.
 3. **Manual (most reliable)**:
    ```bash
